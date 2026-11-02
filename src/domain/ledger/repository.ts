@@ -2,6 +2,14 @@ export type AccountType = "ASSET" | "LIABILITY" | "EQUITY" | "INCOME" | "EXPENSE
 export type JournalStatus = "DRAFT" | "POSTED";
 export type JournalSide = "DEBIT" | "CREDIT";
 
+export interface CurrencyRecord {
+  code: string;
+  name: string;
+  minorUnit: number;
+  isActive: boolean;
+  createdAt: string;
+}
+
 export interface Account {
   id: string;
   name: string;
@@ -47,6 +55,8 @@ export interface CreateDraftEntry {
 
 /** Application-facing persistence port. It deliberately exposes no SQLite/Drizzle types. */
 export interface LedgerRepository {
+  listCurrencies(activeOnly?: boolean): Promise<CurrencyRecord[]>;
+  createCurrency(currency: CurrencyRecord): Promise<void>;
   createAccount(account: Account): Promise<void>;
   findAccountById(id: string): Promise<Account | null>;
   listAccounts(includeArchived?: boolean): Promise<Account[]>;

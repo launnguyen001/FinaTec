@@ -7,6 +7,7 @@ import {
 import type {
   Account,
   CreateDraftEntry,
+  CurrencyRecord,
   JournalEntry,
   JournalLine,
   LedgerRepository,
@@ -14,6 +15,7 @@ import type {
 import type { LedgerDatabase } from "./database";
 import {
   accounts,
+  currencies,
   journalEntries,
   journalLines,
   ledgerSettings,
@@ -21,6 +23,16 @@ import {
 
 export class SqliteLedgerRepository implements LedgerRepository {
   constructor(private readonly db: LedgerDatabase) {}
+
+  async listCurrencies(activeOnly = true): Promise<CurrencyRecord[]> {
+    const query = this.db.select().from(currencies).orderBy(asc(currencies.code));
+    if (activeOnly) return query.where(eq(currencies.isActive, true)).all();
+    return query.all();
+  }
+
+  async createCurrency(currency: CurrencyRecord): Promise<void> {
+    await this.db.insert(currencies).values(currency);
+  }
 
   async createAccount(account: Account): Promise<void> {
     await this.db.insert(accounts).values(account);
