@@ -92,6 +92,14 @@ CREATE INDEX journal_lines_account_idx ON journal_lines(account_id, currency_cod
 CREATE INDEX journal_lines_entry_idx ON journal_lines(entry_id);
 --> statement-breakpoint
 
+CREATE TRIGGER currencies_code_immutable
+BEFORE UPDATE OF code ON currencies
+WHEN OLD.code <> NEW.code
+BEGIN
+  SELECT RAISE(ABORT, 'currency codes are immutable');
+END;
+--> statement-breakpoint
+
 CREATE TRIGGER currencies_no_precision_change_when_referenced
 BEFORE UPDATE OF minor_unit ON currencies
 WHEN OLD.minor_unit <> NEW.minor_unit
@@ -103,6 +111,14 @@ WHEN OLD.minor_unit <> NEW.minor_unit
   )
 BEGIN
   SELECT RAISE(ABORT, 'currency precision is immutable after first use');
+END;
+--> statement-breakpoint
+
+CREATE TRIGGER accounts_currency_immutable
+BEFORE UPDATE OF currency_code ON accounts
+WHEN OLD.currency_code <> NEW.currency_code
+BEGIN
+  SELECT RAISE(ABORT, 'account currency is immutable');
 END;
 --> statement-breakpoint
 
