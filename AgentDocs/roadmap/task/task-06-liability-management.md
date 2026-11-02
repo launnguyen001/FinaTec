@@ -1,58 +1,63 @@
-# TASK-06 — Liability Management
+# TASK-06 — Quản lý khoản nợ
 
-- Phase: 4 — MVP 3
-- Priority: P1
-- Status: BLOCKED
-- Dependencies: TASK-02, TASK-03, TASK-05
+- Giai đoạn: 4 — MVP 3: Khoản nợ, định kỳ và ngân sách
+- Ưu tiên: P1
+- Trạng thái: BLOCKED
+- Phụ thuộc: TASK-02, TASK-03, TASK-05
 
-## Objective
-Manage user-declared liabilities, calculate repayment schedules, record payments and reconcile outstanding amounts with the ledger.
+## 1. Mục tiêu
+Quản lý các khoản vay và nghĩa vụ nợ do người dùng khai báo, tính lịch trả nợ, ghi nhận thanh toán và đối soát dư nợ với ledger.
 
-## Scope
-Create and configure liability records; calculate schedules for declining balance, equal principal, annuity and interest-only methods; track due and overdue periods; support full, partial and early repayment; split principal and interest; select the funding account.
+## 2. Phạm vi
+- Tạo và cấu hình khoản nợ.
+- Tính lịch theo dư nợ giảm dần, gốc đều, trả góp đều (annuity) và chỉ trả lãi.
+- Sinh lịch thanh toán, theo dõi kỳ đến hạn/quá hạn.
+- Thanh toán toàn bộ, một phần hoặc trước hạn.
+- Tách phần gốc/lãi và chọn tài khoản chi trả.
+- Đối soát dư nợ, lịch trả và journal entry.
 
-Out of scope: loan applications, lender integrations and automatic bank payments.
+Không bao gồm đăng ký vay, kết nối bên cho vay hoặc tự động chuyển tiền qua ngân hàng.
 
-## Context
-Read the specification's liability and repayment sections, ERD, sample postings and roadmap Phase 4. Align formulas with TASK-05 conventions.
+## 3. Bối cảnh
+Đọc phần khoản nợ, lịch trả nợ, ERD và ví dụ bút toán trong đặc tả; Giai đoạn 4 roadmap. Đồng bộ quy ước công thức với TASK-05.
 
-## Business rules
-- Outstanding amount must reconcile with posted principal movements.
-- Principal repayment reduces liability; interest is an expense.
-- A payment cannot be applied more than once.
-- Partial and early repayment must update future periods according to an approved policy.
-- Due dates, day-count and rounding must be explicit.
-- Schedule status must be consistent with payments and dates.
+## 4. Quy tắc nghiệp vụ
+- Dư nợ phải đối soát được với các biến động gốc đã ghi sổ.
+- Trả gốc làm giảm khoản nợ; trả lãi được ghi nhận là chi phí.
+- Một khoản thanh toán không được áp dụng hai lần.
+- Trả một phần/trước hạn phải cập nhật các kỳ tương lai theo chính sách đã duyệt.
+- Ngày đến hạn, day-count và làm tròn phải được xác định rõ.
+- Trạng thái lịch trả phải nhất quán với thanh toán và ngày hiện tại.
 
-## Proposed changes
-Liability model; pure repayment calculator; schedule generator; create/repay use cases; ledger mapping; liability and schedule screens; reconciliation query.
+## 5. Thay đổi dự kiến
+Domain model khoản nợ; bộ tính lịch trả; use case tạo/trả nợ; ánh xạ ledger; màn hình khoản nợ và lịch trả; truy vấn đối soát.
 
-## Data changes
-Implement approved liability and repayment schedule records with payment-to-journal linkage and duplicate protection.
+## 6. Thay đổi dữ liệu
+Triển khai schema khoản nợ và lịch trả đã duyệt, liên kết thanh toán với journal entry và cơ chế chống xử lý trùng.
 
-## Implementation plan
-1. Define inputs and repayment conventions.
-2. Implement and verify calculators for supported methods.
-3. Generate and persist schedules.
-4. Implement full, partial and early repayment.
-5. Map principal and interest to ledger.
-6. Recalculate future schedule under approved rules.
-7. Add overdue view and reconciliation.
+## 7. Kế hoạch triển khai
+1. Xác định đầu vào và quy ước trả nợ.
+2. Xây bộ tính thuần cho các phương pháp được hỗ trợ.
+3. Sinh và lưu lịch trả.
+4. Triển khai lệnh thanh toán toàn bộ/một phần/trước hạn.
+5. Ánh xạ phần gốc và lãi vào ledger.
+6. Tính lại lịch tương lai theo chính sách đã duyệt.
+7. Bổ sung màn hình quá hạn và đối soát.
 
-## Test plan
-Reference examples for each method; rate and date boundaries; rounding; partial/early repayment; overdue transitions; retry behavior; ledger reconciliation.
+## 8. Kế hoạch kiểm thử
+Ví dụ tham chiếu cho từng phương pháp; lãi suất và ranh giới ngày; làm tròn; trả một phần/trước hạn; chuyển trạng thái quá hạn; retry/idempotency; đối soát dư nợ với ledger.
 
-## Acceptance criteria
-- [ ] Formulas and reference tests exist for every supported method.
-- [ ] Schedule totals reconcile with assumptions.
-- [ ] Payments update cash and liability correctly.
-- [ ] Partial/early repayment follows approved policy.
-- [ ] Duplicate processing is prevented.
-- [ ] Outstanding balance reconciles with journal history.
+## 9. Tiêu chí nghiệm thu
+- [ ] Mỗi phương pháp có công thức và kiểm thử tham chiếu.
+- [ ] Tổng lịch trả khớp giả định gốc/lãi.
+- [ ] Thanh toán cập nhật tiền và dư nợ chính xác.
+- [ ] Trả một phần/trước hạn tuân theo chính sách đã duyệt.
+- [ ] Không xử lý một khoản thanh toán trùng.
+- [ ] Dư nợ đối soát được với lịch sử journal.
 
-## Progress log
-- Done: Task defined from Phase 4.
-- Doing: Blocked pending ledger and interest conventions.
-- Next: Approve repayment policies and implement calculator.
-- Issues: Early repayment and rate-change behavior need explicit rules.
-- Verification: Not run.
+## 10. Nhật ký tiến độ
+- Đã làm: Tạo task theo Giai đoạn 4.
+- Đang làm: Chờ quy ước ledger và tính lãi.
+- Tiếp theo: Duyệt chính sách trả nợ và triển khai bộ tính.
+- Vấn đề: Cách xử lý trả trước hạn và thay đổi lãi suất cần quy tắc rõ.
+- Kiểm chứng: Chưa chạy.
