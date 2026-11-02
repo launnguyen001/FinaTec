@@ -80,6 +80,13 @@ export class SqliteLedgerRepository implements LedgerRepository {
       if (!/^[1-9]\d*$/.test(line.fxRateNumerator) || !/^[1-9]\d*$/.test(line.fxRateDenominator)) {
         throw new Error("FX rate numerator and denominator must be positive integer strings");
       }
+      if (
+        line.currencyCode === input.entry.baseCurrencyCode &&
+        (line.fxRateNumerator !== line.fxRateDenominator ||
+          line.amountMinor !== line.baseAmountMinor)
+      ) {
+        throw new Error("A base-currency journal line must use FX 1/1 and preserve its minor-unit amount");
+      }
       return {
         ...line,
         amountMinor: toSqliteSafeInteger(line.amountMinor),
