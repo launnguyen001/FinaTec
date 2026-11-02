@@ -7,11 +7,13 @@ CREATE TABLE currencies (
   created_at TEXT NOT NULL,
   CHECK (length(code) = 3 AND code = upper(code))
 );
+--> statement-breakpoint
 
 INSERT INTO currencies (code, name, minor_unit, is_active, created_at)
 VALUES
   ('VND', 'Vietnamese Dong', 0, 1, '2026-11-02T00:00:00.000Z'),
   ('USD', 'US Dollar', 2, 1, '2026-11-02T00:00:00.000Z');
+--> statement-breakpoint
 
 CREATE TABLE ledger_settings (
   id INTEGER PRIMARY KEY NOT NULL CHECK (id = 1),
@@ -19,6 +21,7 @@ CREATE TABLE ledger_settings (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
+--> statement-breakpoint
 
 CREATE TABLE accounts (
   id TEXT PRIMARY KEY NOT NULL,
@@ -30,8 +33,11 @@ CREATE TABLE accounts (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
+--> statement-breakpoint
 CREATE UNIQUE INDEX accounts_id_currency_unique ON accounts(id, currency_code);
+--> statement-breakpoint
 CREATE INDEX accounts_type_archived_idx ON accounts(type, is_archived);
+--> statement-breakpoint
 
 CREATE TABLE journal_entries (
   id TEXT PRIMARY KEY NOT NULL,
@@ -46,12 +52,17 @@ CREATE TABLE journal_entries (
   CHECK ((status = 'DRAFT' AND posted_at IS NULL) OR (status = 'POSTED' AND posted_at IS NOT NULL)),
   CHECK (reversal_of_id IS NULL OR reversal_of_id <> id)
 );
+--> statement-breakpoint
 CREATE INDEX journal_entries_occurred_at_idx ON journal_entries(occurred_at);
+--> statement-breakpoint
 CREATE INDEX journal_entries_status_idx ON journal_entries(status);
+--> statement-breakpoint
 CREATE UNIQUE INDEX journal_entries_idempotency_unique
   ON journal_entries(idempotency_key) WHERE idempotency_key IS NOT NULL;
+--> statement-breakpoint
 CREATE UNIQUE INDEX journal_entries_reversal_unique
   ON journal_entries(reversal_of_id) WHERE reversal_of_id IS NOT NULL;
+--> statement-breakpoint
 
 CREATE TABLE journal_lines (
   id TEXT PRIMARY KEY NOT NULL,
@@ -75,8 +86,11 @@ CREATE TABLE journal_lines (
     REFERENCES accounts(id, currency_code)
     ON UPDATE RESTRICT ON DELETE RESTRICT
 );
+--> statement-breakpoint
 CREATE INDEX journal_lines_account_idx ON journal_lines(account_id, currency_code);
+--> statement-breakpoint
 CREATE INDEX journal_lines_entry_idx ON journal_lines(entry_id);
+--> statement-breakpoint
 
 CREATE TRIGGER journal_entries_no_update_posted
 BEFORE UPDATE ON journal_entries
@@ -84,6 +98,7 @@ WHEN OLD.status = 'POSTED'
 BEGIN
   SELECT RAISE(ABORT, 'posted journal entries are immutable');
 END;
+--> statement-breakpoint
 
 CREATE TRIGGER journal_entries_no_delete_posted
 BEFORE DELETE ON journal_entries
@@ -91,6 +106,7 @@ WHEN OLD.status = 'POSTED'
 BEGIN
   SELECT RAISE(ABORT, 'posted journal entries cannot be deleted');
 END;
+--> statement-breakpoint
 
 CREATE TRIGGER journal_lines_no_insert_into_posted
 BEFORE INSERT ON journal_lines
@@ -98,6 +114,7 @@ WHEN (SELECT status FROM journal_entries WHERE id = NEW.entry_id) = 'POSTED'
 BEGIN
   SELECT RAISE(ABORT, 'cannot add lines to a posted journal entry');
 END;
+--> statement-breakpoint
 
 CREATE TRIGGER journal_lines_no_update_in_posted
 BEFORE UPDATE ON journal_lines
@@ -107,6 +124,7 @@ WHEN
 BEGIN
   SELECT RAISE(ABORT, 'posted journal lines are immutable');
 END;
+--> statement-breakpoint
 
 CREATE TRIGGER journal_lines_no_delete_from_posted
 BEFORE DELETE ON journal_lines
