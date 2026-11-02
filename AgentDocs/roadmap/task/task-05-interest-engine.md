@@ -1,64 +1,64 @@
-# TASK-05 — Interest Engine
+# TASK-05 — Bộ máy tính lãi
 
-- Phase: 3 — MVP 2
-- Priority: P1
-- Status: BLOCKED
-- Dependencies: TASK-02, TASK-04
+- Giai đoạn: 3 — MVP 2
+- Ưu tiên: P1
+- Trạng thái: BLOCKED
+- Phụ thuộc: TASK-02, TASK-04
 
-## Objective
-Calculate and record interest/accrual for eligible interest-bearing assets and liabilities using explicit rate, period, day-count and compounding rules.
+## 1. Mục tiêu
+Tính toán và ghi nhận lãi phát sinh cho tài sản hoặc khoản nợ có lãi theo quy tắc lãi suất, kỳ hạn, quy ước số ngày và ghép lãi được xác định rõ.
 
-## Scope
-- Interest plan configuration for assets and liabilities.
-- APR/APY interpretation and supported day-count conventions.
-- Simple and compound interest calculations.
-- Accrual schedule and posted/accrued/paid lifecycle.
-- Payout to principal or designated account.
-- Stake reward quantity accrual where explicitly supported.
-- Idempotent catch-up processing.
+## 2. Phạm vi
+- Cấu hình kế hoạch tính lãi cho tài sản và khoản nợ.
+- Diễn giải APR/APY và quy ước số ngày được hỗ trợ.
+- Tính lãi đơn và lãi kép.
+- Lịch phát sinh lãi và vòng đời accrued/posted/paid.
+- Nhập lãi vào gốc hoặc thanh toán về tài khoản chỉ định.
+- Ghi nhận phần thưởng staking dưới dạng số lượng khi được đặc tả cho phép.
+- Xử lý bù các kỳ bị bỏ lỡ theo cách idempotent.
 
-Out of scope: provider-specific yield promises, automatic on-chain actions and unsupported financial products.
+Không bao gồm cam kết lợi suất từ nhà cung cấp, tự động thao tác on-chain hoặc sản phẩm chưa được hỗ trợ.
 
-## Context
-Read specification interest/staking section and roadmap Phase 3 and Phase 5. Confirm the final formulas and rounding policy before coding.
+## 3. Bối cảnh
+Đọc phần lãi/staking trong đặc tả và Giai đoạn 3, 5 của roadmap. Phải chốt công thức và quy tắc làm tròn trước khi lập trình.
 
-## Business rules
-- Rate basis (APR/APY), period and day-count convention must be explicit.
-- Accrual must be deterministic for the same inputs.
-- Rounding occurs only at the approved recognition boundary.
-- Re-running a period must not create duplicate accrual or journal postings.
-- Asset interest and liability interest must map to the correct ledger accounts.
-- Missed background execution is recovered safely when the app next runs.
+## 4. Quy tắc nghiệp vụ
+- Cơ sở lãi suất (APR/APY), kỳ tính và quy ước ngày phải rõ ràng.
+- Cùng đầu vào phải cho kết quả xác định.
+- Chỉ làm tròn tại thời điểm ghi nhận đã được duyệt.
+- Chạy lại một kỳ không được tạo lãi hoặc bút toán trùng.
+- Lãi tài sản và lãi khoản nợ phải ánh xạ đúng tài khoản ledger.
+- Nếu ứng dụng không chạy nền, việc tính bù phải được thực hiện an toàn khi mở ứng dụng lần tiếp theo.
 
-## Proposed changes
-InterestPlan and InterestAccrual domain types; pure calculators; accrual and payout use cases; persistence adapter; schedule/catch-up processor; interest detail UI.
+## 5. Thay đổi dự kiến
+InterestPlan và InterestAccrual; bộ tính thuần; use case phát sinh và thanh toán lãi; persistence adapter; bộ xử lý lịch/bù kỳ; màn hình chi tiết lãi.
 
-## Data changes
-Implement approved interest plan/accrual records and unique period/idempotency constraints.
+## 6. Thay đổi dữ liệu
+Triển khai bản ghi kế hoạch và kỳ tính lãi đã duyệt; có unique constraint/idempotency cho từng kỳ.
 
-## Implementation plan
-1. Resolve supported rate basis, frequency, day count and rounding.
-2. Write formula examples and expected results.
-3. Implement pure simple/compound calculators.
-4. Implement period generation and accrual lifecycle.
-5. Map recognized interest to journal entries.
-6. Add idempotent catch-up processing.
-7. Build plan and history screens.
+## 7. Kế hoạch triển khai
+1. Chốt cơ sở lãi suất, tần suất, day-count và làm tròn.
+2. Viết ví dụ công thức cùng kết quả tham chiếu.
+3. Xây bộ tính lãi đơn/lãi kép thuần.
+4. Triển khai sinh kỳ và vòng đời ghi nhận lãi.
+5. Ánh xạ lãi được ghi nhận vào journal entry.
+6. Bổ sung xử lý bù kỳ có idempotency.
+7. Xây màn hình kế hoạch và lịch sử.
 
-## Test plan
-APR/APY conversions; leap-year and month boundaries; simple/compound schedules; zero rate; maturity payout; rounding; repeated catch-up; partial failure/retry; ledger reconciliation.
+## 8. Kế hoạch kiểm thử
+Chuyển đổi APR/APY; năm nhuận và ranh giới tháng; lịch lãi đơn/lãi kép; lãi suất 0; thanh toán đáo hạn; làm tròn; chạy bù nhiều lần; retry sau lỗi; đối soát ledger.
 
-## Acceptance criteria
-- [ ] Supported formulas and conventions are documented.
-- [ ] Calculator outputs match approved reference examples.
-- [ ] Accrual is traceable to journal postings.
-- [ ] Reprocessing cannot duplicate a period.
-- [ ] Asset and liability interest are accounted for correctly.
-- [ ] Tests cover date boundaries and rounding.
+## 9. Tiêu chí nghiệm thu
+- [ ] Công thức và quy ước được hỗ trợ có tài liệu.
+- [ ] Kết quả bộ tính khớp ví dụ tham chiếu đã duyệt.
+- [ ] Lãi phát sinh truy vết được tới journal entry.
+- [ ] Xử lý lại không tạo trùng kỳ.
+- [ ] Lãi tài sản và lãi khoản nợ được hạch toán đúng.
+- [ ] Kiểm thử bao phủ ranh giới ngày và làm tròn.
 
-## Progress log
-- Done: Task defined from roadmap.
-- Doing: Blocked pending approved asset model and interest decisions.
-- Next: Approve calculation conventions and implement pure calculators.
-- Issues: Day-count and payout rules are unresolved.
-- Verification: Not run.
+## 10. Nhật ký tiến độ
+- Đã làm: Tạo task theo roadmap.
+- Đang làm: Chờ mô hình tài sản và quyết định về lãi.
+- Tiếp theo: Chốt quy ước tính và triển khai bộ tính thuần.
+- Vấn đề: Day-count và quy tắc thanh toán chưa được quyết định.
+- Kiểm chứng: Chưa chạy.
