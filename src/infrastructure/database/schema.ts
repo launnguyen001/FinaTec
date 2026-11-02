@@ -156,10 +156,13 @@ export const journalLines = sqliteTable(
       .onUpdate("restrict"),
     check("journal_lines_line_number_positive", sql`${table.lineNumber} > 0`),
     check("journal_lines_side_check", sql`${table.side} IN ('DEBIT', 'CREDIT')`),
-    check("journal_lines_amount_positive", sql`${table.amountMinor} > 0`),
     check(
-      "journal_lines_base_amount_nonnegative",
-      sql`${table.baseAmountMinor} >= 0`,
+      "journal_lines_amount_positive_safe",
+      sql`${table.amountMinor} > 0 AND ${table.amountMinor} <= 9007199254740991`,
+    ),
+    check(
+      "journal_lines_base_amount_safe",
+      sql`${table.baseAmountMinor} >= 0 AND ${table.baseAmountMinor} <= 9007199254740991`,
     ),
     check(
       "journal_lines_fx_numerator_positive",

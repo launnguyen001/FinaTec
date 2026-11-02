@@ -20,6 +20,9 @@ export class FxRate {
     if (numerator <= 0n || denominator <= 0n) {
       throw new Error("FX rate numerator and denominator must be positive");
     }
+    if (nativeCurrency.equals(baseCurrency) && numerator !== denominator) {
+      throw new Error("An FX rate between the same currency must equal 1");
+    }
     this.numerator = numerator;
     this.denominator = denominator;
     this.nativeCurrency = nativeCurrency;

@@ -23,6 +23,7 @@ describe("ledger value objects", () => {
     expect(rate.convertToBase(new Money(100n, usd)).minorUnits).toBe(25451n);
     expect(rate.convertToBase(new Money(1n, usd)).minorUnits).toBe(255n);
     expect(rate.convertToBase(new Money(-1n, usd)).minorUnits).toBe(-255n);
+    expect(() => new FxRate(2n, 1n, usd, usd)).toThrow();
   });
 
   it("round-trips only safe SQLite integers", () => {

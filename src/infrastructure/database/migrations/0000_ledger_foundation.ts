@@ -71,14 +71,14 @@ CREATE TABLE journal_lines (
   account_id TEXT NOT NULL,
   currency_code TEXT NOT NULL,
   side TEXT NOT NULL CHECK (side IN ('DEBIT', 'CREDIT')),
-  amount_minor INTEGER NOT NULL CHECK (amount_minor > 0),
+  amount_minor INTEGER NOT NULL CHECK (amount_minor > 0 AND amount_minor <= 9007199254740991),
   fx_rate_numerator TEXT NOT NULL CHECK (
     fx_rate_numerator GLOB '[1-9]*' AND fx_rate_numerator NOT GLOB '*[^0-9]*'
   ),
   fx_rate_denominator TEXT NOT NULL CHECK (
     fx_rate_denominator GLOB '[1-9]*' AND fx_rate_denominator NOT GLOB '*[^0-9]*'
   ),
-  base_amount_minor INTEGER NOT NULL CHECK (base_amount_minor >= 0),
+  base_amount_minor INTEGER NOT NULL CHECK (base_amount_minor >= 0 AND base_amount_minor <= 9007199254740991),
   memo TEXT,
   created_at TEXT NOT NULL,
   UNIQUE (entry_id, line_number),
