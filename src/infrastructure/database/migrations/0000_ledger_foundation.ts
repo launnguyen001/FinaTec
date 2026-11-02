@@ -92,6 +92,28 @@ CREATE INDEX journal_lines_account_idx ON journal_lines(account_id, currency_cod
 CREATE INDEX journal_lines_entry_idx ON journal_lines(entry_id);
 --> statement-breakpoint
 
+CREATE TRIGGER currencies_no_precision_change_when_referenced
+BEFORE UPDATE OF minor_unit ON currencies
+WHEN OLD.minor_unit <> NEW.minor_unit
+  AND (
+    EXISTS (SELECT 1 FROM ledger_settings WHERE base_currency_code = OLD.code)
+    OR EXISTS (SELECT 1 FROM accounts WHERE currency_code = OLD.code)
+    OR EXISTS (SELECT 1 FROM journal_entries WHERE base_currency_code = OLD.code)
+    OR EXISTS (SELECT 1 FROM journal_lines WHERE currency_code = OLD.code)
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'currency precision is immutable after first use');
+END;
+--> statement-breakpoint
+
+CREATE TRIGGER accounts_no_delete_system
+BEFORE DELETE ON accounts
+WHEN OLD.is_system = 1
+BEGIN
+  SELECT RAISE(ABORT, 'system accounts cannot be deleted');
+END;
+--> statement-breakpoint
+
 CREATE TRIGGER journal_entries_no_update_posted
 BEFORE UPDATE ON journal_entries
 WHEN OLD.status = 'POSTED'

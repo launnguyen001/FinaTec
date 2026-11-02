@@ -103,6 +103,7 @@ erDiagram
 - Non-null idempotency keys are unique.
 - One original entry can have at most one linked reversal.
 - Posted entries and their lines cannot be updated or deleted. Corrections use a new linked reversal and a new adjustment entry.
+- Currency precision cannot be changed after the currency is used by settings, accounts, entries, or lines; system accounts cannot be hard-deleted.
 - Foreign keys use RESTRICT; accounts/currencies are archived/deactivated rather than deleted once referenced.
 
 ## 5. Deliberate omissions
@@ -122,7 +123,7 @@ erDiagram
 | journal_entries | PK(id), occurred_at, status, partial unique idempotency, partial unique reversal | History queries, retry safety, one reversal |
 | journal_lines | PK(id), UNIQUE(entry_id,line_number), entry index, account/currency index | Ordered entry detail and balance queries |
 
-Posted-history immutability is enforced with SQLite triggers in the bundled versioned migration. Drizzle's TypeScript schema declares tables/indexes/checks; triggers are migration-owned objects and must be kept in sync with future migrations.
+Posted-history immutability, currency precision immutability after use, and system-account deletion protection are enforced with SQLite triggers in the bundled versioned migration. Drizzle's TypeScript schema declares tables/indexes/checks; triggers are migration-owned objects and must be kept in sync with future migrations.
 
 ## 7. Transaction and migration behavior
 
