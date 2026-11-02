@@ -35,6 +35,14 @@ export class SqliteLedgerRepository implements LedgerRepository {
   }
 
   async createAccount(account: Account): Promise<void> {
+    const currency = await this.db
+      .select({ isActive: currencies.isActive })
+      .from(currencies)
+      .where(eq(currencies.code, account.currencyCode))
+      .get();
+    if (!currency?.isActive) {
+      throw new Error("Account currency is missing or inactive");
+    }
     await this.db.insert(accounts).values(account);
   }
 
@@ -118,6 +126,14 @@ export class SqliteLedgerRepository implements LedgerRepository {
   }
 
   async setBaseCurrencyCode(code: string, timestamp: string): Promise<void> {
+    const currency = await this.db
+      .select({ isActive: currencies.isActive })
+      .from(currencies)
+      .where(eq(currencies.code, code))
+      .get();
+    if (!currency?.isActive) {
+      throw new Error("Base currency is missing or inactive");
+    }
     await this.db
       .insert(ledgerSettings)
       .values({
