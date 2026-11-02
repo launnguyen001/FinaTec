@@ -2,15 +2,17 @@
 
 - **Giai đoạn:** 1 — Kiến trúc cơ sở dữ liệu & Accounting Engine
 - **Ưu tiên:** P0 / đường găng
-- **Trạng thái:** BLOCKED
-- **Phụ thuộc:** TASK-00, TASK-01
+- **Trạng thái:** IN PROGRESS
+- **Phụ thuộc:** TASK-00, TASK-01 (TASK-01 merged into `main`)
+- **Nhánh thực hiện:** `task/02-accounting-engine`
 
 ## 1. Mục tiêu
 Xây dựng domain kế toán độc lập với UI, có khả năng kiểm tra, ghi sổ và đảo bút toán kép một cách nguyên tử và xác định.
 
 ## 2. Phạm vi
-- Các value object Money, Currency, Amount và tỷ giá.
+- Quy tắc normal balance và tính số dư native currency theo tài khoản.
 - Quy tắc ghi Nợ/Có và kiểm tra journal entry.
+- Xác minh lại FX snapshot và base amount ở thời điểm posting.
 - Vòng đời draft → posted, ranh giới transaction khi ghi sổ và tính số dư.
 - Các thao tác nền tảng cho số dư đầu kỳ và chuyển tiền nội bộ.
 - Liên kết reversal/adjustment và metadata kiểm toán.
@@ -20,51 +22,44 @@ Xây dựng domain kế toán độc lập với UI, có khả năng kiểm tra,
 **Không bao gồm:** màn hình giao dịch, cost basis tài sản, tính lãi và khoản vay.
 
 ## 3. Phụ thuộc
-- TASK-01 cung cấp schema ledger và repository contract đã duyệt.
+- TASK-01 đã merge vào `main` qua PR #3; cung cấp schema ledger và repository contract.
 - TASK-00 xác nhận khả năng tính toán số chính xác và transaction của database.
 
-## 4. Bối cảnh
-Đọc mục kế toán 6.1–6.2 trong đặc tả và Giai đoạn 1 của roadmap. Sử dụng schema và quyết định đã duyệt; không tự suy diễn quy tắc đa tiền tệ còn thiếu.
+## 4. Chính sách kế toán dùng trong task
+- Mỗi posting phải có tối thiểu hai line, ít nhất một DEBIT và một CREDIT.
+- So sánh tổng `baseAmountMinor` sau khi tự tính lại FX snapshot của từng line; không tin giá trị quy đổi do caller truyền vào.
+- Làm tròn half-up đúng một lần trên từng line theo precision của base currency; không tự tạo rounding line.
+- Normal balance: ASSET/EXPENSE là DEBIT; LIABILITY/EQUITY/INCOME là CREDIT. Số dư được biểu diễn dương theo normal side.
+- Account archived và currency inactive không nhận posting mới.
+- Chuyển tiền giữa hai tài khoản cùng chủ sở hữu không tạo INCOME/EXPENSE; hai đầu chuyển phải cân bằng theo base currency.
+- Reversal là một journal entry mới, đảo side từng line và giữ nguyên snapshot tiền tệ/tỷ giá của giao dịch gốc; entry gốc chỉ được reversal một lần.
+- Opening balance ghi Nợ tài khoản tài sản và Có tài khoản vốn chủ sở hữu opening balance (hoặc chiều ngược lại nếu cần ghi nhận số dư âm theo policy được duyệt); không dùng số dư khởi tạo trực tiếp trên account.
+- Idempotency key duy nhất cho mỗi command; retry phải trả về kết quả đã tạo, không tạo thêm journal entry.
 
-## 5. Thay đổi dự kiến
-- Domain: Money, Currency, JournalEntry, JournalLine và bộ kiểm tra posting.
-- Application: use case ghi sổ, đảo bút toán, tạo số dư đầu kỳ và chuyển tiền.
-- Infrastructure: repository triển khai transaction nguyên tử.
-- Kiểm thử unit, integration và các bất biến kế toán.
+## 5. Thay đổi dữ liệu
+Ưu tiên sử dụng schema TASK-01. Chỉ đề xuất migration nếu cần lưu metadata bắt buộc cho invariant mà schema hiện tại không thể bảo vệ.
 
-## 6. Quy tắc nghiệp vụ
-- Bút toán đã ghi sổ phải có các dòng Nợ/Có hợp lệ và cân bằng theo chính sách tiền tệ đã duyệt.
-- Ghi sổ nguyên tử: tất cả dữ liệu liên quan được lưu hoặc không có dữ liệu nào được lưu.
-- Bút toán đã ghi sổ là bất biến; sửa sai bằng bút toán đảo/điều chỉnh có liên kết.
-- Chuyển tiền nội bộ không tạo thu nhập hoặc chi phí.
-- Số dư đầu kỳ phải có tài khoản đối ứng vốn chủ sở hữu rõ ràng.
-- Số học và làm tròn tuân theo precision đã duyệt.
-- Gửi lại command không được tạo bút toán trùng.
+## 6. Kế hoạch triển khai
+1. [x] Định nghĩa normal balance và pure validator cho draft posting.
+2. [x] Tính số dư account từ posted lines theo native currency.
+3. [ ] Thêm Application use cases và repository contract cho post/reversal.
+4. [ ] Triển khai transaction nguyên tử và idempotency.
+5. [ ] Triển khai opening balance và internal transfer.
+6. [ ] Triển khai reversal/adjustment và truy vết.
+7. [ ] Bổ sung unit/integration tests cho invariant kế toán.
+8. [ ] Chạy lint, format, typecheck, Jest và Android acceptance.
 
-## 7. Thay đổi dữ liệu
-Sử dụng schema từ TASK-01. Chỉ đề xuất mở rộng schema khi có bất biến cụ thể cần bảo vệ và phải được review trước migration.
-
-## 8. Kế hoạch triển khai
-1. Xác định normal balance cho từng loại tài khoản.
-2. Xây dựng số học chính xác và kiểm tra theo tiền tệ.
-3. Triển khai kiểm tra draft và chuyển trạng thái ghi sổ.
-4. Triển khai ranh giới persistence nguyên tử.
-5. Triển khai số dư đầu kỳ và chuyển tiền nội bộ.
-6. Triển khai reversal và liên kết truy vết điều chỉnh.
-7. Bổ sung idempotency/chống ghi trùng.
-8. Truy vấn số dư tài khoản từ các dòng ledger đã ghi sổ.
-
-## 9. Kế hoạch kiểm thử
+## 7. Kế hoạch kiểm thử
 - Bút toán cân bằng và không cân bằng.
 - Thiếu dòng, dòng không hợp lệ, giá trị zero/âm, tài khoản hoặc tiền tệ không tương thích.
+- Sai FX snapshot/base amount và rounding/overflow.
 - Rollback nguyên tử khi lỗi tại từng bước ghi dữ liệu.
 - Reversal triệt tiêu đúng bút toán gốc và giữ lịch sử kiểm toán.
-- Từ chối sửa/xóa bút toán đã ghi sổ.
 - Chuyển tiền không làm thay đổi tổng tài sản ròng và không tính vào thu/chi.
 - Số dư đầu kỳ có tài khoản đối ứng chính xác.
-- Precision, rounding, overflow và retry/idempotency.
+- Retry/idempotency và race khi gửi cùng command.
 
-## 10. Tiêu chí nghiệm thu
+## 8. Tiêu chí nghiệm thu
 - [ ] Domain không phụ thuộc React Native hoặc SQLite.
 - [ ] Không thể ghi sổ bút toán không hợp lệ hoặc không cân bằng.
 - [ ] Ghi sổ và reversal có tính nguyên tử.
@@ -73,9 +68,10 @@ Sử dụng schema từ TASK-01. Chỉ đề xuất mở rộng schema khi có b
 - [ ] Số dư tài khoản được tính từ ledger.
 - [ ] Bộ kiểm thử bất biến kế toán thành công.
 
-## 11. Nhật ký tiến độ
-- **Đã làm:** Tạo task theo Giai đoạn 1.
-- **Đang làm:** Chờ TASK-00 và TASK-01.
-- **Tiếp theo:** Triển khai primitive ghi sổ sau khi schema được duyệt.
-- **Vấn đề:** Chính sách cân bằng đa tiền tệ cần quyết định rõ.
-- **Kiểm chứng:** Chưa chạy.
+## 9. Nhật ký tiến độ
+- **Done:** TASK-01 merged to `main` at `f542c42` (PR #3).
+- **Done:** pure posting validator, FX snapshot verification, normal-balance rules and native-currency balance calculation added on this branch.
+- **Doing:** Application use cases and atomic repository posting.
+- **Next:** implement post transaction and idempotent command handling.
+- **Known risks:** SQLite INTEGER persistence is bounded by JavaScript safe-integer range; FX conversion is rounded per line before base-currency balancing.
+- **Verification:** unit tests authored; execution pending.
