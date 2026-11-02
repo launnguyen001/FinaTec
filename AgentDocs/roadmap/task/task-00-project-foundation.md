@@ -2,7 +2,7 @@
 
 - **Giai đoạn:** 0 — Nền tảng dự án
 - **Ưu tiên:** P0
-- **Trạng thái:** IN REVIEW
+- **Trạng thái:** DONE
 - **Ước lượng:** 1–2 tuần (ước lượng lập kế hoạch)
 - **Nhánh thực hiện:** `task/00-project-foundation`
 - **Roadmap nguồn:** `AgentDocs/roadmap/plan.md`
@@ -159,6 +159,7 @@ Chưa tạo schema production. Spike chỉ dùng database thử nghiệm có th�
 - [x] Rủi ro và quyết định còn mở được ghi nhận.
 
 ## 12. Nhật ký tiến độ
+- **2026-11-02 — DONE:** Owner xác nhận TASK-00 hoàn thành; chấp nhận iOS native runtime ở trạng thái NOT VERIFIED và không dùng đây làm điều kiện chặn TASK-01. TASK-00 được merge vào `main` qua PR #1 (merge commit `7e9cfc113c61115ea9da16ee1c153c86acaa6f6b`).
 - **Done:** Đã đọc đặc tả, roadmap, task, `AGENTS.md`; xác nhận nhánh `task/00-project-foundation` và baseline hiện tại trước khi sửa.
 - **Done:** Giữ Expo SDK 58 / React Native 0.88.1 / React 19.3.0 và npm; cài các module theo `npx expo install` và tài liệu SDK 58.
 - **Done:** Chuyển entry point sang Expo Router tại `src/app`, bật TypeScript strict, thêm scripts lint/format/type-check/test và test route gốc.
