@@ -22,6 +22,7 @@ describe("ledger value objects", () => {
     const rate = FxRate.fromDecimal("25450.5", usd, vnd);
     expect(rate.convertToBase(new Money(100n, usd)).minorUnits).toBe(25451n);
     expect(rate.convertToBase(new Money(1n, usd)).minorUnits).toBe(255n);
+    expect(rate.convertToBase(new Money(-1n, usd)).minorUnits).toBe(-255n);
   });
 
   it("round-trips only safe SQLite integers", () => {

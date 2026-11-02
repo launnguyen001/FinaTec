@@ -38,12 +38,14 @@ export class FxRate {
     const denominator =
       this.denominator * 10n ** BigInt(this.nativeCurrency.minorUnit);
 
-    const quotient = numerator / denominator;
-    const remainder = numerator % denominator;
-    const rounded =
+    const sign = numerator < 0n ? -1n : 1n;
+    const absoluteNumerator = numerator < 0n ? -numerator : numerator;
+    const quotient = absoluteNumerator / denominator;
+    const remainder = absoluteNumerator % denominator;
+    const roundedAbsolute =
       remainder * 2n >= denominator ? quotient + 1n : quotient;
 
-    return new Money(rounded, this.baseCurrency);
+    return new Money(sign * roundedAbsolute, this.baseCurrency);
   }
 
   static fromDecimal(
