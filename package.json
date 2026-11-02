@@ -1,18 +1,53 @@
 {
   "name": "fintech",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "expo-router/entry",
   "dependencies": {
+    "drizzle-orm": "^0.45.4",
     "expo": "~58.0.22",
+    "expo-asset": "~58.0.19",
+    "expo-constants": "~58.0.14",
+    "expo-crypto": "~58.0.7",
+    "expo-dev-client": "~58.0.18",
+    "expo-file-system": "~58.0.13",
+    "expo-linking": "~58.0.15",
+    "expo-router": "~58.0.29",
+    "expo-secure-store": "~58.0.2",
+    "expo-sqlite": "~58.0.15",
     "expo-status-bar": "~58.0.4",
+    "expo-system-ui": "~58.0.7",
     "react": "19.3.0",
-    "react-native": "0.88.1"
+    "react-dom": "19.3.0",
+    "react-native": "0.88.1",
+    "react-native-safe-area-context": "~5.10.1",
+    "react-native-screens": "~4.30.1",
+    "react-native-web": "^0.21.4"
   },
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web"
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "web": "expo start --web",
+    "lint": "expo lint",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\" app.json eas.json package.json tsconfig.json eslint.config.js README.md",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx}\" app.json eas.json package.json tsconfig.json eslint.config.js README.md",
+    "typecheck": "tsc --noEmit",
+    "test": "jest --runInBand"
   },
-  "private": true
+  "jest": {
+    "preset": "jest-expo"
+  },
+  "private": true,
+  "devDependencies": {
+    "@testing-library/react-native": "^14.1.0",
+    "@types/jest": "30.0.0",
+    "@types/react": "~19.3.0",
+    "drizzle-kit": "^0.31.11",
+    "eslint": "^9.39.5",
+    "eslint-config-expo": "~58.0.4",
+    "jest": "~30.5.2",
+    "jest-expo": "~58.0.13",
+    "prettier": "^3.9.10",
+    "typescript": "~6.0.3"
+  }
 }
