@@ -87,6 +87,8 @@ erDiagram
 - FX rates are never represented by binary floating-point values. Each journal line stores an exact positive rational quote as numerator/denominator decimal integer strings.
 - Rate convention: **base major currency units per one native major currency unit**.
 - Each line stores the native amount, native currency, rate snapshot, and converted base amount. The converted base amount is rounded half-up once at line-recording time using the base currency's minor-unit scale. No intermediate floating-point rounding is permitted.
+- A line already denominated in the entry's base currency must store FX 1/1 and an unchanged minor-unit amount. A same-currency FX quote other than 1 is invalid.
+- The posting use case must compare the sum of converted DEBIT and CREDIT minor units. It must reject an imbalance; TASK-01 does not create an implicit balancing/rounding line. Any explicit rounding account policy must be decided in TASK-02.
 - VND and USD follow the product specification: VND 0 decimals, USD 2. Other currencies use explicitly configured metadata.
 - For a line in the base currency, the FX snapshot must be 1/1.
 - An entry snapshots its base currency. Changing the current base currency affects only future entries; posted history is not rewritten.
