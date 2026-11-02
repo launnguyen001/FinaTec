@@ -9,7 +9,7 @@ export const ledgerMigrations = {
         idx: 0,
         when: migrationTime,
         tag: "0000_ledger_foundation",
-        breakpoints: false,
+        breakpoints: true,
       },
     ],
   },
