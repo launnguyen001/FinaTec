@@ -25,7 +25,10 @@ export class SqliteLedgerRepository implements LedgerRepository {
   constructor(private readonly db: LedgerDatabase) {}
 
   async listCurrencies(activeOnly = true): Promise<CurrencyRecord[]> {
-    const query = this.db.select().from(currencies).orderBy(asc(currencies.code));
+    const query = this.db
+      .select()
+      .from(currencies)
+      .orderBy(asc(currencies.code));
     if (activeOnly) return query.where(eq(currencies.isActive, true)).all();
     return query.all();
   }
@@ -47,7 +50,11 @@ export class SqliteLedgerRepository implements LedgerRepository {
   }
 
   async findAccountById(id: string): Promise<Account | null> {
-    const row = await this.db.select().from(accounts).where(eq(accounts.id, id)).get();
+    const row = await this.db
+      .select()
+      .from(accounts)
+      .where(eq(accounts.id, id))
+      .get();
     return row ?? null;
   }
 
@@ -70,22 +77,37 @@ export class SqliteLedgerRepository implements LedgerRepository {
       if (line.entryId !== input.entry.id) {
         throw new Error("Every journal line must belong to the supplied entry");
       }
-      if (!Number.isSafeInteger(line.lineNumber) || line.lineNumber <= 0 || lineNumbers.has(line.lineNumber)) {
-        throw new Error("Journal line numbers must be unique positive safe integers");
+      if (
+        !Number.isSafeInteger(line.lineNumber) ||
+        line.lineNumber <= 0 ||
+        lineNumbers.has(line.lineNumber)
+      ) {
+        throw new Error(
+          "Journal line numbers must be unique positive safe integers",
+        );
       }
       lineNumbers.add(line.lineNumber);
       if (line.amountMinor <= 0n || line.baseAmountMinor < 0n) {
-        throw new Error("Journal amounts must be positive native and non-negative base minor units");
+        throw new Error(
+          "Journal amounts must be positive native and non-negative base minor units",
+        );
       }
-      if (!/^[1-9]\d*$/.test(line.fxRateNumerator) || !/^[1-9]\d*$/.test(line.fxRateDenominator)) {
-        throw new Error("FX rate numerator and denominator must be positive integer strings");
+      if (
+        !/^[1-9]\d*$/.test(line.fxRateNumerator) ||
+        !/^[1-9]\d*$/.test(line.fxRateDenominator)
+      ) {
+        throw new Error(
+          "FX rate numerator and denominator must be positive integer strings",
+        );
       }
       if (
         line.currencyCode === input.entry.baseCurrencyCode &&
         (line.fxRateNumerator !== line.fxRateDenominator ||
           line.amountMinor !== line.baseAmountMinor)
       ) {
-        throw new Error("A base-currency journal line must use FX 1/1 and preserve its minor-unit amount");
+        throw new Error(
+          "A base-currency journal line must use FX 1/1 and preserve its minor-unit amount",
+        );
       }
       return {
         ...line,
@@ -94,9 +116,12 @@ export class SqliteLedgerRepository implements LedgerRepository {
       };
     });
 
-    await this.db.transaction(async (tx) => {
-      await tx.insert(journalEntries).values(input.entry);
-      await tx.insert(journalLines).values(rows);
+    this.db.transaction((tx) => {
+      // Drizzle's Expo SQLite session is synchronous: an async callback would
+      // return its Promise before the first await and commit the transaction
+      // early. Use synchronous query execution so both writes remain atomic.
+      tx.insert(journalEntries).values(input.entry).run();
+      tx.insert(journalLines).values(rows).run();
     });
   }
 

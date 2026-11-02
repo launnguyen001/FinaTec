@@ -1,6 +1,10 @@
 import { Currency } from "../domain/ledger/currency";
 import { FxRate } from "../domain/ledger/fx-rate";
-import { Money, fromSqliteInteger, toSqliteSafeInteger } from "../domain/ledger/money";
+import {
+  Money,
+  fromSqliteInteger,
+  toSqliteSafeInteger,
+} from "../domain/ledger/money";
 
 describe("ledger value objects", () => {
   it("normalizes and validates currency codes and minor units", () => {
@@ -12,7 +16,9 @@ describe("ledger value objects", () => {
   it("prevents arithmetic across different currencies", () => {
     const vnd = new Currency("VND", 0);
     const usd = new Currency("USD", 2);
-    expect(new Money(100n, vnd).add(new Money(200n, vnd)).minorUnits).toBe(300n);
+    expect(new Money(100n, vnd).add(new Money(200n, vnd)).minorUnits).toBe(
+      300n,
+    );
     expect(() => new Money(100n, vnd).add(new Money(100n, usd))).toThrow();
   });
 
@@ -28,7 +34,9 @@ describe("ledger value objects", () => {
 
   it("round-trips only safe SQLite integers", () => {
     expect(fromSqliteInteger(toSqliteSafeInteger(123456n))).toBe(123456n);
-    expect(() => toSqliteSafeInteger(BigInt(Number.MAX_SAFE_INTEGER) + 1n)).toThrow();
+    expect(() =>
+      toSqliteSafeInteger(BigInt(Number.MAX_SAFE_INTEGER) + 1n),
+    ).toThrow();
     expect(() => fromSqliteInteger(Number.MAX_SAFE_INTEGER + 1)).toThrow();
   });
 });

@@ -2,7 +2,7 @@
 
 - **Giai đoạn:** 1 — Kiến trúc cơ sở dữ liệu & Accounting Engine
 - **Ưu tiên:** P0
-- **Trạng thái:** IN PROGRESS
+- **Trạng thái:** IN REVIEW
 - **Phụ thuộc:** TASK-00 (merged into `main`)
 - **Nhánh thực hiện:** `task/01-database-architecture`
 
@@ -38,9 +38,9 @@ Xem `AgentDocs/database-schema.md` và `AgentDocs/data-dictionary.md`. Không t�
 3. [x] Xây Drizzle schema và migration SQL version 0000.
 4. [x] Xây SQLCipher-aware database initialization, key preflight và migration bootstrap.
 5. [x] Xây Domain value objects và repository port/SQLite adapter.
-6. [ ] Bổ sung unit/integration tests cho migration, constraints, persistence, immutable posted history.
-7. [ ] Chạy lint, format check, typecheck, Jest và kiểm tra Expo config.
-8. [ ] Review schema/migration, cập nhật kết quả kiểm chứng và chuyển trạng thái.
+6. [x] Bổ sung unit/integration tests cho migration, constraints, persistence, immutable posted history.
+7. [x] Chạy lint, format check, typecheck, Jest và kiểm tra Expo config.
+8. [x] Review schema/migration, cập nhật kết quả kiểm chứng và chuyển trạng thái.
 
 ## 6. Kiểm thử
 - Migration trên database mới và khởi tạo lặp lại.
@@ -57,13 +57,18 @@ Xem `AgentDocs/database-schema.md` và `AgentDocs/data-dictionary.md`. Không t�
 - [x] Drizzle schema và migration ban đầu được triển khai.
 - [x] Database bootstrap có kiểm tra SQLCipher/key và migration.
 - [x] Repository interface/adapter tách khỏi Domain.
-- [ ] Kiểm thử integrity, migration và repository thành công.
-- [ ] Lint, typecheck, format và Jest pass.
-- [ ] Không còn quyết định P0 chưa chốt bị âm thầm đưa vào schema.
+- [x] Kiểm thử integrity, migration và repository thành công trên Expo SQLite/SQLCipher thực tế.
+- [x] Lint, typecheck, format và Jest pass.
+- [x] Không còn quyết định P0 chưa chốt bị âm thầm đưa vào schema.
 
 ## 8. Nhật ký tiến độ
 - **Done:** TASK-00 đã merge vào `main` qua PR #1; nhánh TASK-01 được fast-forward từ merge commit.
 - **Done:** schema, migration, Domain values, repository adapter và tài liệu nền đã được commit.
-- **Doing:** kiểm thử thực thi và review schema.
-- **Next:** kiểm chứng trên môi trường npm/Expo, sửa lỗi phát sinh, hoàn tất acceptance criteria.
-- **Known limitation:** chưa chạy được test/build từ phiên làm việc GitHub API; không đánh dấu TASK-01 DONE trước khi có log kiểm chứng.
+- **Done (2026-11-03):** `npm ci` hoàn tất. Kết quả dependency audit của npm: 48 advisory (1 low, 47 moderate); chưa chạy `npm audit fix` để tránh thay đổi dependency ngoài phạm vi.
+- **Done (2026-11-03):** typecheck (`npx tsc --noEmit`), lint (`npx expo lint`), format (`npm run format:check`) và Jest (`npm test -- --runInBand`) pass. Jest: 3 suites / 9 tests. `npx expo-doctor` pass 20/20; `npx expo install --check` báo dependencies up to date; `npx expo export --platform android` pass.
+- **Done (2026-11-03):** kiểm thử thiết bị trên Huawei LYA-L29, Android 10 / API 29, package `com.anonymous.fintech` Development Build, qua Metro (`npx expo start --dev-client --port 8081`, `adb reverse tcp:8081 tcp:8081`). SQLCipher `4.17.0 community`; key test 32 bytes, lưu SecureStore dưới dạng lowercase hex, không ghi/log key.
+- **Done (2026-11-03):** database diagnostic `task01-acceptance-c668bb564461.db`, kích thước 98,304 bytes; kết quả PASS: SQLCipher keyed schema access, Drizzle migration mới và chạy lặp, repository round-trip, repository rollback, CHECK/NOT NULL/FK/unique constraints, trigger posted entry/lines, Drizzle migration rollback và close/reopen persistence với cùng key. Diagnostic đã đóng kết nối và xóa đúng file/key ngẫu nhiên do chính lần chạy đó tạo.
+- **Đã sửa lỗi P0:** trước đó `createDraftEntry` truyền callback `async` vào Drizzle Expo SQLite. Session của Drizzle Expo SQLite là synchronous và commit ngay khi callback trả Promise, nên insert child lỗi sau commit và parent entry vẫn tồn tại. Adapter hiện chạy `.run()` đồng bộ bên trong callback đồng bộ; rollback đã được xác minh lại trên thiết bị thật.
+- **Doing:** review TASK-01.
+- **Next:** review kết quả/đối chiếu acceptance trên nhánh này; sau khi được chấp thuận mới merge theo quy trình repository.
+- **Known limitation:** iOS runtime chưa được kiểm thử do không có môi trường iOS; phạm vi hiện tại chỉ cần nghiệm thu Android. `npm ci` báo 48 advisory dependency; cần đánh giá riêng, không tự động nâng cấp trong TASK-01.

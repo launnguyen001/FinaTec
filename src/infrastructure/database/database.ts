@@ -14,13 +14,17 @@ const RAW_KEY_PATTERN = /^[0-9a-f]{64}$/;
 
 class SqlCipherUnavailableError extends Error {
   constructor() {
-    super("SQLCipher is unavailable in this native build; refusing plaintext database access");
+    super(
+      "SQLCipher is unavailable in this native build; refusing plaintext database access",
+    );
     this.name = "SqlCipherUnavailableError";
   }
 }
 
 function toHex(bytes: Uint8Array): string {
-  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join(
+    "",
+  );
 }
 
 function databaseFile(): FileSystem.File {
@@ -28,7 +32,9 @@ function databaseFile(): FileSystem.File {
   if (!directory) {
     throw new Error("SQLite database directory is unavailable");
   }
-  const uri = directory.startsWith("file://") ? directory : `file://${directory}`;
+  const uri = directory.startsWith("file://")
+    ? directory
+    : `file://${directory}`;
   return new FileSystem.File(uri, DATABASE_NAME);
 }
 
@@ -39,7 +45,9 @@ async function resolveDatabaseKey(
 
   if (storedKey !== null) {
     if (!RAW_KEY_PATTERN.test(storedKey)) {
-      throw new Error("Stored database key is invalid; refusing to open database");
+      throw new Error(
+        "Stored database key is invalid; refusing to open database",
+      );
     }
     return { key: storedKey, generated: false };
   }

@@ -24,7 +24,10 @@ export const currencies = sqliteTable(
       "currencies_code_format",
       sql`length(${table.code}) = 3 AND ${table.code} = upper(${table.code})`,
     ),
-    check("currencies_minor_unit_range", sql`${table.minorUnit} BETWEEN 0 AND 6`),
+    check(
+      "currencies_minor_unit_range",
+      sql`${table.minorUnit} BETWEEN 0 AND 6`,
+    ),
   ],
 );
 
@@ -155,7 +158,10 @@ export const journalLines = sqliteTable(
       .onDelete("restrict")
       .onUpdate("restrict"),
     check("journal_lines_line_number_positive", sql`${table.lineNumber} > 0`),
-    check("journal_lines_side_check", sql`${table.side} IN ('DEBIT', 'CREDIT')`),
+    check(
+      "journal_lines_side_check",
+      sql`${table.side} IN ('DEBIT', 'CREDIT')`,
+    ),
     check(
       "journal_lines_amount_positive_safe",
       sql`${table.amountMinor} > 0 AND ${table.amountMinor} <= 9007199254740991`,

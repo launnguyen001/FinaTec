@@ -1,4 +1,5 @@
-export type AccountType = "ASSET" | "LIABILITY" | "EQUITY" | "INCOME" | "EXPENSE";
+export type AccountType =
+  "ASSET" | "LIABILITY" | "EQUITY" | "INCOME" | "EXPENSE";
 export type JournalStatus = "DRAFT" | "POSTED";
 export type JournalSide = "DEBIT" | "CREDIT";
 
