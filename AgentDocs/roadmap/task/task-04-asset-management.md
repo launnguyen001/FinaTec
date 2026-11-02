@@ -1,65 +1,66 @@
-# TASK-04 — Asset Management
+# TASK-04 — Quản lý tài sản
 
-- Phase: 3 — MVP 2
-- Priority: P1
-- Status: BLOCKED
-- Dependencies: TASK-02, TASK-03
+- Giai đoạn: 3 — MVP 2: Tài sản và lãi
+- Ưu tiên: P1
+- Trạng thái: BLOCKED
+- Phụ thuộc: TASK-02, TASK-03
 
-## Objective
-Track owned assets, holdings, acquisition/disposal history, lots, fees, cost basis and realized/unrealized profit and loss. The app records holdings; it does not execute trades.
+## 1. Mục tiêu
+Theo dõi tài sản, số lượng đang nắm giữ, lịch sử mua/bán, các lô tài sản, phí, giá vốn và lãi/lỗ đã thực hiện hoặc chưa thực hiện. Ứng dụng chỉ ghi nhận tài sản, không thực hiện giao dịch mua bán thực tế.
 
-## Scope
-- Asset classes and asset records.
-- Quantity and storage-location metadata.
-- Acquisition and disposal linked to funding accounts and ledger.
-- Asset lots, fees and approved cost-basis method (weighted average or FIFO).
-- Manual/market valuation, price history and stale-state display.
-- Offline digital-asset tracking limited to quantity and location.
+## 2. Phạm vi
+- Danh mục loại tài sản và hồ sơ tài sản.
+- Theo dõi số lượng và thông tin nơi lưu trữ.
+- Ghi nhận mua/bán tài sản, liên kết tài khoản thanh toán và ledger.
+- Quản lý lô tài sản, phí và phương pháp tính giá vốn được duyệt (bình quân gia quyền hoặc FIFO).
+- Định giá thủ công hoặc theo dữ liệu thị trường.
+- Lịch sử giá và trạng thái dữ liệu giá đã cũ.
+- Theo dõi tài sản số offline nhưng không lưu thông tin bí mật.
 
-Out of scope: trade execution, custody, investment advice and external provider integration before terms/reliability review.
+Không bao gồm thực hiện lệnh giao dịch, lưu private key/seed phrase hoặc tích hợp nhà cung cấp khi chưa đánh giá điều khoản và độ tin cậy.
 
-## Context
-Read specification sections 5 and 6.3, asset screen description and roadmap Phase 3.
+## 3. Bối cảnh
+Đọc mục 5, 6.3 và mô tả màn hình tài sản trong đặc tả; Giai đoạn 3 của roadmap.
 
-## Business rules
-- Disposal quantity cannot exceed holdings.
-- Acquisition cost includes fees under approved policy.
-- Realized P&L uses the selected cost-basis method.
-- Market price changes affect estimated value and unrealized P&L only.
-- Cash and asset value must not be double-counted.
-- Stale prices display timestamp and warning.
-- Never store recovery phrases or private keys.
+## 4. Quy tắc nghiệp vụ
+- Không được bán số lượng lớn hơn số đang nắm giữ.
+- Giá vốn mua vào bao gồm phí theo chính sách đã duyệt.
+- Lãi/lỗ thực hiện được tính khi bán theo phương pháp giá vốn đã chọn.
+- Biến động giá thị trường chỉ ảnh hưởng giá trị ước tính và lãi/lỗ chưa thực hiện; không tự tạo thu nhập đã thực hiện.
+- Không tính trùng tiền mặt và giá trị tài sản.
+- Giá đã cũ phải hiển thị thời điểm cập nhật và cảnh báo.
+- Không lưu seed phrase hoặc private key.
 
-## Proposed changes
-Asset/lot domain models; cost-basis service; acquisition/disposal use cases; ledger mappings; PriceProvider interface and cached history; asset list/detail/lot screens; valuation and P&L queries.
+## 5. Thay đổi dự kiến
+Domain model tài sản/lô; dịch vụ tính giá vốn; use case mua/bán; ánh xạ ledger; giao diện PriceProvider và bộ nhớ đệm lịch sử giá; màn hình danh sách/chi tiết/lô; truy vấn định giá và lãi/lỗ.
 
-## Data changes
-Implement only approved asset, lot, price-source and price-history schema with ledger traceability.
+## 6. Thay đổi dữ liệu
+Chỉ triển khai schema tài sản, lô, nguồn giá và lịch sử giá đã được duyệt; bảo đảm truy vết đến bút toán ledger.
 
-## Implementation plan
-1. Approve asset taxonomy, quantity precision and cost-basis policy.
-2. Model asset and lot lifecycle.
-3. Implement acquisition/disposal use cases.
-4. Implement the selected cost-basis calculator.
-5. Define provider contract, cache and stale-price policy.
-6. Build asset screens and P&L summaries.
-7. Reconcile holdings with ledger.
+## 7. Kế hoạch triển khai
+1. Chốt phân loại tài sản, precision số lượng và phương pháp giá vốn.
+2. Thiết kế vòng đời tài sản và lô.
+3. Triển khai use case mua và bán.
+4. Triển khai bộ tính giá vốn theo phương pháp đã duyệt.
+5. Xác định hợp đồng provider, cache và chính sách giá cũ.
+6. Xây màn hình tài sản và tổng hợp lãi/lỗ.
+7. Đối soát số lượng tài sản với ledger.
 
-## Test plan
-Multiple acquisitions at different prices/fees; partial/full disposal; insufficient quantity; cost-basis and rounding; realized/unrealized separation; provider failure, stale cache and offline display; double-counting checks.
+## 8. Kế hoạch kiểm thử
+Nhiều lần mua với giá/phí khác nhau; bán một phần/toàn bộ; bán vượt số lượng; tính giá vốn và làm tròn; phân biệt lãi/lỗ đã và chưa thực hiện; provider lỗi, cache cũ, offline; kiểm tra không tính trùng.
 
-## Acceptance criteria
-- [ ] Holdings and lots are traceable.
-- [ ] Acquisition/disposal reconcile with accounts and ledger.
-- [ ] Overselling is rejected.
-- [ ] Cost basis and P&L match approved method.
-- [ ] Stale prices are marked and cached values remain available offline.
-- [ ] Sensitive wallet credentials are never stored.
-- [ ] Asset and ledger balances reconcile.
+## 9. Tiêu chí nghiệm thu
+- [ ] Tài sản và các lô truy vết được.
+- [ ] Mua/bán đối soát được với tài khoản và ledger.
+- [ ] Từ chối bán vượt số lượng.
+- [ ] Giá vốn và lãi/lỗ khớp phương pháp đã duyệt.
+- [ ] Giá cũ được đánh dấu; dữ liệu cache vẫn xem được offline.
+- [ ] Không lưu hoặc truyền thông tin bí mật của ví.
+- [ ] Số lượng tài sản và số liệu ledger đối soát được.
 
-## Progress log
-- Done: Task defined from Phase 3.
-- Doing: Blocked pending accounting and core finance.
-- Next: Approve asset model and cost-basis policy.
-- Issues: Provider and precision policy remain open.
-- Verification: Not run.
+## 10. Nhật ký tiến độ
+- Đã làm: Tạo task theo Giai đoạn 3.
+- Đang làm: Chờ các phân hệ kế toán và tài chính cốt lõi.
+- Tiếp theo: Duyệt mô hình tài sản và chính sách giá vốn.
+- Vấn đề: Nhà cung cấp dữ liệu giá và precision còn mở.
+- Kiểm chứng: Chưa chạy.
