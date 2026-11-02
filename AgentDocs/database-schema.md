@@ -120,12 +120,13 @@ erDiagram
 | journal_entries | PK(id), occurred_at, status, partial unique idempotency, partial unique reversal | History queries, retry safety, one reversal |
 | journal_lines | PK(id), UNIQUE(entry_id,line_number), entry index, account/currency index | Ordered entry detail and balance queries |
 
-Posted-history immutability is enforced with SQLite triggers in migration SQL. Drizzle's TypeScript schema declares tables/indexes/checks; triggers are migration-owned objects and must be kept in sync with future migrations.
+Posted-history immutability is enforced with SQLite triggers in the bundled versioned migration. Drizzle's TypeScript schema declares tables/indexes/checks; triggers are migration-owned objects and must be kept in sync with future migrations.
 
 ## 7. Transaction and migration behavior
 
 - SQLCipher availability is checked before applying the key. If `PRAGMA cipher_version` is empty, initialization aborts; no plaintext fallback is allowed.
 - The key is 32 random bytes, hex-encoded and stored only in SecureStore. If the DB exists and the key is missing/invalid, initialization fails closed. No key regeneration, database deletion, or plaintext open is allowed.
+- A failed SQLCipher preflight removes only a database file created by that same fresh preflight (and its newly generated key); an existing database is never deleted.
 - Foreign keys and WAL are enabled on the encrypted connection before migrations.
 - Drizzle migration is versioned and safe to rerun using its migration journal. Migration failure closes the connection and rejects initialization; the application must not use a partially initialized repository.
 - The initialized database connection is process-singleton. Do not create new SQLite connections for queries/transactions unless the SQLCipher key setup is also performed on that connection.

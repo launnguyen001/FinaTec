@@ -32,10 +32,10 @@ export interface JournalLine {
   accountId: string;
   currencyCode: string;
   side: JournalSide;
-  amountMinor: number;
+  amountMinor: bigint;
   fxRateNumerator: string;
   fxRateDenominator: string;
-  baseAmountMinor: number;
+  baseAmountMinor: bigint;
   memo: string | null;
   createdAt: string;
 }

@@ -7,6 +7,7 @@ import {
   sqliteTable,
   text,
   uniqueIndex,
+  type AnySQLiteColumn,
 } from "drizzle-orm/sqlite-core";
 
 export const currencies = sqliteTable(
@@ -19,7 +20,10 @@ export const currencies = sqliteTable(
     createdAt: text("created_at").notNull(),
   },
   (table) => [
-    check("currencies_code_format", sql`length(${table.code}) = 3 AND ${table.code} = upper(${table.code})`),
+    check(
+      "currencies_code_format",
+      sql`length(${table.code}) = 3 AND ${table.code} = upper(${table.code})`,
+    ),
     check("currencies_minor_unit_range", sql`${table.minorUnit} BETWEEN 0 AND 6`),
   ],
 );
@@ -30,13 +34,14 @@ export const ledgerSettings = sqliteTable(
     id: integer("id").primaryKey(),
     baseCurrencyCode: text("base_currency_code")
       .notNull()
-      .references(() => currencies.code, { onDelete: "restrict", onUpdate: "restrict" }),
+      .references(() => currencies.code, {
+        onDelete: "restrict",
+        onUpdate: "restrict",
+      }),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
-  (table) => [
-    check("ledger_settings_singleton", sql`${table.id} = 1`),
-  ],
+  (table) => [check("ledger_settings_singleton", sql`${table.id} = 1`)],
 );
 
 export const accounts = sqliteTable(
@@ -49,7 +54,10 @@ export const accounts = sqliteTable(
     }).notNull(),
     currencyCode: text("currency_code")
       .notNull()
-      .references(() => currencies.code, { onDelete: "restrict", onUpdate: "restrict" }),
+      .references(() => currencies.code, {
+        onDelete: "restrict",
+        onUpdate: "restrict",
+      }),
     isSystem: integer("is_system", { mode: "boolean" }).notNull(),
     isArchived: integer("is_archived", { mode: "boolean" }).notNull(),
     createdAt: text("created_at").notNull(),
@@ -75,12 +83,15 @@ export const journalEntries = sqliteTable(
     status: text("status", { enum: ["DRAFT", "POSTED"] }).notNull(),
     baseCurrencyCode: text("base_currency_code")
       .notNull()
-      .references(() => currencies.code, { onDelete: "restrict", onUpdate: "restrict" }),
+      .references(() => currencies.code, {
+        onDelete: "restrict",
+        onUpdate: "restrict",
+      }),
     idempotencyKey: text("idempotency_key"),
-    reversalOfId: text("reversal_of_id").references((): any => journalEntries.id, {
-      onDelete: "restrict",
-      onUpdate: "restrict",
-    }),
+    reversalOfId: text("reversal_of_id").references(
+      (): AnySQLiteColumn => journalEntries.id,
+      { onDelete: "restrict", onUpdate: "restrict" },
+    ),
     createdAt: text("created_at").notNull(),
     postedAt: text("posted_at"),
   },
@@ -93,12 +104,18 @@ export const journalEntries = sqliteTable(
     uniqueIndex("journal_entries_reversal_unique")
       .on(table.reversalOfId)
       .where(sql`${table.reversalOfId} IS NOT NULL`),
-    check("journal_entries_status_check", sql`${table.status} IN ('DRAFT', 'POSTED')`),
+    check(
+      "journal_entries_status_check",
+      sql`${table.status} IN ('DRAFT', 'POSTED')`,
+    ),
     check(
       "journal_entries_posted_at_check",
       sql`(${table.status} = 'DRAFT' AND ${table.postedAt} IS NULL) OR (${table.status} = 'POSTED' AND ${table.postedAt} IS NOT NULL)`,
     ),
-    check("journal_entries_not_self_reversal", sql`${table.reversalOfId} IS NULL OR ${table.reversalOfId} <> ${table.id}`),
+    check(
+      "journal_entries_not_self_reversal",
+      sql`${table.reversalOfId} IS NULL OR ${table.reversalOfId} <> ${table.id}`,
+    ),
   ],
 );
 
@@ -108,7 +125,10 @@ export const journalLines = sqliteTable(
     id: text("id").primaryKey(),
     entryId: text("entry_id")
       .notNull()
-      .references(() => journalEntries.id, { onDelete: "restrict", onUpdate: "restrict" }),
+      .references(() => journalEntries.id, {
+        onDelete: "restrict",
+        onUpdate: "restrict",
+      }),
     lineNumber: integer("line_number").notNull(),
     accountId: text("account_id").notNull(),
     currencyCode: text("currency_code").notNull(),
@@ -121,18 +141,26 @@ export const journalLines = sqliteTable(
     createdAt: text("created_at").notNull(),
   },
   (table) => [
-    uniqueIndex("journal_lines_entry_line_unique").on(table.entryId, table.lineNumber),
+    uniqueIndex("journal_lines_entry_line_unique").on(
+      table.entryId,
+      table.lineNumber,
+    ),
     index("journal_lines_account_idx").on(table.accountId, table.currencyCode),
     index("journal_lines_entry_idx").on(table.entryId),
     foreignKey({
       columns: [table.accountId, table.currencyCode],
       foreignColumns: [accounts.id, accounts.currencyCode],
       name: "journal_lines_account_currency_fk",
-    }).onDelete("restrict").onUpdate("restrict"),
+    })
+      .onDelete("restrict")
+      .onUpdate("restrict"),
     check("journal_lines_line_number_positive", sql`${table.lineNumber} > 0`),
     check("journal_lines_side_check", sql`${table.side} IN ('DEBIT', 'CREDIT')`),
     check("journal_lines_amount_positive", sql`${table.amountMinor} > 0`),
-    check("journal_lines_base_amount_nonnegative", sql`${table.baseAmountMinor} >= 0`),
+    check(
+      "journal_lines_base_amount_nonnegative",
+      sql`${table.baseAmountMinor} >= 0`,
+    ),
     check(
       "journal_lines_fx_numerator_positive",
       sql`${table.fxRateNumerator} GLOB '[1-9]*' AND ${table.fxRateNumerator} NOT GLOB '*[^0-9]*'`,

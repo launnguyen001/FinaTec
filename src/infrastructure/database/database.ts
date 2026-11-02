@@ -12,6 +12,13 @@ const DATABASE_NAME = "ket-so-ledger.db";
 const KEY_STORAGE_NAME = "ketso.database.sqlcipher-key.v1";
 const RAW_KEY_PATTERN = /^[0-9a-f]{64}$/;
 
+class SqlCipherUnavailableError extends Error {
+  constructor() {
+    super("SQLCipher is unavailable in this native build; refusing plaintext database access");
+    this.name = "SqlCipherUnavailableError";
+  }
+}
+
 function toHex(bytes: Uint8Array): string {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
@@ -25,14 +32,16 @@ function databaseFile(): FileSystem.File {
   return new FileSystem.File(uri, DATABASE_NAME);
 }
 
-async function resolveDatabaseKey(databaseExists: boolean): Promise<string> {
+async function resolveDatabaseKey(
+  databaseExists: boolean,
+): Promise<{ key: string; generated: boolean }> {
   const storedKey = await SecureStore.getItemAsync(KEY_STORAGE_NAME);
 
   if (storedKey !== null) {
     if (!RAW_KEY_PATTERN.test(storedKey)) {
       throw new Error("Stored database key is invalid; refusing to open database");
     }
-    return storedKey;
+    return { key: storedKey, generated: false };
   }
 
   if (databaseExists) {
@@ -43,7 +52,7 @@ async function resolveDatabaseKey(databaseExists: boolean): Promise<string> {
 
   const key = toHex(await Crypto.getRandomBytesAsync(32));
   await SecureStore.setItemAsync(KEY_STORAGE_NAME, key);
-  return key;
+  return { key, generated: true };
 }
 
 function createLedgerDatabase(client: SQLite.SQLiteDatabase) {
@@ -54,8 +63,8 @@ export type LedgerDatabase = ReturnType<typeof createLedgerDatabase>;
 
 async function openLedgerDatabase(): Promise<LedgerDatabase> {
   const file = databaseFile();
-  const key = await resolveDatabaseKey(file.exists);
-
+  const databaseExisted = file.exists;
+  const keyResult = await resolveDatabaseKey(databaseExisted);
   const client = await SQLite.openDatabaseAsync(DATABASE_NAME, {
     useNewConnection: true,
   });
@@ -65,13 +74,11 @@ async function openLedgerDatabase(): Promise<LedgerDatabase> {
       "PRAGMA cipher_version",
     );
     if (!cipher?.cipher_version) {
-      throw new Error(
-        "SQLCipher is unavailable in this native build; refusing plaintext database access",
-      );
+      throw new SqlCipherUnavailableError();
     }
 
     // The key is validated as lowercase hex before interpolation; PRAGMA key does not accept bind parameters.
-    await client.execAsync(`PRAGMA key = "x'${key}'"`);
+    await client.execAsync(`PRAGMA key = "x'${keyResult.key}'"`);
     await client.execAsync("PRAGMA foreign_keys = ON");
     await client.execAsync("PRAGMA journal_mode = WAL");
 
@@ -80,6 +87,15 @@ async function openLedgerDatabase(): Promise<LedgerDatabase> {
     return db;
   } catch (error) {
     await client.closeAsync();
+
+    // Expo SQLite creates a file when opened. Remove only that just-created empty
+    // preflight file if this binary lacks SQLCipher; never touch an existing DB.
+    if (error instanceof SqlCipherUnavailableError && !databaseExisted) {
+      if (file.exists) file.delete();
+      if (keyResult.generated) {
+        await SecureStore.deleteItemAsync(KEY_STORAGE_NAME);
+      }
+    }
     throw error;
   }
 }
@@ -95,13 +111,4 @@ export function getLedgerDatabase(): Promise<LedgerDatabase> {
     });
   }
   return databasePromise;
-}
-
-/** Intended for controlled app shutdown and integration tests, never for routine queries. */
-export async function closeLedgerDatabase(): Promise<void> {
-  if (!databasePromise) return;
-  const db = await databasePromise;
-  // Drizzle retains the Expo SQLite client as its session client.
-  await (db as unknown as { $client: SQLite.SQLiteDatabase }).$client.closeAsync();
-  databasePromise = null;
 }

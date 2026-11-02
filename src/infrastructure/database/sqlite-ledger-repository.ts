@@ -1,5 +1,9 @@
 import { asc, eq } from "drizzle-orm";
 
+import {
+  fromSqliteInteger,
+  toSqliteSafeInteger,
+} from "../../domain/ledger/money";
 import type {
   Account,
   CreateDraftEntry,
@@ -41,9 +45,31 @@ export class SqliteLedgerRepository implements LedgerRepository {
       throw new Error("A draft journal entry must contain at least one line");
     }
 
+    const lineNumbers = new Set<number>();
+    const rows = input.lines.map((line) => {
+      if (line.entryId !== input.entry.id) {
+        throw new Error("Every journal line must belong to the supplied entry");
+      }
+      if (!Number.isSafeInteger(line.lineNumber) || line.lineNumber <= 0 || lineNumbers.has(line.lineNumber)) {
+        throw new Error("Journal line numbers must be unique positive safe integers");
+      }
+      lineNumbers.add(line.lineNumber);
+      if (line.amountMinor <= 0n || line.baseAmountMinor < 0n) {
+        throw new Error("Journal amounts must be positive native and non-negative base minor units");
+      }
+      if (!/^[1-9]\d*$/.test(line.fxRateNumerator) || !/^[1-9]\d*$/.test(line.fxRateDenominator)) {
+        throw new Error("FX rate numerator and denominator must be positive integer strings");
+      }
+      return {
+        ...line,
+        amountMinor: toSqliteSafeInteger(line.amountMinor),
+        baseAmountMinor: toSqliteSafeInteger(line.baseAmountMinor),
+      };
+    });
+
     await this.db.transaction(async (tx) => {
       await tx.insert(journalEntries).values(input.entry);
-      await tx.insert(journalLines).values(input.lines);
+      await tx.insert(journalLines).values(rows);
     });
   }
 
@@ -57,12 +83,17 @@ export class SqliteLedgerRepository implements LedgerRepository {
   }
 
   async listJournalLines(entryId: string): Promise<JournalLine[]> {
-    return this.db
+    const rows = await this.db
       .select()
       .from(journalLines)
       .where(eq(journalLines.entryId, entryId))
       .orderBy(asc(journalLines.lineNumber))
       .all();
+    return rows.map((row) => ({
+      ...row,
+      amountMinor: fromSqliteInteger(row.amountMinor),
+      baseAmountMinor: fromSqliteInteger(row.baseAmountMinor),
+    }));
   }
 
   async getBaseCurrencyCode(): Promise<string | null> {

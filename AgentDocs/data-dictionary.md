@@ -69,4 +69,4 @@ The row is absent until the user completes first-run currency setup.
 
 ## Persistence limits
 
-The Domain `Money` value object uses `bigint`. Before writing to SQLite INTEGER through the JavaScript driver, the adapter must validate `Number.isSafeInteger` range. Amounts outside this limit are rejected, never truncated or coerced.
+The Domain `Money` value object uses `bigint`. Before writing to SQLite INTEGER through the JavaScript driver, the adapter validates `Number.isSafeInteger` range. Amounts outside this limit are rejected, never truncated or coerced.

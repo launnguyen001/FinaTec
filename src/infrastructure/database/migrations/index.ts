@@ -1,4 +1,4 @@
-import migration0000 from "./0000_ledger_foundation.sql";
+import { migration0000 } from "./0000_ledger_foundation";
 
 const migrationTime = 1_793_520_000_000;
 

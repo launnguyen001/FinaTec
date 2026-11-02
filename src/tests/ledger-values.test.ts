@@ -20,7 +20,7 @@ describe("ledger value objects", () => {
     const usd = new Currency("USD", 2);
     const vnd = new Currency("VND", 0);
     const rate = FxRate.fromDecimal("25450.5", usd, vnd);
-    expect(rate.convertToBase(new Money(100n, usd)).minorUnits).toBe(2545050n);
+    expect(rate.convertToBase(new Money(100n, usd)).minorUnits).toBe(25451n);
     expect(rate.convertToBase(new Money(1n, usd)).minorUnits).toBe(255n);
   });
 
