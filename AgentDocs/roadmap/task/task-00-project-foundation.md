@@ -1,89 +1,89 @@
-# TASK-00 — Project Foundation
+# TASK-00 — Nền tảng dự án
 
-- **Phase:** 0 — Project Foundation
-- **Priority:** P0
-- **Status:** IN PROGRESS
-- **Estimate:** 1–2 weeks (planning estimate)
-- **Roadmap source:** `AgentDocs/roadmap/plan.md`
-- **Specification source:** `AgentDocs/core/Đặc tả ứng dụng Quản lý Tài chính Cá nhân – Két Số.md`
+- **Giai đoạn:** 0 — Nền tảng dự án
+- **Ưu tiên:** P0
+- **Trạng thái:** IN PROGRESS
+- **Ước lượng:** 1–2 tuần (ước lượng lập kế hoạch)
+- **Roadmap nguồn:** `AgentDocs/roadmap/plan.md`
+- **Đặc tả nguồn:** Tài liệu đặc tả ứng dụng trong `AgentDocs/core/`
 
-## 1. Objective
-Establish a reproducible Android/iOS development foundation for Két Số. Validate the current Expo project and prove the feasibility of the selected local encrypted database stack before feature implementation.
+## 1. Mục tiêu
+Thiết lập nền tảng phát triển Android/iOS có thể tái lập và kiểm chứng. Rà soát dự án Expo hiện tại, đồng thời xác minh khả năng tích hợp cơ sở dữ liệu cục bộ có mã hóa trước khi triển khai nghiệp vụ tài chính.
 
-## 2. Scope
-**In scope**
-- Audit the existing repository, Expo SDK, React Native, package manager, app entry points and current build state.
-- Establish TypeScript strict mode and a safe migration path from existing JavaScript; do not rewrite working code without need.
-- Configure Expo Router and the agreed source layout.
-- Configure lint, formatting, type-check, unit-test baseline and documented commands.
-- Run a technical spike for SQLite + SQLCipher + Drizzle on an Expo Development Build, including open/close, encryption/key handling feasibility and one migration.
-- Establish design tokens, typography, spacing and minimal reusable primitives.
-- Establish privacy-safe logging and Android development build workflow.
+## 2. Phạm vi
+**Bao gồm**
+- Kiểm tra cấu trúc repo, Expo SDK, React Native, trình quản lý gói, entry point và trạng thái build hiện tại.
+- Thiết lập TypeScript strict mode và lộ trình chuyển đổi an toàn từ JavaScript; không viết lại phần đang hoạt động nếu không cần thiết.
+- Cấu hình Expo Router và cấu trúc mã nguồn theo kiến trúc đã thống nhất.
+- Thiết lập lint, format, type-check, unit test và tài liệu hướng dẫn chạy.
+- Thực hiện technical spike cho SQLite + SQLCipher + Drizzle trên Expo Development Build: mở/đóng DB, kiểm tra mã hóa, khả năng quản lý khóa và chạy migration thử nghiệm.
+- Xây dựng design token, typography, spacing và các UI primitive tối thiểu.
+- Thiết lập quy tắc log an toàn và quy trình build Android.
 
-**Out of scope**
-- Financial feature implementation, final ledger schema and production backup implementation.
-- Market-price provider integration.
-- Replacing Expo or introducing a backend.
+**Không bao gồm**
+- Triển khai tính năng tài chính, schema ledger production hay backup production.
+- Tích hợp nhà cung cấp giá thị trường.
+- Thay thế Expo hoặc bổ sung backend.
 
-## 3. Dependencies
-- None. This is the first execution task.
-- Product and architecture constraints are defined by the specification and roadmap; unresolved choices must be recorded, not silently assumed.
+## 3. Phụ thuộc
+- Không có task phụ thuộc trước đó.
+- Các ràng buộc sản phẩm và kiến trúc phải tuân theo đặc tả và roadmap. Mọi lựa chọn chưa rõ phải được ghi nhận, không tự suy diễn.
 
-## 4. Current context to inspect
-- `package.json`, lockfile, `app.json`, `App.js`, `index.js`, `AGENTS.md`, `.gitignore`, existing assets and app startup.
-- Current Expo SDK / React Native versions and compatibility documentation for every Expo/native API touched.
-- Existing directory structure before adding `src/`.
+## 4. Bối cảnh cần kiểm tra
+- `package.json`, lockfile, `app.json`, `App.js`, `index.js`, `AGENTS.md`, `.gitignore`, assets và luồng khởi động hiện tại.
+- Phiên bản Expo SDK/React Native và tài liệu tương thích đúng phiên bản cho các API native được sử dụng.
+- Cấu trúc thư mục hiện tại trước khi bổ sung `src/`.
 
-## 5. Proposed changes
-- Add or configure TypeScript, strict compiler settings and Expo Router only after compatibility review.
-- Create the approved `src/app`, `presentation`, `application`, `domain`, `infrastructure`, `shared`, and test structure.
-- Add lint/format/type-check/test scripts and a minimal smoke test.
-- Add a database adapter spike isolated from production domain code.
-- Document exact supported commands and development-build requirements.
+## 5. Thay đổi dự kiến
+- Cấu hình TypeScript, compiler strict mode và Expo Router sau khi rà soát tương thích.
+- Thiết lập các ranh giới `app`, `presentation`, `application`, `domain`, `infrastructure`, `shared` và thư mục test theo cấu trúc được duyệt.
+- Bổ sung script lint/format/type-check/test và smoke test tối thiểu.
+- Tạo technical spike DB tách biệt khỏi domain production.
+- Ghi lại chính xác các lệnh phát triển và yêu cầu Development Build.
 
-## 6. Business and technical rules
-- Core financial data remains local; no user financial data may be sent to a server.
-- Do not assume Expo Go supports SQLCipher or other native modules.
-- Use Expo-compatible dependency installation and versioned Expo documentation.
-- No financial amounts may be calculated with ordinary floating-point arithmetic.
-- Logs must not contain balances, transaction descriptions, PINs, keys or other sensitive financial data.
+## 6. Quy tắc nghiệp vụ và kỹ thuật
+- Dữ liệu tài chính cốt lõi được lưu cục bộ; không gửi dữ liệu tài chính người dùng lên server.
+- Không mặc định Expo Go hỗ trợ SQLCipher hoặc native module khác.
+- Cài dependency tương thích Expo và dùng tài liệu Expo đúng phiên bản.
+- Không dùng số thực dấu phẩy động thông thường để tính toán tiền.
+- Log không được chứa số dư, mô tả giao dịch, PIN, khóa mã hóa hoặc dữ liệu tài chính nhạy cảm.
 
-## 7. Data changes
-No production schema. The spike may create a disposable test database and one test migration only.
+## 7. Thay đổi dữ liệu
+Chưa tạo schema production. Spike chỉ được dùng database thử nghiệm có thể xóa và một migration kiểm chứng.
 
-## 8. Implementation plan
-1. Inventory current app and capture baseline build/start/type/lint state.
-2. Confirm Expo SDK and React Native versions; inspect matching versioned Expo docs.
-3. Decide and document TypeScript adoption and routing migration strategy.
-4. Configure project structure and quality gates with minimal disruption.
-5. Prototype SQLite, SQLCipher and Drizzle in a Development Build.
-6. Verify database encryption behavior, key storage boundary, open/close and migration.
-7. Establish visual foundations and a minimal launch screen.
-8. Record compatibility findings, decisions, blockers and follow-up tasks.
+## 8. Kế hoạch triển khai
+1. Kiểm kê ứng dụng và ghi nhận trạng thái build/start/type/lint ban đầu.
+2. Xác nhận phiên bản Expo SDK và React Native; kiểm tra tài liệu tương ứng.
+3. Chốt cách áp dụng TypeScript và lộ trình chuyển đổi routing.
+4. Cấu hình cấu trúc dự án và quality gate với mức thay đổi tối thiểu.
+5. Tạo thử nghiệm SQLite, SQLCipher và Drizzle trên Development Build.
+6. Kiểm chứng mã hóa, ranh giới lưu khóa, mở/đóng DB và migration.
+7. Thiết lập nền tảng giao diện và màn hình khởi chạy tối thiểu.
+8. Ghi nhận kết quả tương thích, quyết định, rủi ro và việc cần làm tiếp.
 
-## 9. Test plan
-- Clean install and start app on Android development build.
-- Type-check, lint, formatter check and baseline unit tests.
-- Launch smoke test and route/navigation smoke test.
-- Database create/open/close/reopen and migration test.
-- Verify wrong/missing key cannot read encrypted database (if the selected SQLCipher integration supports this claim).
-- Verify no financial test data appears in logs.
-- Record iOS feasibility separately; do not claim iOS verified from Android-only tests.
+## 9. Kế hoạch kiểm thử
+- Cài đặt sạch và chạy ứng dụng trên Android Development Build.
+- Chạy type-check, lint, formatter check và unit test nền.
+- Kiểm thử khởi động ứng dụng và điều hướng cơ bản.
+- Kiểm thử tạo/mở/đóng/mở lại database và migration.
+- Xác minh khóa sai hoặc thiếu không thể đọc database đã mã hóa (nếu thư viện SQLCipher được chọn hỗ trợ kiểm chứng này).
+- Xác minh dữ liệu tài chính thử nghiệm không xuất hiện trong log.
+- Ghi riêng kết quả khả thi trên iOS; không tuyên bố đã kiểm thử iOS nếu chỉ chạy Android.
 
-## 10. Acceptance criteria
-- [ ] Existing app and dependencies have been audited.
-- [ ] Android development build runs reproducibly.
-- [ ] TypeScript strict-mode strategy is implemented or an explicit, justified migration plan is documented.
-- [ ] Expo Router and source boundaries are established without business logic in UI.
-- [ ] Lint, type-check and test baseline commands pass.
-- [ ] SQLite + SQLCipher + Drizzle compatibility is demonstrated in a development build, or a documented blocker and viable alternative are presented.
-- [ ] Database open/close and migration smoke tests pass.
-- [ ] Privacy-safe logging rules and developer commands are documented.
-- [ ] Decisions and unresolved risks are recorded for review.
+## 10. Tiêu chí nghiệm thu
+- [ ] Đã rà soát ứng dụng và dependency hiện tại.
+- [ ] Android Development Build chạy được theo quy trình có thể tái lập.
+- [ ] TypeScript strict mode được cấu hình hoặc có lộ trình chuyển đổi rõ ràng, có lý do.
+- [ ] Expo Router và ranh giới source được thiết lập, không đặt nghiệp vụ trong UI.
+- [ ] Các lệnh lint, type-check và test nền chạy thành công.
+- [ ] Đã chứng minh khả năng tương thích SQLite + SQLCipher + Drizzle trên Development Build, hoặc ghi rõ blocker và phương án thay thế.
+- [ ] Kiểm thử mở/đóng DB và migration thành công.
+- [ ] Quy tắc log an toàn và lệnh phát triển được tài liệu hóa.
+- [ ] Quyết định và rủi ro chưa xử lý được ghi nhận để review.
 
-## 11. Progress log
-- **Done:** Task created from Phase 0 of the approved roadmap.
-- **Doing:** Repository/toolchain audit and database feasibility spike.
-- **Next:** Complete compatibility review and foundation implementation.
-- **Issues:** Current repository starts as Expo JavaScript; confirm actual baseline before migrating.
-- **Verification:** Not run.
+## 11. Nhật ký tiến độ
+- **Đã làm:** Tạo task theo Giai đoạn 0 của roadmap.
+- **Đang làm:** Rà soát repo/toolchain và technical spike database.
+- **Tiếp theo:** Hoàn tất đánh giá tương thích và triển khai nền tảng.
+- **Vấn đề:** Repo hiện có nền JavaScript Expo; cần xác minh trạng thái thực tế trước khi chuyển đổi.
+- **Kiểm chứng:** Chưa chạy.
