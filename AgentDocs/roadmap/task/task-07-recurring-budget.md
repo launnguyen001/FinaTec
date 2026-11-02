@@ -1,63 +1,63 @@
-# TASK-07 — Recurring Transactions & Budget
+# TASK-07 — Giao dịch định kỳ và ngân sách
 
-- Phase: 4 — MVP 3
-- Priority: P1
-- Status: BLOCKED
-- Dependencies: TASK-02, TASK-03
+- Giai đoạn: 4 — MVP 3
+- Ưu tiên: P1
+- Trạng thái: BLOCKED
+- Phụ thuộc: TASK-02, TASK-03
 
-## Objective
-Support scheduled recurring financial records and category budgets with safe catch-up behavior and reminders.
+## 1. Mục tiêu
+Hỗ trợ các giao dịch được lên lịch định kỳ và ngân sách theo danh mục, có cơ chế xử lý bù an toàn và nhắc nhở người dùng.
 
-## Scope
-- Recurring rule configuration: frequency, next due date, amount, category and source account.
-- Reminder-only and user-confirmed/automatic posting modes, subject to approved policy.
-- Catch-up processing when app opens after missed dates.
-- Monthly category budgets and consumption summaries.
-- Notifications for upcoming recurring items and budget thresholds.
+## 2. Phạm vi
+- Cấu hình quy tắc định kỳ: tần suất, ngày đến hạn tiếp theo, số tiền, danh mục và tài khoản nguồn.
+- Chế độ chỉ nhắc nhở hoặc yêu cầu xác nhận/tự động ghi sổ theo chính sách đã duyệt.
+- Xử lý bù các kỳ đến hạn khi người dùng mở ứng dụng sau thời gian không sử dụng.
+- Ngân sách theo danh mục và kỳ tháng.
+- Thông báo giao dịch sắp đến hạn và ngưỡng ngân sách.
 
-Out of scope: cloud scheduler, server-side automation and automatic payments.
+Không bao gồm bộ lập lịch cloud, tự động hóa phía server hoặc thanh toán tự động.
 
-## Context
-Read specification sections on recurring rules, budgets and notifications; roadmap Phase 4. Reuse TASK-03 transaction use cases.
+## 3. Bối cảnh
+Đọc phần quy tắc định kỳ, ngân sách và thông báo trong đặc tả; Giai đoạn 4 roadmap. Tái sử dụng use case giao dịch của TASK-03.
 
-## Business rules
-- Recurring generation must be idempotent across app restarts and repeated catch-up.
-- Auto-post behavior must be explicit per rule; default should not silently move money.
-- Generated transactions use the same accounting validation as manual transactions.
-- Budget consumption is derived from eligible posted expenses, not separately maintained totals.
-- Transfers are excluded from expense budget consumption.
-- Notification delivery is best-effort; core records cannot depend on background execution.
+## 4. Quy tắc nghiệp vụ
+- Việc sinh giao dịch định kỳ phải idempotent qua các lần mở ứng dụng và xử lý bù.
+- Chế độ tự động ghi sổ phải được cấu hình rõ; mặc định không tự ý dịch chuyển tiền.
+- Giao dịch sinh tự động phải qua cùng kiểm tra kế toán như giao dịch thủ công.
+- Mức sử dụng ngân sách được tính từ chi phí đã ghi sổ đủ điều kiện, không duy trì một tổng độc lập dễ sai lệch.
+- Chuyển tiền không được tính vào ngân sách chi tiêu.
+- Thông báo chỉ mang tính hỗ trợ; dữ liệu cốt lõi không phụ thuộc việc chạy nền.
 
-## Proposed changes
-RecurringRule model and processor; idempotency key/unique period constraint; budget use cases and queries; notification adapter; recurring and budget screens.
+## 5. Thay đổi dự kiến
+RecurringRule và bộ xử lý; khóa idempotency/unique constraint theo kỳ; use case và truy vấn ngân sách; notification adapter; màn hình quản lý định kỳ và ngân sách.
 
-## Data changes
-Approved recurring rule, generated-occurrence tracking and budget records. Add uniqueness that prevents duplicate occurrence creation.
+## 6. Thay đổi dữ liệu
+Bổ sung bản ghi quy tắc định kỳ, lần phát sinh và ngân sách đã duyệt. Có unique constraint để ngăn tạo trùng một lần phát sinh.
 
-## Implementation plan
-1. Define recurrence frequencies, month-end behavior and catch-up policy.
-2. Define confirmation versus auto-post behavior.
-3. Implement due-occurrence calculation and idempotency.
-4. Route generated entries through normal transaction use cases.
-5. Implement budget limits and derived consumption.
-6. Schedule notifications and handle denied permissions.
-7. Build management and summary screens.
+## 7. Kế hoạch triển khai
+1. Chốt tần suất, cách xử lý cuối tháng và chính sách bù kỳ.
+2. Chốt chế độ xác nhận hay tự động ghi sổ.
+3. Xây bộ tính lần phát sinh đến hạn và idempotency.
+4. Đưa giao dịch sinh ra qua use case giao dịch thông thường.
+5. Triển khai hạn mức và mức sử dụng ngân sách được tính từ dữ liệu gốc.
+6. Lập lịch thông báo và xử lý trường hợp người dùng từ chối quyền.
+7. Xây màn hình quản lý và tổng quan.
 
-## Test plan
-Month-end/leap-year schedules; app offline for multiple periods; repeated catch-up; retry after partial failure; auto-post versus reminder-only; budget period boundaries; transfer exclusion; notification permission denied.
+## 8. Kế hoạch kiểm thử
+Cuối tháng/năm nhuận; ứng dụng offline nhiều kỳ; chạy bù lặp lại; retry sau lỗi một phần; chế độ tự động và chỉ nhắc; ranh giới kỳ ngân sách; loại chuyển tiền; từ chối quyền thông báo.
 
-## Acceptance criteria
-- [ ] Recurring rules generate or remind according to configuration.
-- [ ] Reprocessing never duplicates an occurrence.
-- [ ] Generated postings pass normal accounting validation.
-- [ ] Budget usage derives from eligible posted expenses.
-- [ ] Transfers do not consume expense budgets.
-- [ ] Missing background execution is recovered on next app launch.
-- [ ] Tests cover date boundaries and retries.
+## 9. Tiêu chí nghiệm thu
+- [ ] Quy tắc định kỳ sinh giao dịch hoặc nhắc nhở đúng cấu hình.
+- [ ] Xử lý lại không tạo lần phát sinh trùng.
+- [ ] Giao dịch sinh ra vượt qua kiểm tra kế toán thông thường.
+- [ ] Mức sử dụng ngân sách được tính từ chi phí đủ điều kiện đã ghi sổ.
+- [ ] Chuyển tiền không làm tiêu hao ngân sách chi phí.
+- [ ] Các kỳ bị bỏ lỡ được xử lý khi mở ứng dụng lần tiếp theo.
+- [ ] Kiểm thử bao phủ ranh giới ngày và retry.
 
-## Progress log
-- Done: Task defined from Phase 4.
-- Doing: Blocked pending TASK-03 and recurrence policy decisions.
-- Next: Approve schedule semantics and implement idempotent processor.
-- Issues: Month-end and catch-up policy require confirmation.
-- Verification: Not run.
+## 10. Nhật ký tiến độ
+- Đã làm: Tạo task theo Giai đoạn 4.
+- Đang làm: Chờ TASK-03 và quyết định về quy tắc định kỳ.
+- Tiếp theo: Chốt ngữ nghĩa lịch và triển khai bộ xử lý idempotent.
+- Vấn đề: Cách xử lý cuối tháng và bù kỳ cần xác nhận.
+- Kiểm chứng: Chưa chạy.
