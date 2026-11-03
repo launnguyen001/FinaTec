@@ -20,6 +20,10 @@ import {
   type RepaymentMethod,
 } from "../../domain/liability/repayment-schedule";
 import { formatBigIntVi } from "../../shared/formatting/format-bigint";
+import {
+  parseFxRateRatio,
+  splitDecliningPrincipalInput,
+} from "./liability-input";
 import { colors, spacing } from "../../shared/theme/tokens";
 import { ScreenBackLink } from "../components/ScreenBackLink";
 import { useFinanceRuntime } from "../providers/FinanceRuntimeProvider";
@@ -43,24 +47,6 @@ function parseAprPpm(value: string): bigint {
     throw new Error("APR không hợp lệ; tối đa 4 chữ số thập phân");
   const [whole, fraction = ""] = normalized.split(".");
   return BigInt(whole!) * 10_000n + BigInt((fraction + "0000").slice(0, 4));
-}
-
-function parseFxRateRatio(value: string): {
-  numerator: string;
-  denominator: string;
-} {
-  const normalized = value.trim().replace(",", ".");
-  if (!/^(?:0|[1-9]\d*)(?:\.\d{1,8})?$/.test(normalized)) {
-    throw new Error("Tỷ giá phải là số thập phân dương, tối đa 8 chữ số");
-  }
-  const [whole, fraction = ""] = normalized.split(".");
-  const denominator = 10n ** BigInt(fraction.length);
-  const numerator = BigInt(whole!) * denominator + BigInt(fraction || "0");
-  if (numerator <= 0n) throw new Error("Tỷ giá phải lớn hơn 0");
-  return {
-    numerator: numerator.toString(),
-    denominator: denominator.toString(),
-  };
 }
 
 function formatMoney(
@@ -313,11 +299,9 @@ export function LiabilityScreen() {
       const dueDate = firstDueDate || addMonthsClamped(startDate, 1);
       const principalParts =
         method === "DECLINING"
-          ? decliningPrincipalInput
-              .split(/[;\n]+/)
-              .map((part) => part.trim())
-              .filter(Boolean)
-              .map((part) => parseMinorUnits(part, selectedCurrency.minorUnit))
+          ? splitDecliningPrincipalInput(decliningPrincipalInput).map((part) =>
+              parseMinorUnits(part, selectedCurrency.minorUnit),
+            )
           : undefined;
       if (
         method === "DECLINING" &&
