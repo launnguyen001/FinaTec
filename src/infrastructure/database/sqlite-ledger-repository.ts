@@ -89,7 +89,7 @@ export class SqliteLedgerRepository implements LedgerRepository {
       // Drizzle's Expo SQLite session is synchronous: an async callback would
       // return its Promise before the first await and commit the transaction
       // early. Use synchronous query execution so both writes remain atomic.
-      tx.insert(journalEntries).values(input.entry).run();
+      tx.insert(journalEntries).values({ ...input.entry, transactionKind: input.entry.transactionKind ?? "LEGACY", categoryId: input.entry.categoryId ?? null, postingPurpose: input.entry.postingPurpose ?? "STANDARD", auditReason: input.entry.auditReason ?? null }).run();
       tx.insert(journalLines).values(rows).run();
     });
   }
@@ -197,6 +197,10 @@ export class SqliteLedgerRepository implements LedgerRepository {
       ...input.entry,
       status: "DRAFT" as const,
       postedAt: null,
+      transactionKind: input.entry.transactionKind ?? "LEGACY",
+      categoryId: input.entry.categoryId ?? null,
+      postingPurpose: input.entry.postingPurpose ?? "STANDARD",
+      auditReason: input.entry.auditReason ?? null,
     };
 
     return this.db.transaction((tx) => {
@@ -239,10 +243,11 @@ export class SqliteLedgerRepository implements LedgerRepository {
         }
       }
 
+      const archivedAccountIds = this.validateArchivedPosting(input.entry, input.lines, tx);
       validateJournalEntry(
         input.entry,
         input.lines,
-        this.readPostingContext(tx),
+        this.readPostingContext(tx, archivedAccountIds),
       );
 
       // The schema forbids adding lines to an entry whose status is already
@@ -294,7 +299,51 @@ export class SqliteLedgerRepository implements LedgerRepository {
     return this.toDomainLines(rows);
   }
 
-  private readPostingContext(tx: LedgerTransaction): PostingContext {
+  private validateArchivedPosting(
+    entry: JournalEntry,
+    lines: readonly JournalLine[],
+    tx: LedgerTransaction,
+  ): ReadonlySet<string> {
+    const accountRows = tx.select().from(accounts).all();
+    const accountById = new Map(accountRows.map((account) => [account.id, account]));
+    const archivedIds = new Set(lines.filter((line) => accountById.get(line.accountId)?.isArchived).map((line) => line.accountId));
+    if (archivedIds.size === 0) {
+      if ((entry.postingPurpose ?? "STANDARD") !== "STANDARD" || entry.auditReason) throw new Error("Archived-account audit metadata is only valid when a posting touches an archived account");
+      return archivedIds;
+    }
+    const reason = entry.auditReason?.trim() ?? "";
+    if (reason.length < 8) throw new Error("Archived-account posting requires an audit reason of at least 8 characters");
+    const purpose = entry.postingPurpose ?? "STANDARD";
+    if (purpose === "ARCHIVED_ACCOUNT_SETTLEMENT" || purpose === "ARCHIVED_ACCOUNT_ADJUSTMENT") {
+      if (entry.transactionKind !== "ADJUSTMENT" || entry.reversalOfId !== null) throw new Error("Archived-account settlement must be a new ADJUSTMENT entry");
+      if (archivedIds.size !== 1) throw new Error("A settlement may affect exactly one archived account");
+      if ([...archivedIds].some((id) => accountById.get(id)?.type !== "ASSET")) throw new Error("Only archived ASSET accounts can be settled through this flow");
+      if (lines.length !== 2) throw new Error("Archived-account settlement must contain exactly two journal lines");
+      const sourceLine = lines.find((line) => archivedIds.has(line.accountId));
+      const destinationLine = lines.find((line) => !archivedIds.has(line.accountId));
+      if (!sourceLine || !destinationLine || accountById.get(destinationLine.accountId)?.type !== "ASSET" || accountById.get(destinationLine.accountId)?.isArchived) throw new Error("Archived-account settlement requires one active ASSET destination");
+      if (sourceLine.side !== "CREDIT" || destinationLine.side !== "DEBIT" || sourceLine.currencyCode !== destinationLine.currencyCode || sourceLine.amountMinor !== destinationLine.amountMinor || sourceLine.fxRateNumerator !== destinationLine.fxRateNumerator || sourceLine.fxRateDenominator !== destinationLine.fxRateDenominator) throw new Error("Archived-account settlement must transfer the same currency amount out of the archived account");
+      return archivedIds;
+    }
+    if (purpose === "ARCHIVED_ACCOUNT_REVERSAL") {
+      if (entry.transactionKind !== "REVERSAL" || !entry.reversalOfId) throw new Error("Archived-account reversal must link to its original entry");
+      const original = tx.select().from(journalEntries).where(eq(journalEntries.id, entry.reversalOfId)).get();
+      if (!original || original.status !== "POSTED") throw new Error("Archived-account reversal source must be POSTED");
+      const originalRows = tx.select().from(journalLines).where(eq(journalLines.entryId, original.id)).orderBy(asc(journalLines.lineNumber)).all();
+      const originalLines = this.toDomainLines(originalRows);
+      if (originalLines.length !== lines.length) throw new Error("Reversal must preserve every original journal line");
+      if (entry.baseCurrencyCode !== original.baseCurrencyCode || (entry.categoryId ?? null) !== (original.categoryId ?? null)) throw new Error("Reversal must preserve the original base currency and Category");
+      for (let index = 0; index < originalLines.length; index += 1) {
+        const source = originalLines[index]!;
+        const reversal = lines[index]!;
+        if (source.accountId !== reversal.accountId || source.currencyCode !== reversal.currencyCode || source.amountMinor !== reversal.amountMinor || source.baseAmountMinor !== reversal.baseAmountMinor || source.fxRateNumerator !== reversal.fxRateNumerator || source.fxRateDenominator !== reversal.fxRateDenominator || source.side === reversal.side) throw new Error("Reversal lines must exactly mirror the original entry with opposite sides");
+      }
+      if ([...archivedIds].some((id) => !originalLines.some((line) => line.accountId === id))) throw new Error("Reversal may only access archived accounts used by the original entry");
+      return archivedIds;
+    }
+    throw new Error("Archived accounts require a dedicated settlement or reversal purpose");
+  }
+  private readPostingContext(tx: LedgerTransaction, allowedArchivedAccountIds: ReadonlySet<string> = new Set()): PostingContext {
     const accountRows = tx.select().from(accounts).all();
     const currencyRows = tx.select().from(currencies).all();
     return {
@@ -309,6 +358,7 @@ export class SqliteLedgerRepository implements LedgerRepository {
           },
         ]),
       ),
+      allowedArchivedAccountIds,
     };
   }
 

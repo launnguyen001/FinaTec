@@ -70,3 +70,36 @@ The row is absent until the user completes first-run currency setup.
 ## Persistence limits
 
 The Domain `Money` value object uses `bigint`. Before writing to SQLite INTEGER through the JavaScript driver, the adapter validates `Number.isSafeInteger` range. Amounts outside this limit are rejected, never truncated or coerced.
+
+## TASK-03 — Schema version 2 additions
+
+### accounts (new column)
+| Column | Type | Null | Rule |
+|---|---|---:|---|
+| subtype | TEXT | Yes | ASSET only: CASH, BANK, EWALLET, SAVINGS, OTHER. Existing ASSET rows backfill to OTHER; other Account types must be null. |
+
+### categories (new table)
+| Column | Type | Null | Rule |
+|---|---|---:|---|
+| id | TEXT | No | PK |
+| name | TEXT | No | Non-empty |
+| kind | TEXT | No | INCOME or EXPENSE; immutable after referenced by a Journal Entry |
+| parent_id | TEXT | Yes | Self-FK; parent and child must have same kind; hierarchy must be acyclic |
+| is_archived | INTEGER | No | Boolean; archive preserves historical references |
+| created_at | TEXT | No | Creation timestamp |
+| updated_at | TEXT | No | Last update timestamp |
+
+### journal_entries (new columns)
+| Column | Type | Null | Rule |
+|---|---|---:|---|
+| transaction_kind | TEXT | No | INCOME, EXPENSE, TRANSFER, OPENING_BALANCE, ADJUSTMENT, REVERSAL, LEGACY; existing entries backfill to LEGACY |
+| category_id | TEXT | Yes | FK categories.id; at most one Category per entry; income/expense kind must match transaction kind |
+
+TRANSFER and OPENING_BALANCE entries must not carry a Category. Historical entries whose kind cannot be inferred remain LEGACY and uncategorized.
+
+Additional `journal_entries` audit columns (TASK-03):
+
+| Column | Type | Null | Rule |
+|---|---|---:|---|
+| posting_purpose | TEXT | No | STANDARD, ARCHIVED_ACCOUNT_SETTLEMENT, ARCHIVED_ACCOUNT_ADJUSTMENT, ARCHIVED_ACCOUNT_REVERSAL; defaults to STANDARD |
+| audit_reason | TEXT | Yes | Required (minimum 8 trimmed characters) whenever a posting touches an archived Account through an approved purpose |

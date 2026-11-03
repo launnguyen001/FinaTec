@@ -2,7 +2,7 @@
 
 - **Giai đoạn:** 2 — MVP 1
 - **Ưu tiên:** P0
-- **Trạng thái:** PLANNED — scope đã chốt; chưa triển khai
+- **Trạng thái:** IN_PROGRESS — triển khai trên branch `task/03-core-finance`
 - **Phụ thuộc:** TASK-02 (DONE; cần mở rộng có kiểm soát policy posting theo mục 5)
 - **Scope được duyệt:** 2026-11-03
 
@@ -22,6 +22,7 @@ Người dùng thao tác bằng ngôn ngữ tài chính thông thường. Mọi 
 - Giữ nguyên Account.type hiện tại: ASSET, LIABILITY, EQUITY, INCOME, EXPENSE.
 - Account loại ASSET có subtype: CASH, BANK, EWALLET, SAVINGS, OTHER. Danh sách có thể mở rộng ở task sau bằng migration; không tạo Account.type mới để biểu diễn nguồn tiền.
 - subtype chỉ áp dụng cho ASSET; các loại Account khác để null.
+- subtype chỉ phân loại nguồn tiền, không phải Asset record hoặc nguồn số dư riêng. Nếu TASK-04 tạo hồ sơ Asset liên kết Account, số dư kinh tế chỉ được tính một lần theo mapping/reconciliation của Core.
 - Không lưu số dư trực tiếp trên Account. Số dư luôn suy ra từ journal lines thuộc Journal Entry POSTED.
 
 **Category**
@@ -163,7 +164,7 @@ App hiện mới ở mức khung/skeleton và diagnostic/acceptance screens. TAS
 
 ## 5. Hai điểm kiến trúc bắt buộc xử lý
 
-### 5.1 Archived-account settlement — cần mở rộng policy TASK-02
+### 5.1 Archived-account settlement — policy extension của TASK-02
 
 **Xung đột đã xác định:** TASK-02 hiện từ chối mọi posting vào Account archive, trong khi scope được duyệt yêu cầu tất toán/điều chỉnh có kiểm soát.
 
@@ -171,7 +172,7 @@ App hiện mới ở mức khung/skeleton và diagnostic/acceptance screens. TAS
 
 Yêu cầu:
 - Mặc định Account archive vẫn bị từ chối trong giao dịch thông thường.
-- Chỉ Application use case chuyên biệt được phép yêu cầu posting có purpose ARCHIVED_ACCOUNT_SETTLEMENT hoặc ARCHIVED_ACCOUNT_ADJUSTMENT.
+- Chỉ Application use case chuyên biệt được phép yêu cầu posting có purpose ARCHIVED_ACCOUNT_SETTLEMENT hoặc ARCHIVED_ACCOUNT_ADJUSTMENT; reversal chạm Account archive dùng ARCHIVED_ACCOUNT_REVERSAL.
 - Reversal của giao dịch cũ liên quan Account archive phải qua luồng reversal chuyên biệt và giữ audit link.
 - Domain/Accounting Engine kiểm tra purpose, command type, Account archive liên quan và điều kiện tất toán. Caller không được truyền boolean allowArchived tùy ý.
 - Ghi reason/audit metadata và idempotency key.
@@ -193,7 +194,8 @@ Schema delta dự kiến, xác nhận lại trong migration design:
 - Thêm accounts.subtype, chỉ áp dụng cho ASSET.
 - Tạo categories với ID, name, kind, parent reference, archive state và timestamps.
 - Thêm journal_entries.category_id nullable, FK tới Category.
-- Thêm transaction kind cho Journal Entry để phân biệt nghiệp vụ: INCOME, EXPENSE, TRANSFER, OPENING_BALANCE, ADJUSTMENT, REVERSAL; có thể có LEGACY cho dữ liệu cũ không thể phân loại chắc chắn.
+- Thêm transaction kind cho Journal Entry để phân biệt nghiệp vụ: INCOME, EXPENSE, TRANSFER, OPENING_BALANCE, ADJUSTMENT, REVERSAL; có LEGACY cho dữ liệu cũ không thể phân loại chắc chắn.
+- Thêm posting_purpose và audit_reason để lưu lý do kiểm toán cho settlement/reversal chạm Account archive.
 - Index cho Category hierarchy, account subtype/archive, occurredAt và history filters.
 - Bổ sung FK/check/unique constraints phù hợp; invariant không biểu diễn được bằng SQL phải validate ở Domain/Application.
 
@@ -292,10 +294,16 @@ Mọi command ghi dữ liệu phải có Domain/Application validation, idempote
 
 ## 11. Nhật ký tiến độ
 
-- **Done:** Chủ dự án chốt scope và các lựa chọn nghiệp vụ ngày 2026-11-03.
-- **Done:** Đối chiếu Core, TASK-01 schema, TASK-02 accounting rules và dependency TASK-04/05/06/07/08.
-- **Doing:** Chưa triển khai code; task spec ghi rõ schema delta, migration strategy, archived-account policy và Dashboard multi-currency.
-- **Next:** Thiết kế chi tiết ERD/schema delta và implementation proposal; sau đó triển khai theo scope đã duyệt.
-- **Issues:** TASK-02 hiện cấm posting vào Account archive; cần mở rộng có kiểm soát trước khi triển khai settlement. Dashboard không thể biểu diễn một scalar total khi có nhiều native currency; scope được đáp ứng bằng tổng hợp theo từng currency.
-- **Decisions:** Category riêng, tree hierarchy, một Category/Journal Entry; ASSET subtype; archive-only Account; opening balance qua journal; archived settlement có kiểm soát; business use cases dùng chung Accounting Engine; reversal + replacement; Quick Entry tối đa 3 thao tác; occurredAt; Dashboard 4 chỉ số; available balance gồm mọi active ASSET; history filter ngày/Category/Account; migration tiến về phía trước và bảo toàn dữ liệu; unit + integration tests; UI hoàn chỉnh responsive/accessibility.
-- **Verification:** Đã rà soát tài liệu nguồn trên main; chưa chạy test vì chưa có thay đổi code.
+- **Done:** Chủ dự án chốt scope ngày 2026-11-03; branch `task/03-core-finance` được tạo từ `main`.
+- **Done:** Migration `0001_core_finance.ts` và migration registry cho schema v2; bổ sung Category, Account subtype, transaction kind/category FK, posting purpose/audit reason, index và integrity triggers. Migration v1 không bị sửa.
+- **Done:** Domain/Application/SQLite repository cho Category tree, parent-kind validation, cycle protection và archive lifecycle.
+- **Done:** Account create/list/rename/update metadata/archive; ASSET subtype được validate ở Application và database migration.
+- **Done:** Income/Expense use cases dùng chung AccountingService; transfer, opening balance và reversal được phân loại theo transaction kind; reversal kế thừa Category.
+- **Done:** Archived Account policy: ordinary posting tiếp tục bị chặn; settlement chỉ chuyển số dư dương từ một archived ASSET sang một active ASSET cùng currency, yêu cầu audit reason; archived reversal yêu cầu reason và mirror chính xác bút toán gốc. Repository revalidate trong transaction.
+- **Done:** Dashboard query/service tổng hợp available balance, income, expense và net flow theo native currency; history query/service lọc occurredAt, Category và Account.
+- **Done:** UI khung sản phẩm cho Dashboard, Account, Category, Quick Expense, Quick Income, Transfer (có FX snapshot), Opening Balance, History/reversal và archived-account settlement; có base-currency setup, empty/error/loading states và điều hướng.
+- **Done:** Unit tests được bổ sung cho AccountService, CategoryService, income/expense, Dashboard multi-currency và archived-account settlement/reversal.
+- **Doing:** Hoàn thiện UI chỉnh sửa Account/Category và luồng tạo giao dịch thay thế có liên kết; bổ sung repository integration tests cho migration/SQLite và kiểm thử UI/accessibility trên thiết bị.
+- **Next:** Chạy TypeScript, ESLint, Prettier, Jest; bổ sung migration v1→v2 integration test trên Expo SQLite; sau đó Android offline regression và kiểm tra responsive/accessibility.
+- **Issues:** Không có quyền thực thi package scripts trên môi trường làm việc hiện tại; clone GitHub thất bại do môi trường không phân giải được github.com. Vì vậy chưa có bằng chứng `typecheck`, `lint`, `format:check`, Jest hoặc Android acceptance pass. Migration SQL đã được smoke-test thủ công bằng SQLite, bao gồm subtype CHECK, category parent-kind/cycle và account hard-delete trigger; chưa chạy trên database thiết bị thật.
+- **Verification:** Các thay đổi được ghi trên branch `task/03-core-finance`; chưa merge vào `main`, chưa đánh dấu TASK-03 DONE.

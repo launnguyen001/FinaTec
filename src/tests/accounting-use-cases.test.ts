@@ -526,4 +526,29 @@ describe("accounting use cases", () => {
     expect(repository.commitCount).toBe(0);
     expect(repository.entries.size).toBe(0);
   });
+  it("settles a positive balance from an archived ASSET into an active ASSET with audit metadata", async () => {
+    const { repository, service } = await createFixture();
+    await service.createOpeningBalance({ idempotencyKey: "archive-opening", accountId: accounts.cash.id, offsetAccountId: accounts.openingVnd.id, amountMinor: 1_000_000n });
+    repository.accounts.set(accounts.cash.id, { ...accounts.cash, isArchived: true });
+    await expect(service.transferFunds({ idempotencyKey: "ordinary-archived-transfer", fromAccountId: accounts.cash.id, toAccountId: accounts.bank.id, amountMinor: 100_000n })).rejects.toThrow(/archived/i);
+    await expect(service.settleArchivedAccount({ idempotencyKey: "archive-settlement-too-large", archivedAccountId: accounts.cash.id, destinationAccountId: accounts.bank.id, amountMinor: 1_100_000n, reason: "Close unused cash account" })).rejects.toThrow(/exceeds/);
+    const settlement = await service.settleArchivedAccount({ idempotencyKey: "archive-settlement", archivedAccountId: accounts.cash.id, destinationAccountId: accounts.bank.id, amountMinor: 600_000n, reason: "Close unused cash account" });
+    expect(settlement.entry.transactionKind).toBe("ADJUSTMENT");
+    expect(settlement.entry.postingPurpose).toBe("ARCHIVED_ACCOUNT_SETTLEMENT");
+    expect(settlement.entry.auditReason).toBe("Close unused cash account");
+    expect((await service.getAccountBalance(accounts.cash.id)).minorUnits).toBe(400_000n);
+    expect((await service.getAccountBalance(accounts.bank.id)).minorUnits).toBe(600_000n);
+  });
+
+  it("requires an audit reason when reversing a posting that touches an archived account", async () => {
+    const { repository, service } = await createFixture();
+    const original = await service.createOpeningBalance({ idempotencyKey: "archive-reverse-opening", accountId: accounts.cash.id, offsetAccountId: accounts.openingVnd.id, amountMinor: 900_000n });
+    repository.accounts.set(accounts.cash.id, { ...accounts.cash, isArchived: true });
+    await expect(service.reverseEntry({ idempotencyKey: "archive-reversal-no-reason", originalEntryId: original.entry.id })).rejects.toThrow(/audit reason/);
+    const reversal = await service.reverseEntry({ idempotencyKey: "archive-reversal", originalEntryId: original.entry.id, reason: "Correct prior opening entry" });
+    expect(reversal.entry.postingPurpose).toBe("ARCHIVED_ACCOUNT_REVERSAL");
+    expect(reversal.entry.categoryId).toBe(original.entry.categoryId ?? null);
+    expect((await service.getAccountBalance(accounts.cash.id)).minorUnits).toBe(0n);
+  });
+
 });

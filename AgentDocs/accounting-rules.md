@@ -81,3 +81,27 @@ No rounding line is created. Rounding is half-up once per line, then the resulti
 - Jest covers posting validation, FX recomputation, rounding, balances, opening balance, same/cross-currency transfer, draft lifecycle, reversal, one-reversal rule, idempotency and failed-commit rollback.
 - TypeScript, Expo lint and Prettier must pass before merge.
 - Android acceptance must be run on a development build because the database uses SQLCipher.
+
+## 10. TASK-03 transaction classification
+
+Schema v2 adds `journal_entries.transaction_kind` and nullable `category_id`.
+
+- INCOME and EXPENSE are business classifications on the Journal Entry; they still post through the same balanced Ledger Engine.
+- Income uses a DEBIT line on an ASSET account and a CREDIT line on an INCOME account.
+- Expense uses a CREDIT line on an ASSET account and a DEBIT line on an EXPENSE account.
+- TRANSFER and OPENING_BALANCE must have no Category and do not contribute to income/expense totals.
+- Category kind must match INCOME/EXPENSE transaction kind. A Journal Entry has at most one Category.
+- REVERSAL retains the original Category reference and swaps every original line side. Reporting must include the reversal's negative effect.
+- Existing v1 entries are LEGACY and remain uncategorized unless a future audited backfill can infer their meaning without guessing.
+
+## 11. Archived Account policy — TASK-03 extension
+
+Default behavior remains unchanged: ordinary income, expense, transfer, opening-balance, draft and direct posting commands reject archived Accounts.
+
+Two narrow exceptions are implemented:
+- `ARCHIVED_ACCOUNT_SETTLEMENT`: one archived ASSET with a positive residual balance may be reduced by a same-currency CREDIT line, with the matching DEBIT to one active ASSET destination. Exactly two lines are accepted. Amount cannot exceed the archived Account's current positive Ledger balance.
+- `ARCHIVED_ACCOUNT_REVERSAL`: an original POSTED entry touching an Account that has since been archived may be reversed only by an exact line-for-line mirror with opposite sides, preserving account, native amount, currency, FX snapshot and base amount.
+
+Both exceptions require a non-empty audit reason of at least 8 trimmed characters. The purpose and reason are persisted on the Journal Entry. The SQLite repository revalidates the purpose and line shape inside the same atomic transaction before inserting the entry. Callers cannot pass a generic `allowArchived` boolean. Presentation must call the dedicated Application use case; direct journal-table writes remain forbidden.
+
+`ARCHIVED_ACCOUNT_ADJUSTMENT` is reserved in the persisted purpose enum but must obey the same strict settlement line policy until a separately reviewed adjustment use case is added.

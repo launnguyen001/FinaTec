@@ -140,3 +140,26 @@ Posted-history immutability, currency/account identity immutability, currency pr
 - TASK-01: `AgentDocs/roadmap/task/task-01-database-architecture.md`.
 - Expo SDK 58 SQLite documentation: https://docs.expo.dev/versions/v58.0.0/sdk/sqlite/
 - Drizzle Expo SQLite: https://orm.drizzle.team/docs/sqlite/connect-expo-sqlite
+
+## 9. Schema version 2 — TASK-03
+
+Schema v2 is introduced by `0001_core_finance.ts`; migration `0000_ledger_foundation.ts` remains immutable.
+
+Additions:
+- `accounts.subtype`: nullable source-of-funds subtype (`CASH`, `BANK`, `EWALLET`, `SAVINGS`, `OTHER`). Only ASSET accounts may have a subtype. Existing ASSET rows are backfilled to `OTHER`; non-ASSET rows remain null.
+- `categories`: independent INCOME/EXPENSE classification with optional self-referencing `parent_id`, archive state and timestamps.
+- `journal_entries.category_id`: optional FK to categories; one Category per entry.
+- `journal_entries.transaction_kind`: INCOME, EXPENSE, TRANSFER, OPENING_BALANCE, ADJUSTMENT, REVERSAL or LEGACY. Existing entries are safely backfilled to LEGACY.
+- Indexes support Category tree, archive/kind and occurredAt history queries.
+- Triggers prevent account hard deletion, mismatched Category kind, Category kind mutation after use, and invalid parent kind/cycles.
+
+Category is not an Account. Account subtype does not create a second balance or asset subledger. Ledger balances remain derived only from POSTED journal lines.
+
+Dashboard available balances and income/expense totals are grouped by native currency. Schema v2 does not provide current market FX conversion or revaluation.
+
+Archived-account posting audit metadata:
+- `journal_entries.posting_purpose` records STANDARD or one of the narrowly scoped archived-account purposes.
+- `journal_entries.audit_reason` records why a settlement/adjustment/reversal touched an archived Account.
+- The SQLite repository validates purpose, transaction kind, archived Account type, destination Account state, line shape and exact reversal mirror before allowing a posting that touches an archived Account.
+- Ordinary income, expense, transfer, opening-balance and draft-posting paths continue to reject archived Accounts.
+- Category triggers also prevent an archived parent from being assigned, archiving a parent with active children, and changing a parent kind while its children would become inconsistent.

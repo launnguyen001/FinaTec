@@ -30,6 +30,8 @@ export interface JournalLinesInput {
   idempotencyKey: string;
   occurredAt?: string;
   description?: string | null;
+  transactionKind?: import("../../domain/ledger/repository").TransactionKind;
+  categoryId?: string | null;
   lines: readonly PostingLineSpec[];
 }
 
@@ -73,6 +75,7 @@ export interface ReverseEntryInput {
   originalEntryId: string;
   occurredAt?: string;
   description?: string | null;
+  reason?: string;
 }
 
 interface LoadedContext {
@@ -82,6 +85,7 @@ interface LoadedContext {
     string,
     { code: string; minorUnit: number; isActive: boolean }
   >;
+  allowedArchivedAccountIds?: ReadonlySet<string>;
 }
 
 /**
@@ -124,6 +128,8 @@ export class AccountingService {
       baseCurrencyCode: input.baseCurrencyCode ?? context.baseCurrencyCode,
       idempotencyKey: key,
       reversalOfId: null,
+      transactionKind: input.transactionKind ?? "LEGACY",
+      categoryId: input.categoryId ?? null,
       createdAt: this.now(),
       postedAt: null,
       lines: input.lines,
@@ -162,6 +168,8 @@ export class AccountingService {
       baseCurrencyCode: input.baseCurrencyCode ?? context.baseCurrencyCode,
       idempotencyKey: key,
       reversalOfId: null,
+      transactionKind: input.transactionKind ?? "LEGACY",
+      categoryId: input.categoryId ?? null,
       createdAt: this.now(),
       postedAt: this.now(),
       lines: input.lines,
@@ -245,6 +253,8 @@ export class AccountingService {
       baseCurrencyCode: context.baseCurrencyCode,
       idempotencyKey: key,
       reversalOfId: null,
+      transactionKind: "OPENING_BALANCE",
+      categoryId: null,
       createdAt: this.now(),
       postedAt: this.now(),
       lines: [
@@ -360,6 +370,8 @@ export class AccountingService {
       baseCurrencyCode: context.baseCurrencyCode,
       idempotencyKey: key,
       reversalOfId: null,
+      transactionKind: "TRANSFER",
+      categoryId: null,
       createdAt: this.now(),
       postedAt: this.now(),
       lines: [
@@ -384,6 +396,44 @@ export class AccountingService {
     return this.repository.commitPostedEntry(built);
   }
 
+  /** Settles a positive residual balance from one archived ASSET into an active ASSET. */
+  async settleArchivedAccount(input: { idempotencyKey: string; archivedAccountId: string; destinationAccountId: string; amountMinor: bigint; reason: string; occurredAt?: string; fxRateNumerator?: string; fxRateDenominator?: string }): Promise<PostingResult> {
+    const key = this.requireIdempotencyKey(input.idempotencyKey);
+    const existing = await this.findPostedByIdempotencyKey(key);
+    if (existing) return existing;
+    const reason = input.reason.trim();
+    if (reason.length < 8) throw new Error("Archived-account settlement requires an audit reason of at least 8 characters");
+    if (input.amountMinor <= 0n) throw new Error("Settlement amount must be positive");
+    const context = await this.loadContext([input.archivedAccountId]);
+    const source = this.requireAccount(context, input.archivedAccountId);
+    const destination = this.requireAccount(context, input.destinationAccountId);
+    if (source.type !== "ASSET" || !source.isArchived) throw new Error("Settlement source must be an archived ASSET account");
+    if (destination.type !== "ASSET" || destination.isArchived) throw new Error("Settlement destination must be an active ASSET account");
+    if (source.id === destination.id || source.currencyCode !== destination.currencyCode) throw new Error("Settlement requires two different ASSET accounts with the same currency");
+    const balance = await this.getAccountBalance(source.id);
+    if (balance.minorUnits <= 0n || input.amountMinor > balance.minorUnits) throw new Error("Settlement amount exceeds the positive archived account balance");
+    const fx = resolveFxSnapshot(source.currencyCode, context.baseCurrencyCode, input.fxRateNumerator, input.fxRateDenominator);
+    const built = this.buildPosting({
+      status: "POSTED",
+      occurredAt: input.occurredAt ?? this.now(),
+      description: "Archived account settlement",
+      baseCurrencyCode: context.baseCurrencyCode,
+      idempotencyKey: key,
+      reversalOfId: null,
+      transactionKind: "ADJUSTMENT",
+      categoryId: null,
+      postingPurpose: "ARCHIVED_ACCOUNT_SETTLEMENT",
+      auditReason: reason,
+      createdAt: this.now(),
+      postedAt: this.now(),
+      lines: [
+        { accountId: source.id, side: "CREDIT", amountMinor: input.amountMinor, fxRateNumerator: fx.numerator, fxRateDenominator: fx.denominator },
+        { accountId: destination.id, side: "DEBIT", amountMinor: input.amountMinor, fxRateNumerator: fx.numerator, fxRateDenominator: fx.denominator },
+      ],
+      context,
+    });
+    return this.repository.commitPostedEntry(built);
+  }
   /**
    * Creates a new linked reversal entry that swaps every line side while
    * preserving its account, native amount, FX snapshot and base amount.
@@ -416,7 +466,11 @@ export class AccountingService {
     }
 
     const originalLines = await this.repository.listJournalLines(original.id);
-    const context = await this.loadContext();
+    const initialContext = await this.loadContext();
+    const archivedAccountIds = [...new Set(originalLines.filter((line) => initialContext.accounts.get(line.accountId)?.isArchived).map((line) => line.accountId))];
+    const reason = input.reason?.trim() ?? "";
+    if (archivedAccountIds.length > 0 && reason.length < 8) throw new Error("Reversing an entry that touches an archived account requires an audit reason of at least 8 characters");
+    const context = archivedAccountIds.length > 0 ? await this.loadContext(archivedAccountIds) : initialContext;
     validateJournalEntry(original, originalLines, context);
 
     const built = this.buildPosting({
@@ -427,6 +481,10 @@ export class AccountingService {
       baseCurrencyCode: original.baseCurrencyCode,
       idempotencyKey: key,
       reversalOfId: original.id,
+      transactionKind: "REVERSAL",
+      categoryId: original.categoryId ?? null,
+      postingPurpose: archivedAccountIds.length > 0 ? "ARCHIVED_ACCOUNT_REVERSAL" : "STANDARD",
+      auditReason: archivedAccountIds.length > 0 ? reason : null,
       createdAt: this.now(),
       postedAt: this.now(),
       lines: originalLines
@@ -478,6 +536,10 @@ export class AccountingService {
     baseCurrencyCode: string;
     idempotencyKey: string | null;
     reversalOfId: string | null;
+    transactionKind?: import("../../domain/ledger/repository").TransactionKind;
+    categoryId?: string | null;
+    postingPurpose?: import("../../domain/ledger/repository").PostingPurpose;
+    auditReason?: string | null;
     createdAt: string;
     postedAt: string | null;
     lines: readonly PostingLineSpec[];
@@ -492,6 +554,10 @@ export class AccountingService {
         baseCurrencyCode: params.baseCurrencyCode,
         idempotencyKey: params.idempotencyKey,
         reversalOfId: params.reversalOfId,
+        transactionKind: params.transactionKind,
+        categoryId: params.categoryId,
+        postingPurpose: params.postingPurpose,
+        auditReason: params.auditReason,
         createdAt: params.createdAt,
         postedAt: params.postedAt,
         lines: params.lines,
@@ -501,7 +567,7 @@ export class AccountingService {
     );
   }
 
-  private async loadContext(): Promise<LoadedContext> {
+  private async loadContext(allowedArchivedAccountIds: readonly string[] = []): Promise<LoadedContext> {
     const [baseCurrencyCode, accounts, currencies] = await Promise.all([
       this.repository.getBaseCurrencyCode(),
       this.repository.listAccounts(true),
@@ -517,6 +583,7 @@ export class AccountingService {
       currencies: new Map(
         currencies.map((currency) => [currency.code, currency]),
       ),
+      allowedArchivedAccountIds: new Set(allowedArchivedAccountIds),
     };
   }
 
