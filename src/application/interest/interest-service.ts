@@ -393,6 +393,43 @@ export class InterestService {
    * as exact fractions and posted once the combined amount reaches one minor
    * unit, avoiding daily/monthly rounding drift.
    */
+  async catchUpActivePlans(): Promise<
+    { planId: string; processed: number; error: string | null }[]
+  > {
+    const plans = await this.repository.listPlans();
+    const outcomes: {
+      planId: string;
+      processed: number;
+      error: string | null;
+    }[] = [];
+    for (const plan of plans) {
+      if (plan.status !== "ACTIVE") continue;
+      const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone: plan.timezoneId,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).formatToParts(new Date(this.now()));
+      const values = new Map(parts.map((part) => [part.type, part.value]));
+      const asOfDate = `${values.get("year")}-${values.get("month")}-${values.get("day")}`;
+      const kind: InterestAccrualKind =
+        plan.compounding === "AFTER_CAPITALIZATION"
+          ? "CAPITALIZATION"
+          : "PAYOUT";
+      try {
+        const posted = await this.catchUp(plan.id, asOfDate, kind);
+        outcomes.push({ planId: plan.id, processed: posted.length, error: null });
+      } catch (error) {
+        outcomes.push({
+          planId: plan.id,
+          processed: 0,
+          error: error instanceof Error ? error.message : "Unknown catch-up failure",
+        });
+      }
+    }
+    return outcomes;
+  }
+
   async catchUp(
     planId: string,
     asOfDate: string,
