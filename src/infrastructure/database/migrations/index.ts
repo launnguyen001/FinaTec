@@ -3,12 +3,14 @@ import { migration0001 } from "./0001_core_finance";
 import { migration0002 } from "./0002_asset_management";
 import { migration0003 } from "./0003_asset_remaining_cost_basis";
 import { migration0004 } from "./0004_usdt_currency_code";
+import { migration0005 } from "./0005_interest_engine";
 
 const migrationTime = 1_793_520_000_000;
 const coreFinanceMigrationTime = 1_793_700_000_000;
 const assetManagementMigrationTime = 1_793_800_000_000;
 const assetRemainingCostBasisMigrationTime = 1_793_900_000_000;
 const usdtCurrencyMigrationTime = 1_794_000_000_000;
+const interestEngineMigrationTime = 1_794_100_000_000;
 
 export const ledgerMigrations = {
   journal: {
@@ -43,6 +45,12 @@ export const ledgerMigrations = {
         tag: "0004_usdt_currency_code",
         breakpoints: true,
       },
+      {
+        idx: 5,
+        when: interestEngineMigrationTime,
+        tag: "0005_interest_engine",
+        breakpoints: true,
+      },
     ],
   },
   migrations: {
@@ -51,5 +59,6 @@ export const ledgerMigrations = {
     m0002: migration0002,
     m0003: migration0003,
     m0004: migration0004,
+    m0005: migration0005,
   },
 };
