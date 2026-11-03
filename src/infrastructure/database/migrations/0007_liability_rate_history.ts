@@ -5,8 +5,7 @@ CREATE TABLE liability_rate_changes (
   annual_rate_ppm INTEGER NOT NULL CHECK (annual_rate_ppm BETWEEN 0 AND 10000000),
   effective_date TEXT NOT NULL,
   reason TEXT,
-  created_at TEXT NOT NULL,
-  UNIQUE (liability_id, effective_date)
+  created_at TEXT NOT NULL
 );
 --> statement-breakpoint
 CREATE INDEX liability_rate_changes_effective_idx
