@@ -93,3 +93,4 @@ Liability, RepaymentSchedule, LiabilityPayment (hoặc tên tương ứng theo n
 - SQLCipher acceptance diagnostic đã mở rộng để kiểm tra APR reset, reversal và replacement payment trên database cô lập.
 - CI đã xác nhận typecheck và lint PASS trên snapshot trước lần format hiện tại; format check và unit tests sẽ được xác nhận lại trên HEAD sau khi format.
 - Còn lại trước bàn giao CLI: xác nhận CI xanh trên HEAD, review migration/schema + luồng rollback, và chạy diagnostic trên Development Build. Chưa tuyên bố thiết bị pass, chưa merge PR #8.
+
