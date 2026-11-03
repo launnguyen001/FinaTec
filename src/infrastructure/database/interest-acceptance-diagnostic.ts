@@ -171,6 +171,21 @@ export async function runInterestAcceptanceDiagnostic(): Promise<InterestAccepta
       amountMinor: 100_000n,
       occurredAt: "2025-12-31T20:00:00.000Z",
     });
+    await accounting.createOpeningBalance({
+      idempotencyKey: `task05-${suffix}-opening-principal`,
+      accountId: principal.id,
+      offsetAccountId: equity.id,
+      amountMinor: 100_000n,
+      occurredAt: "2025-12-31T12:00:00.000Z",
+    });
+
+    const interestRepository = new SqliteInterestRepository(db);
+    const interest = new InterestService(interestRepository, ledger, {
+      createId,
+      now,
+      deviceTimeZone: () => "UTC",
+    });
+
     await expectFailure(
       () =>
         interest.createPlan({
@@ -194,20 +209,6 @@ export async function runInterestAcceptanceDiagnostic(): Promise<InterestAccepta
       "a 2025-12-31 20:00Z movement is after 2026-01-01 local midnight in Asia/Ho_Chi_Minh and is rejected",
     );
 
-    await accounting.createOpeningBalance({
-      idempotencyKey: `task05-${suffix}-opening-principal`,
-      accountId: principal.id,
-      offsetAccountId: equity.id,
-      amountMinor: 100_000n,
-      occurredAt: "2025-12-31T12:00:00.000Z",
-    });
-
-    const interestRepository = new SqliteInterestRepository(db);
-    const interest = new InterestService(interestRepository, ledger, {
-      createId,
-      now,
-      deviceTimeZone: () => "UTC",
-    });
     const capitalizationPlan = await interest.createPlan({
       name: "One-year capitalization",
       principalAccountId: principal.id,
