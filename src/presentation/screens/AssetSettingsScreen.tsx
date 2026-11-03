@@ -77,7 +77,9 @@ export function AssetSettingsScreen() {
     // Preferences load after the encrypted finance runtime is ready.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load().catch((cause: unknown) =>
-      setFailure(cause instanceof Error ? cause.message : "Không thể tải cài đặt."),
+      setFailure(
+        cause instanceof Error ? cause.message : "Không thể tải cài đặt.",
+      ),
     );
   }, [load]);
 
@@ -87,8 +89,13 @@ export function AssetSettingsScreen() {
     setFailure(null);
     setMessage(null);
     try {
-      if ((primary === "COINGECKO" || fallback === "COINGECKO") && !apiKey.trim()) {
-        throw new Error("CoinGecko Demo cần API key trước khi được chọn làm provider.");
+      if (
+        (primary === "COINGECKO" || fallback === "COINGECKO") &&
+        !apiKey.trim()
+      ) {
+        throw new Error(
+          "CoinGecko Demo cần API key trước khi được chọn làm provider.",
+        );
       }
       if (apiKey.trim()) {
         await SecureStore.setItemAsync(COINGECKO_KEY, apiKey.trim());
@@ -109,7 +116,9 @@ export function AssetSettingsScreen() {
       );
       setMessage("Đã lưu cài đặt định giá tài sản.");
     } catch (cause) {
-      setFailure(cause instanceof Error ? cause.message : "Không thể lưu cài đặt.");
+      setFailure(
+        cause instanceof Error ? cause.message : "Không thể lưu cài đặt.",
+      );
     } finally {
       setBusy(false);
     }
@@ -121,8 +130,8 @@ export function AssetSettingsScreen() {
       <Text style={styles.eyebrow}>ASSET MANAGEMENT</Text>
       <Text style={styles.title}>Cài đặt định giá</Text>
       <Text style={styles.subtitle}>
-        Cấu hình timezone, chu kỳ refresh và thứ tự provider. Các giá trị này chỉ
-        điều khiển dữ liệu định giá, không tạo bút toán Ledger.
+        Cấu hình timezone, chu kỳ refresh và thứ tự provider. Các giá trị này
+        chỉ điều khiển dữ liệu định giá, không tạo bút toán Ledger.
       </Text>
       {loading ? <ActivityIndicator color={colors.primary} /> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -132,8 +141,16 @@ export function AssetSettingsScreen() {
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Timezone lịch sử định giá</Text>
         <View style={styles.options}>
-          <Option label="Theo thiết bị" selected={mode === "DEVICE"} onPress={() => setMode("DEVICE")} />
-          <Option label="Tùy chỉnh" selected={mode === "CUSTOM"} onPress={() => setMode("CUSTOM")} />
+          <Option
+            label="Theo thiết bị"
+            selected={mode === "DEVICE"}
+            onPress={() => setMode("DEVICE")}
+          />
+          <Option
+            label="Tùy chỉnh"
+            selected={mode === "CUSTOM"}
+            onPress={() => setMode("CUSTOM")}
+          />
         </View>
         <Text style={styles.label}>Timezone ID (IANA)</Text>
         <TextInput
@@ -145,30 +162,67 @@ export function AssetSettingsScreen() {
           autoCapitalize="none"
           style={[styles.input, mode === "DEVICE" && styles.disabled]}
         />
-        <Text style={styles.hint}>Timezone đang áp dụng: {effectiveTimeZone}. Timestamp vẫn được lưu theo UTC; chỉ valuation date dùng timezone này.</Text>
+        <Text style={styles.hint}>
+          Timezone đang áp dụng: {effectiveTimeZone}. Timestamp vẫn được lưu
+          theo UTC; chỉ valuation date dùng timezone này.
+        </Text>
       </View>
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Chu kỳ refresh (phút)</Text>
         <Text style={styles.label}>Crypto · tối thiểu 15</Text>
-        <TextInput accessibilityLabel="Crypto refresh minutes" keyboardType="number-pad" value={cryptoMinutes} onChangeText={setCryptoMinutes} style={styles.input} />
+        <TextInput
+          accessibilityLabel="Crypto refresh minutes"
+          keyboardType="number-pad"
+          value={cryptoMinutes}
+          onChangeText={setCryptoMinutes}
+          style={styles.input}
+        />
         <Text style={styles.label}>Kim loại · tối thiểu 15</Text>
-        <TextInput accessibilityLabel="Metal refresh minutes" keyboardType="number-pad" value={metalMinutes} onChangeText={setMetalMinutes} style={styles.input} />
+        <TextInput
+          accessibilityLabel="Metal refresh minutes"
+          keyboardType="number-pad"
+          value={metalMinutes}
+          onChangeText={setMetalMinutes}
+          style={styles.input}
+        />
         <Text style={styles.label}>Fiat FX · tối thiểu 15</Text>
-        <TextInput accessibilityLabel="Fiat refresh minutes" keyboardType="number-pad" value={fiatMinutes} onChangeText={setFiatMinutes} style={styles.input} />
+        <TextInput
+          accessibilityLabel="Fiat refresh minutes"
+          keyboardType="number-pad"
+          value={fiatMinutes}
+          onChangeText={setFiatMinutes}
+          style={styles.input}
+        />
       </View>
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Crypto price providers</Text>
         <Text style={styles.label}>Primary provider</Text>
         <View style={styles.options}>
-          <Option label="CoinPaprika" selected={primary === "COINPAPRIKA"} onPress={() => setPrimary("COINPAPRIKA")} />
-          <Option label="CoinGecko Demo" selected={primary === "COINGECKO"} onPress={() => setPrimary("COINGECKO")} />
+          <Option
+            label="CoinPaprika"
+            selected={primary === "COINPAPRIKA"}
+            onPress={() => setPrimary("COINPAPRIKA")}
+          />
+          <Option
+            label="CoinGecko Demo"
+            selected={primary === "COINGECKO"}
+            onPress={() => setPrimary("COINGECKO")}
+          />
         </View>
         <Text style={styles.label}>Fallback provider</Text>
         <View style={styles.options}>
-          <Option label="CoinPaprika" selected={fallback === "COINPAPRIKA"} onPress={() => setFallback("COINPAPRIKA")} />
-          <Option label="CoinGecko Demo" selected={fallback === "COINGECKO"} onPress={() => setFallback("COINGECKO")} />
+          <Option
+            label="CoinPaprika"
+            selected={fallback === "COINPAPRIKA"}
+            onPress={() => setFallback("COINPAPRIKA")}
+          />
+          <Option
+            label="CoinGecko Demo"
+            selected={fallback === "COINGECKO"}
+            onPress={() => setFallback("COINGECKO")}
+          />
         </View>
         <Text style={styles.label}>CoinGecko Demo API key</Text>
         <TextInput
@@ -180,33 +234,110 @@ export function AssetSettingsScreen() {
           placeholder="Lưu trong SecureStore của thiết bị"
           style={styles.input}
         />
-        <Text style={styles.hint}>API key chỉ được lưu trong SecureStore, không nằm trong SQLite hoặc Git. Provider symbol cần đúng định danh của provider tương ứng.</Text>
+        <Text style={styles.hint}>
+          API key chỉ được lưu trong SecureStore, không nằm trong SQLite hoặc
+          Git. Provider symbol cần đúng định danh của provider tương ứng.
+        </Text>
       </View>
 
-      <Pressable accessibilityRole="button" disabled={busy || loading || !runtime} onPress={() => void save()} style={[styles.primaryButton, (busy || loading || !runtime) && styles.disabled]}>
-        <Text style={styles.primaryButtonText}>{busy ? "Đang lưu…" : "Lưu cài đặt"}</Text>
+      <Pressable
+        accessibilityRole="button"
+        disabled={busy || loading || !runtime}
+        onPress={() => void save()}
+        style={[
+          styles.primaryButton,
+          (busy || loading || !runtime) && styles.disabled,
+        ]}
+      >
+        <Text style={styles.primaryButtonText}>
+          {busy ? "Đang lưu…" : "Lưu cài đặt"}
+        </Text>
       </Pressable>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  content: { flexGrow: 1, backgroundColor: colors.background, padding: spacing.lg, paddingBottom: spacing.xl, gap: spacing.md },
-  eyebrow: { color: colors.primary, fontSize: typography.caption, fontWeight: "700", letterSpacing: 1 },
+  content: {
+    flexGrow: 1,
+    backgroundColor: colors.background,
+    padding: spacing.lg,
+    paddingBottom: spacing.xl,
+    gap: spacing.md,
+  },
+  eyebrow: {
+    color: colors.primary,
+    fontSize: typography.caption,
+    fontWeight: "700",
+    letterSpacing: 1,
+  },
   title: { color: colors.text, fontSize: typography.title, fontWeight: "800" },
-  subtitle: { color: colors.mutedText, fontSize: typography.body, lineHeight: 23 },
-  card: { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: 16, padding: spacing.md, gap: spacing.sm },
-  sectionTitle: { color: colors.text, fontSize: typography.subtitle, fontWeight: "700" },
-  label: { color: colors.mutedText, fontSize: typography.caption, fontWeight: "700" },
-  hint: { color: colors.mutedText, fontSize: typography.caption, lineHeight: 18 },
-  input: { borderColor: colors.border, borderWidth: 1, borderRadius: 10, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, color: colors.text, backgroundColor: colors.background, fontSize: typography.body },
+  subtitle: {
+    color: colors.mutedText,
+    fontSize: typography.body,
+    lineHeight: 23,
+  },
+  card: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  sectionTitle: {
+    color: colors.text,
+    fontSize: typography.subtitle,
+    fontWeight: "700",
+  },
+  label: {
+    color: colors.mutedText,
+    fontSize: typography.caption,
+    fontWeight: "700",
+  },
+  hint: {
+    color: colors.mutedText,
+    fontSize: typography.caption,
+    lineHeight: 18,
+  },
+  input: {
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    color: colors.text,
+    backgroundColor: colors.background,
+    fontSize: typography.body,
+  },
   options: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs },
-  option: { borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, backgroundColor: colors.background },
+  option: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 999,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.background,
+  },
   optionSelected: { borderColor: colors.primary, backgroundColor: "#E7F3ED" },
-  optionText: { color: colors.mutedText, fontSize: typography.caption, fontWeight: "600" },
+  optionText: {
+    color: colors.mutedText,
+    fontSize: typography.caption,
+    fontWeight: "600",
+  },
   optionTextSelected: { color: colors.primary },
-  primaryButton: { alignItems: "center", justifyContent: "center", borderRadius: 10, padding: spacing.md, backgroundColor: colors.primary },
-  primaryButtonText: { color: "#FFFFFF", fontSize: typography.body, fontWeight: "700" },
+  primaryButton: {
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 10,
+    padding: spacing.md,
+    backgroundColor: colors.primary,
+  },
+  primaryButtonText: {
+    color: "#FFFFFF",
+    fontSize: typography.body,
+    fontWeight: "700",
+  },
   disabled: { opacity: 0.5 },
   error: { color: "#B42318", fontSize: typography.body },
   success: { color: colors.primary, fontSize: typography.body },

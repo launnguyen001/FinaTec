@@ -1,6 +1,12 @@
 import type { MarketQuote, QuoteSource } from "../../domain/asset/asset";
-import type { PriceProvider, PriceRequest } from "../../domain/asset/price-provider";
-export type { PriceProvider, PriceRequest } from "../../domain/asset/price-provider";
+import type {
+  PriceProvider,
+  PriceRequest,
+} from "../../domain/asset/price-provider";
+export type {
+  PriceProvider,
+  PriceRequest,
+} from "../../domain/asset/price-provider";
 
 async function readJson(
   url: string,

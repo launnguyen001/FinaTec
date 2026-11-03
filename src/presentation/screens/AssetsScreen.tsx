@@ -214,8 +214,12 @@ export function AssetsScreen() {
         Ledger, không tạo bản sao.
       </Text>
       <View style={styles.choices}>
-        <Link href="/asset-history" style={styles.navigationLink}>Lịch sử định giá</Link>
-        <Link href="/asset-settings" style={styles.navigationLink}>Cài đặt định giá</Link>
+        <Link href="/asset-history" style={styles.navigationLink}>
+          Lịch sử định giá
+        </Link>
+        <Link href="/asset-settings" style={styles.navigationLink}>
+          Cài đặt định giá
+        </Link>
       </View>
 
       {loading ? <ActivityIndicator color={colors.primary} /> : null}
@@ -227,7 +231,8 @@ export function AssetsScreen() {
         <Text style={styles.sectionTitle}>Cập nhật giá từ provider</Text>
         <Text style={styles.muted}>
           Hiện hỗ trợ crypto qua CoinPaprika và CoinGecko Demo. Kim loại chưa có
-          provider được phê duyệt; lỗi provider sẽ giữ giá gần nhất và đánh dấu stale.
+          provider được phê duyệt; lỗi provider sẽ giữ giá gần nhất và đánh dấu
+          stale.
         </Text>
         <Pressable
           accessibilityRole="button"
@@ -238,14 +243,27 @@ export function AssetsScreen() {
             setFailure(null);
             setMessage(null);
             try {
-              const outcomes = await runtime.assetPriceRefresh.refreshDueAssets(true);
-              const updated = outcomes.filter((item) => item.status === "UPDATED").length;
-              const failed = outcomes.filter((item) => item.status === "FAILED").length;
-              const skipped = outcomes.filter((item) => item.status === "SKIPPED").length;
-              setMessage(`Refresh hoàn tất: ${updated} cập nhật, ${skipped} bỏ qua, ${failed} lỗi.`);
+              const outcomes =
+                await runtime.assetPriceRefresh.refreshDueAssets(true);
+              const updated = outcomes.filter(
+                (item) => item.status === "UPDATED",
+              ).length;
+              const failed = outcomes.filter(
+                (item) => item.status === "FAILED",
+              ).length;
+              const skipped = outcomes.filter(
+                (item) => item.status === "SKIPPED",
+              ).length;
+              setMessage(
+                `Refresh hoàn tất: ${updated} cập nhật, ${skipped} bỏ qua, ${failed} lỗi.`,
+              );
               await refresh();
             } catch (cause) {
-              setFailure(cause instanceof Error ? cause.message : "Không thể refresh giá.");
+              setFailure(
+                cause instanceof Error
+                  ? cause.message
+                  : "Không thể refresh giá.",
+              );
             } finally {
               setBusy(false);
             }
@@ -292,7 +310,11 @@ export function AssetsScreen() {
                           setMessage("Đã archive hồ sơ tài sản.");
                           await refresh();
                         } catch (cause) {
-                          setFailure(cause instanceof Error ? cause.message : "Không thể archive tài sản.");
+                          setFailure(
+                            cause instanceof Error
+                              ? cause.message
+                              : "Không thể archive tài sản.",
+                          );
                         } finally {
                           setBusy(false);
                         }
@@ -549,9 +571,24 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   assetActions: { alignItems: "flex-end", gap: spacing.xs },
-  archiveButton: { borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: spacing.sm, paddingVertical: 4 },
-  archiveButtonText: { color: colors.mutedText, fontSize: 11, fontWeight: "700" },
-  navigationLink: { color: colors.primary, fontSize: typography.caption, fontWeight: "700", paddingVertical: spacing.xs },
+  archiveButton: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+  },
+  archiveButtonText: {
+    color: colors.mutedText,
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  navigationLink: {
+    color: colors.primary,
+    fontSize: typography.caption,
+    fontWeight: "700",
+    paddingVertical: spacing.xs,
+  },
   assetSymbol: {
     color: colors.text,
     fontSize: typography.body,

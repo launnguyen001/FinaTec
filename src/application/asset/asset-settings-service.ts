@@ -42,7 +42,9 @@ export class AssetSettingsService {
     getMinimumRefreshIntervalMs("METAL", input.metalRefreshMinutes);
     getMinimumRefreshIntervalMs("FIAT_FX", input.fiatRefreshMinutes);
     if (input.primaryCryptoProvider === input.fallbackCryptoProvider) {
-      throw new Error("Primary and fallback crypto providers must be different");
+      throw new Error(
+        "Primary and fallback crypto providers must be different",
+      );
     }
     return this.assets.updateSettings({
       ...input,

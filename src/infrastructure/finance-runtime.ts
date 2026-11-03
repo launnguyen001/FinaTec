@@ -40,7 +40,8 @@ export async function createFinanceRuntime() {
   });
   const assetSettings = new AssetSettingsService(assetRepository, {
     now,
-    deviceTimeZone: () => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+    deviceTimeZone: () =>
+      Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
   });
   return {
     createId,
@@ -73,7 +74,9 @@ export async function createFinanceRuntime() {
           }
           const providers = [primary, fallback]
             .map((name) => providerMap[name])
-            .filter((provider): provider is PriceProvider => provider !== undefined);
+            .filter(
+              (provider): provider is PriceProvider => provider !== undefined,
+            );
           if (providers.length === 0) {
             throw new Error(
               "No configured crypto provider is available; configure a CoinGecko Demo key or enable CoinPaprika",

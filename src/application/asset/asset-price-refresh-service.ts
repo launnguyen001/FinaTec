@@ -48,7 +48,9 @@ export class AssetPriceRefreshService {
       );
     }
     if (!facts.asset.providerSymbol?.trim()) {
-      throw new Error("Provider symbol is required before refreshing this asset");
+      throw new Error(
+        "Provider symbol is required before refreshing this asset",
+      );
     }
 
     const settings = await this.settings.get();
@@ -175,8 +177,7 @@ export class AssetPriceRefreshService {
     const eligible = assets.filter((asset) => {
       const type = typeById.get(asset.assetTypeId);
       return (
-        type?.assetClass === "CRYPTO" &&
-        type.valuationModel === "MARKET_VALUED"
+        type?.assetClass === "CRYPTO" && type.valuationModel === "MARKET_VALUED"
       );
     });
     return Promise.all(
