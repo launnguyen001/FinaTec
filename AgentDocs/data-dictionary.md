@@ -32,7 +32,7 @@ The row is absent until the user completes first-run currency setup.
 | type | TEXT | No | ASSET, LIABILITY, EQUITY, INCOME, EXPENSE |
 | currency_code | TEXT | No | Fixed currency; FK currencies.code |
 | is_system | INTEGER | No | Boolean; system account cannot be removed by normal UI |
-| is_archived | INTEGER | No | Boolean; archival preserves history |
+| is_archived | INTEGER | No | Boolean; Account can be archived only when the signed native-currency Ledger balance from POSTED lines is exactly zero; restore changes only this flag |
 | created_at | TEXT | No | Creation timestamp |
 | updated_at | TEXT | No | Last update timestamp |
 
