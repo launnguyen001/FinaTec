@@ -73,7 +73,8 @@ export class AssetTransactionService {
   ): Promise<{ created: boolean; lotId: string }> {
     const key = this.requireKey(input.idempotencyKey);
     const entryId = "asset:buy:" + key;
-    const existing = await this.ledger.findJournalEntryByIdempotencyKey(entryId);
+    const existing =
+      await this.ledger.findJournalEntryByIdempotencyKey(entryId);
     if (existing) {
       if (existing.status !== "POSTED") {
         throw new Error(
