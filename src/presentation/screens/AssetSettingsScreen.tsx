@@ -9,10 +9,14 @@ import {
   View,
 } from "react-native";
 import * as SecureStore from "expo-secure-store";
+import * as BackgroundTask from "expo-background-task";
+import * as TaskManager from "expo-task-manager";
+import { Platform } from "react-native";
 import type { AssetSettingsRecord } from "../../domain/asset/repository";
 import { ScreenBackLink } from "../components/ScreenBackLink";
 import { useFinanceRuntime } from "../providers/FinanceRuntimeProvider";
 import { colors, spacing, typography } from "../../shared/theme/tokens";
+import { ASSET_REFRESH_TASK } from "../../infrastructure/background/asset-refresh-task";
 
 const COINGECKO_KEY = "ketso.asset.coingecko-demo-key.v1";
 
@@ -55,6 +59,8 @@ export function AssetSettingsScreen() {
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [backgroundStatus, setBackgroundStatus] = useState<string>("Chưa kiểm tra");
+  const [backgroundBusy, setBackgroundBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (!runtime) return;
@@ -62,6 +68,21 @@ export function AssetSettingsScreen() {
       runtime.assetSettings.get(),
       SecureStore.getItemAsync(COINGECKO_KEY),
     ]);
+    if (Platform.OS !== "web") {
+      const [status, registered] = await Promise.all([
+        BackgroundTask.getStatusAsync(),
+        TaskManager.isTaskRegisteredAsync(ASSET_REFRESH_TASK),
+      ]);
+      setBackgroundStatus(
+        status === BackgroundTask.BackgroundTaskStatus.Available
+          ? registered
+            ? "Đã đăng ký · OS quyết định thời điểm chạy"
+            : "Sẵn sàng · chưa đăng ký"
+          : "Bị giới hạn bởi hệ điều hành",
+      );
+    } else {
+      setBackgroundStatus("Không hỗ trợ trên web");
+    }
     setMode(settings.timezoneMode);
     setTimezoneId(settings.effectiveTimeZone);
     setEffectiveTimeZone(settings.effectiveTimeZone);
@@ -191,6 +212,47 @@ export function AssetSettingsScreen() {
           onChangeText={setFiatMinutes}
           style={styles.input}
         />
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>Background refresh</Text>
+        <Text style={styles.hint}>
+          {backgroundStatus}. OS chỉ chạy khi điều kiện pin/mạng phù hợp; thời
+          điểm thực thi không được bảo đảm chính xác.
+        </Text>
+        {__DEV__ && Platform.OS !== "web" ? (
+          <Pressable
+            accessibilityRole="button"
+            disabled={backgroundBusy}
+            onPress={async () => {
+              setBackgroundBusy(true);
+              setFailure(null);
+              try {
+                const triggered =
+                  await BackgroundTask.triggerTaskWorkerForTestingAsync();
+                setMessage(
+                  triggered
+                    ? "Đã kích hoạt background worker test."
+                    : "OS không kích hoạt background worker test.",
+                );
+                await load();
+              } catch (cause) {
+                setFailure(
+                  cause instanceof Error
+                    ? cause.message
+                    : "Không thể test background worker.",
+                );
+              } finally {
+                setBackgroundBusy(false);
+              }
+            }}
+            style={[styles.primaryButton, backgroundBusy && styles.disabled]}
+          >
+            <Text style={styles.primaryButtonText}>
+              {backgroundBusy ? "Đang kiểm thử…" : "Test background worker"}
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
 
       <View style={styles.card}>

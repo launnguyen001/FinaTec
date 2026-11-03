@@ -7,6 +7,7 @@ import {
   type PropsWithChildren,
 } from "react";
 import type { FinanceRuntime } from "../../infrastructure/finance-runtime";
+import { registerAssetRefreshTask } from "../../infrastructure/background/asset-refresh-task";
 
 interface FinanceRuntimeState {
   runtime: FinanceRuntime | null;
@@ -53,6 +54,7 @@ export function FinanceRuntimeProvider({
   useEffect(() => {
     const runtime = state.runtime;
     if (!runtime) return;
+    void registerAssetRefreshTask().catch(() => undefined);
     let refreshing = false;
     const refresh = () => {
       if (refreshing) return;
