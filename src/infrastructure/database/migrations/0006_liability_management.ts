@@ -19,7 +19,7 @@ CREATE TABLE liabilities (
   updated_at TEXT NOT NULL,
   paid_off_at TEXT,
   CHECK (first_due_date > start_date),
-  CHECK ((status = 'PAID_OFF' AND outstanding_principal_minor = 0 AND paid_off_at IS NOT NULL) OR (status <> 'PAID_OFF' AND paid_off_at IS NULL))
+  CHECK ((status IN ('PAID_OFF', 'ARCHIVED') AND outstanding_principal_minor = 0 AND paid_off_at IS NOT NULL) OR (status = 'ACTIVE' AND paid_off_at IS NULL))
 );
 --> statement-breakpoint
 CREATE INDEX liabilities_status_idx ON liabilities(status, updated_at);
