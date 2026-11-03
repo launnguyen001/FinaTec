@@ -230,6 +230,32 @@ export async function runLiabilityAcceptanceDiagnostic(): Promise<LiabilityAccep
       "interest was allocated before principal; Ledger and liability balances reconcile; retry did not duplicate the journal",
     );
 
+    await service.reversePayment(partial.id, "Acceptance reversal");
+    const afterReversal = await service.reconcile(loan.id);
+    check(
+      "Payment reversal",
+      afterReversal.recordedPrincipalMinor === 100_000n &&
+        afterReversal.ledgerPrincipalMinor === 100_000n &&
+        afterReversal.differenceMinor === 0n,
+      "reversal posted a linked counter-entry and restored the liability subledger without editing the original journal",
+    );
+    const replacement = await service.recordPayment({
+      liabilityId: loan.id,
+      sourceAccountId: cashOut.id,
+      amountMinor: 5_000n,
+      paidAt: currentTime,
+      idempotencyKey: `task06-${suffix}-replacement-payment`,
+      replacesPaymentId: partial.id,
+    });
+    const afterReplacement = await service.reconcile(loan.id);
+    check(
+      "Replacement payment linkage",
+      replacement.replacesPaymentId === partial.id &&
+        afterReplacement.recordedPrincipalMinor === 96_000n &&
+        afterReplacement.differenceMinor === 0n,
+      "replacement payment explicitly references the reversed payment and restores the expected balance",
+    );
+
     await expectFailure(
       () => service.archive(loan.id),
       /fully paid|fully paid off|archive/i,
@@ -255,6 +281,16 @@ export async function runLiabilityAcceptanceDiagnostic(): Promise<LiabilityAccep
       timezoneId: "UTC",
       earlyPaymentPolicy: "KEEP_MATURITY_REDUCE_INSTALLMENT",
     });
+    const rateChange = await service.changeApr(earlyLoan.id, 240_000n, "Acceptance APR reset");
+    const afterRateChange = await service.getDetail(earlyLoan.id);
+    check(
+      "APR history and forward-only recalculation",
+      rateChange.annualRatePpm === 240_000n &&
+        afterRateChange.rateChanges.some((item) => item.id === rateChange.id) &&
+        afterRateChange.installments.filter((item) => item.status === "CANCELLED").length === 3 &&
+        afterRateChange.installments.filter((item) => item.status === "UPCOMING").every((item) => item.annualRatePpm === 240_000n),
+      "APR change is immutable history and only replaces not-yet-due installments with the new APR snapshot",
+    );
     await service.recordPayment({
       liabilityId: earlyLoan.id,
       sourceAccountId: cashOut.id,
