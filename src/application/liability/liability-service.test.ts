@@ -484,6 +484,7 @@ describe("LiabilityService", () => {
       fxRateNumerator: "1",
       fxRateDenominator: "1",
       replacesPaymentId: null,
+      postingOrder: 1,
       idempotencyKey: "payment-retry",
       paidAt: timestamp,
       principalPaidMinor: 5_000n,
