@@ -790,7 +790,8 @@ export class SqliteLiabilityRepository implements LiabilityRepository {
       schedulePrincipalMinor,
       paymentDerivedPrincipalMinor,
       differenceMinor: ledgerPrincipalMinor - recordedPrincipalMinor,
-      scheduleDifferenceMinor: schedulePrincipalMinor - recordedPrincipalMinor,
+      scheduleDifferenceMinor:
+        schedulePrincipalMinor - recordedPrincipalMinor,
       paymentDifferenceMinor:
         paymentDerivedPrincipalMinor - recordedPrincipalMinor,
     };
