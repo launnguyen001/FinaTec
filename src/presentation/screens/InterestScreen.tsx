@@ -81,6 +81,7 @@ export function InterestScreen() {
   const [incomeAccountId, setIncomeAccountId] = useState("");
   const [payoutAccountId, setPayoutAccountId] = useState("");
   const [frequency, setFrequency] = useState<"MONTHLY" | "AT_MATURITY">("MONTHLY");
+  const [compounding, setCompounding] = useState<"SIMPLE" | "AFTER_CAPITALIZATION">("SIMPLE");
   const [periodStart, setPeriodStart] = useState("");
   const [periodEnd, setPeriodEnd] = useState(new Date().toISOString().slice(0, 10));
   const [kind, setKind] = useState<"CAPITALIZATION" | "PAYOUT">("CAPITALIZATION");
@@ -164,6 +165,7 @@ export function InterestScreen() {
         interestIncomeAccountId: incomeAccountId,
         payoutAccountId: payoutAccountId || null,
         annualRatePpm: ppm,
+        compounding,
         postingFrequency: frequency,
         startDate,
         maturityDate: maturityDate || null,
@@ -264,6 +266,14 @@ export function InterestScreen() {
         <AccountPicker title="Tài khoản gốc · INVESTMENT ASSET" accounts={principalAccounts} selectedId={principalAccountId} onSelect={setPrincipalAccountId} />
         <AccountPicker title="Tài khoản thu nhập lãi · INCOME" accounts={incomeAccounts} selectedId={incomeAccountId} onSelect={setIncomeAccountId} />
         <AccountPicker title="Tài khoản nhận payout · tùy chọn" accounts={payoutAccounts} selectedId={payoutAccountId} onSelect={setPayoutAccountId} />
+        <Text style={styles.label}>Phương thức tính lãi</Text>
+        <View style={styles.wrap}>
+          <Action label="Lãi đơn · trả lãi" selected={compounding === "SIMPLE"} onPress={() => setCompounding("SIMPLE")} />
+          <Action label="Nhập gốc · lãi kép" selected={compounding === "AFTER_CAPITALIZATION"} onPress={() => setCompounding("AFTER_CAPITALIZATION")} />
+        </View>
+        <Text style={styles.muted}>
+          Lãi đơn bắt buộc có tài khoản payout. Nhập lãi vào gốc chỉ được phép khi chọn lãi kép.
+        </Text>
         <Text style={styles.label}>Lịch posting</Text>
         <View style={styles.wrap}>
           <Action label="Hàng tháng" selected={frequency === "MONTHLY"} onPress={() => setFrequency("MONTHLY")} />
