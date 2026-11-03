@@ -747,10 +747,52 @@ export class SqliteLiabilityRepository implements LiabilityRepository {
     const recordedPrincipalMinor = fromSqliteInteger(
       row.outstandingPrincipalMinor,
     );
+    const installments = await this.db
+      .select()
+      .from(liabilityInstallments)
+      .where(eq(liabilityInstallments.liabilityId, id))
+      .all();
+    const schedulePrincipalMinor = installments
+      .filter((item) => item.status !== "CANCELLED")
+      .reduce(
+        (balance, item) =>
+          balance +
+          fromSqliteInteger(item.principalDueMinor) -
+          fromSqliteInteger(item.principalPaidMinor),
+        0n,
+      );
+    const [payments, reversals] = await Promise.all([
+      this.db
+        .select()
+        .from(liabilityPayments)
+        .where(eq(liabilityPayments.liabilityId, id))
+        .all(),
+      this.db
+        .select({ paymentId: liabilityPaymentReversals.paymentId })
+        .from(liabilityPaymentReversals)
+        .all(),
+    ]);
+    const reversedPaymentIds = new Set(
+      reversals.map((item) => item.paymentId),
+    );
+    const netPrincipalPaidMinor = payments
+      .filter((item) => !reversedPaymentIds.has(item.id))
+      .reduce(
+        (total, item) =>
+          total + fromSqliteInteger(item.principalPaidMinor),
+        0n,
+      );
+    const paymentDerivedPrincipalMinor =
+      fromSqliteInteger(row.originalPrincipalMinor) - netPrincipalPaidMinor;
     return {
       ledgerPrincipalMinor,
       recordedPrincipalMinor,
+      schedulePrincipalMinor,
+      paymentDerivedPrincipalMinor,
       differenceMinor: ledgerPrincipalMinor - recordedPrincipalMinor,
+      scheduleDifferenceMinor: schedulePrincipalMinor - recordedPrincipalMinor,
+      paymentDifferenceMinor:
+        paymentDerivedPrincipalMinor - recordedPrincipalMinor,
     };
   }
 
