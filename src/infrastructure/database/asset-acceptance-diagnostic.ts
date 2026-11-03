@@ -459,7 +459,7 @@ export async function runAssetAcceptanceDiagnostic(): Promise<AssetAcceptanceRes
       sameDayHistory.length === 1 &&
         updatedSameDayHistory.length === 1 &&
         updatedSameDayHistory[0]?.id === sameDayHistory[0]?.id &&
-        updatedSameDayHistory[0]?.totalValue === "120",
+        updatedSameDayHistory[0]?.totalValue === "120.000000",
       "multiple same-day quotes update one open snapshot rather than append rows",
     );
 

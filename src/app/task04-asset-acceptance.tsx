@@ -44,7 +44,7 @@ export default function Task04AssetAcceptanceRoute() {
         database containing legacy data, then verifies atomic asset posting,
         partial-sale cost basis, DCA, valuation history, P&L, settings, refresh
         state and zero-quantity archive policy. It never opens or mutates the
-        user's production database.
+        production database belonging to the user.
       </Text>
       <Button
         title={running ? "Running…" : "Run Task04 acceptance"}
