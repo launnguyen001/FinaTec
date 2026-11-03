@@ -71,6 +71,25 @@ BEGIN
   ) THEN RAISE(ABORT, 'payout account must be an ASSET in the plan currency') END;
 END;
 --> statement-breakpoint
+CREATE TRIGGER interest_plans_terms_immutable
+BEFORE UPDATE ON interest_plans
+WHEN
+  NEW.principal_account_id <> OLD.principal_account_id
+  OR NEW.interest_income_account_id <> OLD.interest_income_account_id
+  OR NEW.payout_account_id IS NOT OLD.payout_account_id
+  OR NEW.annual_rate_ppm <> OLD.annual_rate_ppm
+  OR NEW.rate_convention <> OLD.rate_convention
+  OR NEW.day_count <> OLD.day_count
+  OR NEW.compounding <> OLD.compounding
+  OR NEW.posting_frequency <> OLD.posting_frequency
+  OR NEW.start_date <> OLD.start_date
+  OR NEW.maturity_date IS NOT OLD.maturity_date
+  OR NEW.timezone_id <> OLD.timezone_id
+  OR (OLD.status = 'CLOSED' AND NEW.status <> 'CLOSED')
+BEGIN
+  SELECT RAISE(ABORT, 'interest plan terms are immutable; create a new plan version');
+END;
+--> statement-breakpoint
 CREATE TRIGGER interest_plans_no_delete
 BEFORE DELETE ON interest_plans
 BEGIN
