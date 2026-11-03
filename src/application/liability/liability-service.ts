@@ -475,6 +475,7 @@ export class LiabilityService {
         item.status !== "PAID",
     );
     const newInstallments: LiabilityInstallment[] = [];
+    const futureApr = future[0]?.annualRatePpm ?? liability.annualRatePpm;
     if (
       (extraPrincipal > 0n || outstanding - principalPaid === 0n) &&
       future.length > 0
@@ -499,7 +500,7 @@ export class LiabilityService {
                 : undefined;
             const candidate = calculateRepaymentSchedule({
               principalMinor: newBalance,
-              annualRatePpm: liability.annualRatePpm,
+              annualRatePpm: futureApr,
               termMonths: months,
               method: liability.repaymentMethod,
               startDate: localDate,
@@ -520,7 +521,7 @@ export class LiabilityService {
             : undefined;
         const recalculated = calculateRepaymentSchedule({
           principalMinor: newBalance,
-          annualRatePpm: liability.annualRatePpm,
+          annualRatePpm: futureApr,
           termMonths: newTerm,
           method: liability.repaymentMethod,
           startDate: localDate,
@@ -535,7 +536,7 @@ export class LiabilityService {
             id: this.options.createId(),
             liabilityId: liability.id,
             sequence: nextSequence + item.sequence - 1,
-            annualRatePpm: liability.annualRatePpm,
+            annualRatePpm: futureApr,
             principalPaidMinor: 0n,
             interestPaidMinor: 0n,
             status: "UPCOMING",
