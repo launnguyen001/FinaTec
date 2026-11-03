@@ -415,7 +415,6 @@ export function assertTransactionFee(
   }
 }
 
-
 export interface UnrealizedPnlCalculation {
   currentValueMinor: bigint;
   remainingCostBasisMinor: bigint;

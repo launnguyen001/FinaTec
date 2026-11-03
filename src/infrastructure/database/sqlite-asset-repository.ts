@@ -12,6 +12,7 @@ import {
   type MarketQuote,
 } from "../../domain/asset/asset";
 import type {
+  AssetRefreshStateRecord,
   AssetRepository,
   AssetSettingsRecord,
 } from "../../domain/asset/repository";
@@ -29,6 +30,7 @@ import {
   assetSettings,
   assetLots,
   assetPriceQuotes,
+  assetRefreshStates,
   assetTransactions,
   assets,
   assetTypes,
@@ -274,6 +276,75 @@ export class SqliteAssetRepository implements AssetRepository {
     }).where(eq(assetSettings.id, 1)).run();
     if (updated.changes !== 1) throw new Error("Asset settings could not be updated");
     return settings;
+  }
+
+  async getLatestQuote(assetId: string): Promise<MarketQuote | null> {
+    const row = await this.db
+      .select()
+      .from(assetPriceQuotes)
+      .where(eq(assetPriceQuotes.assetId, assetId))
+      .orderBy(desc(assetPriceQuotes.capturedAt))
+      .limit(1)
+      .get();
+    if (!row) return null;
+    return {
+      assetId: row.assetId,
+      price: row.priceDecimal,
+      currencyCode: row.currencyCode,
+      source: row.source,
+      status: row.quoteStatus,
+      observedAt: row.observedAt,
+      capturedAt: row.capturedAt,
+      ...(row.conversionBasis === "USDT_USD_PARITY"
+        ? { conversionBasis: "USDT_USD_PARITY" as const }
+        : {}),
+    };
+  }
+
+  async getRefreshState(providerKey: string): Promise<AssetRefreshStateRecord> {
+    const row = await this.db
+      .select()
+      .from(assetRefreshStates)
+      .where(eq(assetRefreshStates.providerKey, providerKey))
+      .get();
+    return row
+      ? {
+          providerKey: row.providerKey,
+          lastAttemptAt: row.lastAttemptAt,
+          lastSuccessAt: row.lastSuccessAt,
+          failureCount: row.failureCount,
+          nextAttemptAt: row.nextAttemptAt,
+          lastError: row.lastError,
+        }
+      : {
+          providerKey,
+          lastAttemptAt: null,
+          lastSuccessAt: null,
+          failureCount: 0,
+          nextAttemptAt: null,
+          lastError: null,
+        };
+  }
+
+  async saveRefreshState(state: AssetRefreshStateRecord): Promise<void> {
+    const values = {
+      lastAttemptAt: state.lastAttemptAt,
+      lastSuccessAt: state.lastSuccessAt,
+      failureCount: state.failureCount,
+      nextAttemptAt: state.nextAttemptAt,
+      lastError: state.lastError,
+    };
+    const updated = await this.db
+      .update(assetRefreshStates)
+      .set(values)
+      .where(eq(assetRefreshStates.providerKey, state.providerKey))
+      .run();
+    if (updated.changes === 0) {
+      await this.db.insert(assetRefreshStates).values({
+        providerKey: state.providerKey,
+        ...values,
+      }).run();
+    }
   }
 
   async findAssetForTransaction(assetId: string) {

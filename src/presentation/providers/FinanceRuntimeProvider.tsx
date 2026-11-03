@@ -1,3 +1,4 @@
+import { AppState } from "react-native";
 import {
   createContext,
   useContext,
@@ -49,6 +50,31 @@ export function FinanceRuntimeProvider({
       active = false;
     };
   }, [createRuntime]);
+  useEffect(() => {
+    const runtime = state.runtime;
+    if (!runtime) return;
+    let refreshing = false;
+    const refresh = () => {
+      if (refreshing) return;
+      refreshing = true;
+      void runtime.assetPriceRefresh
+        .refreshDueAssets(false)
+        .catch(() => undefined)
+        .finally(() => {
+          refreshing = false;
+        });
+    };
+    refresh();
+    const timer = setInterval(refresh, 60_000);
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active") refresh();
+    });
+    return () => {
+      clearInterval(timer);
+      subscription.remove();
+    };
+  }, [state.runtime]);
+
   return (
     <FinanceRuntimeContext.Provider value={state}>
       {children}

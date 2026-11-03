@@ -224,6 +224,39 @@ export function AssetsScreen() {
       {message ? <Text style={styles.success}>{message}</Text> : null}
 
       <View style={styles.card}>
+        <Text style={styles.sectionTitle}>Cập nhật giá từ provider</Text>
+        <Text style={styles.muted}>
+          Hiện hỗ trợ crypto qua CoinPaprika và CoinGecko Demo. Kim loại chưa có
+          provider được phê duyệt; lỗi provider sẽ giữ giá gần nhất và đánh dấu stale.
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          disabled={busy || !runtime}
+          onPress={async () => {
+            if (!runtime) return;
+            setBusy(true);
+            setFailure(null);
+            setMessage(null);
+            try {
+              const outcomes = await runtime.assetPriceRefresh.refreshDueAssets(true);
+              const updated = outcomes.filter((item) => item.status === "UPDATED").length;
+              const failed = outcomes.filter((item) => item.status === "FAILED").length;
+              const skipped = outcomes.filter((item) => item.status === "SKIPPED").length;
+              setMessage(`Refresh hoàn tất: ${updated} cập nhật, ${skipped} bỏ qua, ${failed} lỗi.`);
+              await refresh();
+            } catch (cause) {
+              setFailure(cause instanceof Error ? cause.message : "Không thể refresh giá.");
+            } finally {
+              setBusy(false);
+            }
+          }}
+          style={[styles.primaryButton, busy && styles.disabled]}
+        >
+          <Text style={styles.primaryButtonText}>Refresh giá crypto</Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.card}>
         <Text style={styles.sectionTitle}>Danh mục tài sản</Text>
         {assets.length === 0 ? (
           <Text style={styles.muted}>Chưa có tài sản nào được khai báo.</Text>

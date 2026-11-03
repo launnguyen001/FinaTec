@@ -1,9 +1,11 @@
 import * as Crypto from "expo-crypto";
+import * as SecureStore from "expo-secure-store";
 import { AccountService } from "../application/account/account-service";
 import { AssetTransactionService } from "../application/asset/asset-transaction-service";
 import { AssetCatalogService } from "../application/asset/asset-catalog-service";
 import { AssetValuationService } from "../application/asset/asset-valuation-service";
 import { AssetSettingsService } from "../application/asset/asset-settings-service";
+import { AssetPriceRefreshService } from "../application/asset/asset-price-refresh-service";
 import { CategoryService } from "../application/category/category-service";
 import { DashboardService } from "../application/finance/dashboard-service";
 import { FinanceTransactionService } from "../application/finance/finance-transaction-service";
@@ -26,6 +28,14 @@ export async function createFinanceRuntime() {
   const now = () => new Date().toISOString();
   const createId = () => Crypto.randomUUID();
   const accounting = new AccountingService(ledger, { createId, now });
+  const assetValuations = new AssetValuationService(assetRepository, ledger, {
+    now,
+    createId,
+  });
+  const assetSettings = new AssetSettingsService(assetRepository, {
+    now,
+    deviceTimeZone: () => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+  });
   return {
     createId,
     ledger,
@@ -37,14 +47,18 @@ export async function createFinanceRuntime() {
       categoryRepository,
       { now },
     ),
-    assetValuations: new AssetValuationService(assetRepository, ledger, {
-      now,
-      createId,
-    }),
-    assetSettings: new AssetSettingsService(assetRepository, {
-      now,
-      deviceTimeZone: () => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-    }),
+    assetValuations,
+    assetSettings,
+    assetPriceRefresh: new AssetPriceRefreshService(
+      assetRepository,
+      assetSettings,
+      assetValuations,
+      {
+        now,
+        getCoinGeckoApiKey: () =>
+          SecureStore.getItemAsync("ketso.asset.coingecko-demo-key.v1"),
+      },
+    ),
     accounts: new AccountService(accountRepository, ledger, { createId, now }),
     categories: new CategoryService(categoryRepository, { createId, now }),
     transactions: new FinanceTransactionService(

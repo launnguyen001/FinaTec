@@ -33,6 +33,15 @@ export interface AssetLotRecord extends AssetLot {
   mergedIntoId: string | null;
 }
 
+export interface AssetRefreshStateRecord {
+  providerKey: string;
+  lastAttemptAt: string | null;
+  lastSuccessAt: string | null;
+  failureCount: number;
+  nextAttemptAt: string | null;
+  lastError: string | null;
+}
+
 export interface AssetSettingsRecord {
   timezoneMode: "DEVICE" | "CUSTOM";
   timezoneId: string;
@@ -108,6 +117,9 @@ export interface AssetRepository {
   archiveAssetType(assetTypeId: string, archivedAt: string): Promise<void>;
   getSettings(): Promise<AssetSettingsRecord>;
   updateSettings(settings: AssetSettingsRecord): Promise<AssetSettingsRecord>;
+  getLatestQuote(assetId: string): Promise<MarketQuote | null>;
+  getRefreshState(providerKey: string): Promise<AssetRefreshStateRecord>;
+  saveRefreshState(state: AssetRefreshStateRecord): Promise<void>;
   findAssetForTransaction(
     assetId: string,
   ): Promise<{ asset: AssetRecord; assetType: AssetTypeRecord } | null>;
