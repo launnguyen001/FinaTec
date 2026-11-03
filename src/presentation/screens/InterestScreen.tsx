@@ -147,6 +147,9 @@ export function InterestScreen() {
     ]);
     setAccounts(nextAccounts);
     setPlans(nextPlans);
+    if (!selectedPlanId && nextPlans.length > 0) {
+      setSelectedPlanId(nextPlans[0]!.id);
+    }
     if (!principalAccountId) {
       setPrincipalAccountId(
         nextAccounts.find((item) => item.type === "ASSET" && item.isInvestment)
@@ -158,15 +161,25 @@ export function InterestScreen() {
         nextAccounts.find((item) => item.type === "INCOME")?.id ?? "",
       );
     }
-  }, [runtime, principalAccountId, incomeAccountId]);
+  }, [runtime, principalAccountId, incomeAccountId, selectedPlanId]);
 
   const loadAccruals = useCallback(async () => {
     if (!runtime || !selectedPlanId) {
       setAccruals([]);
       return;
     }
-    setAccruals(await runtime.interest.listAccruals(selectedPlanId));
-  }, [runtime, selectedPlanId]);
+    const nextAccruals = await runtime.interest.listAccruals(selectedPlanId);
+    setAccruals(nextAccruals);
+    const settled = nextAccruals
+      .filter((item) => item.status === "POSTED" || item.status === "PAID")
+      .sort((a, b) => a.periodEnd.localeCompare(b.periodEnd));
+    const selectedPlan = plans.find((item) => item.id === selectedPlanId);
+    setPeriodStart(
+      settled.length > 0
+        ? settled[settled.length - 1]!.periodEnd
+        : selectedPlan?.startDate ?? "",
+    );
+  }, [runtime, selectedPlanId, plans]);
 
   useEffect(() => {
     // Runtime data is loaded asynchronously after encrypted DB initialization.
