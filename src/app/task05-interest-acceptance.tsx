@@ -1,5 +1,11 @@
 import { useState } from "react";
-import { ActivityIndicator, Button, ScrollView, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Button,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 
 import {
   runInterestAcceptanceDiagnostic,
