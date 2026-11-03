@@ -16,4 +16,5 @@ export interface AccountRepository {
   list(includeArchived?: boolean): Promise<Account[]>;
   updateMetadata(id: string, input: { name: string; subtype: AccountSubtype | null; updatedAt: string }): Promise<Account>;
   archive(id: string, updatedAt: string): Promise<void>;
+  restore(id: string, updatedAt: string): Promise<void>;
 }
