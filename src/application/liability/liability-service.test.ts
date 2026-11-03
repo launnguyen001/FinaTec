@@ -79,6 +79,9 @@ function createHarness(
     listInstallments: jest.fn().mockResolvedValue(installments),
     listPayments: jest.fn().mockResolvedValue([]),
     listRateChanges: jest.fn().mockResolvedValue([]),
+    findPaymentById: jest.fn().mockResolvedValue(null),
+    findPaymentReversal: jest.fn().mockResolvedValue(null),
+    reversePayment: jest.fn().mockResolvedValue(undefined),
     addRateChange: jest.fn().mockResolvedValue(undefined),
     commitPayment: jest.fn(
       async (input: { payment: LiabilityPayment }) => input.payment,
@@ -98,6 +101,8 @@ function createHarness(
       async (id: string) => accounts.find((item) => item.id === id) ?? null,
     ),
     listPostedJournalLinesForAccount: jest.fn().mockResolvedValue([]),
+    findJournalEntryById: jest.fn().mockResolvedValue(null),
+    listJournalLines: jest.fn().mockResolvedValue([]),
   } as unknown as LedgerRepository;
   const service = new LiabilityService(repository, ledger, {
     createId,
@@ -380,6 +385,58 @@ describe("LiabilityService", () => {
     ).toBe(80_000n);
   });
 
+  it("reverses a posted payment through a linked immutable journal", async () => {
+    const current = baseLiability();
+    const existing: LiabilityPayment = {
+      id: "payment-to-reverse",
+      liabilityId: current.id,
+      scheduleId: null,
+      sourceAccountId: "cash-out",
+      journalEntryId: "journal-original-payment",
+      fxRateNumerator: "1",
+      fxRateDenominator: "1",
+      replacesPaymentId: null,
+      idempotencyKey: "payment-original",
+      paidAt: timestamp,
+      principalPaidMinor: 4_000n,
+      interestPaidMinor: 1_000n,
+      feePaidMinor: 0n,
+      note: null,
+      createdAt: timestamp,
+    };
+    const original = {
+      id: existing.journalEntryId,
+      occurredAt: timestamp,
+      description: "Payment",
+      status: "POSTED" as const,
+      baseCurrencyCode: "VND",
+      idempotencyKey: existing.idempotencyKey,
+      reversalOfId: null,
+      replacementOfId: null,
+      transactionKind: "ADJUSTMENT" as const,
+      categoryId: null,
+      createdAt: timestamp,
+      postedAt: timestamp,
+    };
+    const lines = [
+      { id: "line-1", entryId: original.id, lineNumber: 1, accountId: "loan", currencyCode: "VND", side: "DEBIT" as const, amountMinor: 4_000n, fxRateNumerator: "1", fxRateDenominator: "1", baseAmountMinor: 4_000n, memo: null, createdAt: timestamp },
+      { id: "line-2", entryId: original.id, lineNumber: 2, accountId: "cash-out", currencyCode: "VND", side: "CREDIT" as const, amountMinor: 4_000n, fxRateNumerator: "1", fxRateDenominator: "1", baseAmountMinor: 4_000n, memo: null, createdAt: timestamp },
+    ];
+    const { service, repository, ledger } = createHarness(current);
+    (repository.findPaymentById as jest.Mock).mockResolvedValue(existing);
+    (repository.listPayments as jest.Mock).mockResolvedValue([existing]);
+    (ledger.findJournalEntryById as jest.Mock).mockResolvedValue(original);
+    (ledger.listJournalLines as jest.Mock).mockResolvedValue(lines);
+
+    await service.reversePayment(existing.id, "Incorrect allocation");
+
+    const commit = (repository.reversePayment as jest.Mock).mock.calls[0]![0];
+    expect(commit.reversal.journalEntry.reversalOfId).toBe(original.id);
+    expect(commit.reversal.journalEntry.transactionKind).toBe("REVERSAL");
+    expect(commit.reversal.journalLines.map((line: { side: string }) => line.side)).toEqual(["CREDIT", "DEBIT"]);
+    expect(commit.record.paymentId).toBe(existing.id);
+  });
+
   it("returns an existing payment for the same idempotency key", async () => {
     const current = baseLiability();
     const existing: LiabilityPayment = {
@@ -388,6 +445,9 @@ describe("LiabilityService", () => {
       scheduleId: null,
       sourceAccountId: "cash-out",
       journalEntryId: "journal-existing",
+      fxRateNumerator: "1",
+      fxRateDenominator: "1",
+      replacesPaymentId: null,
       idempotencyKey: "payment-retry",
       paidAt: timestamp,
       principalPaidMinor: 5_000n,
