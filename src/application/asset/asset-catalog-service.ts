@@ -37,7 +37,9 @@ export class AssetCatalogService {
     }
     const quoteCurrency = input.quoteCurrency.trim().toUpperCase();
     if (input.assetClass === "CRYPTO" && quoteCurrency !== "USDT") {
-      throw new Error("Crypto asset types must use USDT as their quote currency");
+      throw new Error(
+        "Crypto asset types must use USDT as their quote currency",
+      );
     }
     const now = this.options.now();
     return this.assets.createAssetType({

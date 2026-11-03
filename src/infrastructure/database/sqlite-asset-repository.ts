@@ -101,7 +101,9 @@ export class SqliteAssetRepository implements AssetRepository {
     if (!currency?.isActive)
       throw new Error("Asset quote currency is missing or inactive");
     if (input.assetClass === "CRYPTO" && input.quoteCurrency !== "USDT") {
-      throw new Error("Crypto asset types must use USDT as their quote currency");
+      throw new Error(
+        "Crypto asset types must use USDT as their quote currency",
+      );
     }
     if (!input.name.trim() || !input.unitCode.trim()) {
       throw new Error("Asset type name and unit code are required");

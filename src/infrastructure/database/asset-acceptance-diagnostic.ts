@@ -84,7 +84,10 @@ export async function runAssetAcceptanceDiagnostic(): Promise<AssetAcceptanceRes
   try {
     await SecureStore.setItemAsync(secureStoreName, key);
     const restoredKey = await SecureStore.getItemAsync(secureStoreName);
-    assert(restoredKey === key, "Diagnostic key could not be read from SecureStore");
+    assert(
+      restoredKey === key,
+      "Diagnostic key could not be read from SecureStore",
+    );
 
     client = await SQLite.openDatabaseAsync(databaseName, {
       useNewConnection: true,
@@ -93,7 +96,10 @@ export async function runAssetAcceptanceDiagnostic(): Promise<AssetAcceptanceRes
     const cipher = await client.getFirstAsync<{ cipher_version: string }>(
       "PRAGMA cipher_version",
     );
-    assert(cipher?.cipher_version, "SQLCipher is unavailable in this Development Build");
+    assert(
+      cipher?.cipher_version,
+      "SQLCipher is unavailable in this Development Build",
+    );
     cipherVersion = cipher.cipher_version;
     await client.execAsync(`PRAGMA key = "x'${restoredKey}'"`);
     await client.execAsync("PRAGMA foreign_keys = ON");
@@ -157,8 +163,7 @@ export async function runAssetAcceptanceDiagnostic(): Promise<AssetAcceptanceRes
     check(
       "Asset settings persistence",
       updatedSettings.timezoneMode === "CUSTOM" &&
-        (await settingsService.get()).effectiveTimeZone ===
-          "Asia/Ho_Chi_Minh",
+        (await settingsService.get()).effectiveTimeZone === "Asia/Ho_Chi_Minh",
       "custom timezone and refresh preferences round-tripped",
     );
 
@@ -547,8 +552,9 @@ export async function runAssetAcceptanceDiagnostic(): Promise<AssetAcceptanceRes
       lastError: null,
     };
     await assetRepository.saveRefreshState(refreshState);
-    const persistedRefreshState =
-      await assetRepository.getRefreshState(refreshState.providerKey);
+    const persistedRefreshState = await assetRepository.getRefreshState(
+      refreshState.providerKey,
+    );
     check(
       "Refresh state persistence",
       persistedRefreshState.lastSuccessAt === timestamp &&
@@ -567,7 +573,8 @@ export async function runAssetAcceptanceDiagnostic(): Promise<AssetAcceptanceRes
       fileSizeBytes,
       cipherVersion,
       checks,
-      cleanup: "isolated SQLCipher database and unique SecureStore key removed after result",
+      cleanup:
+        "isolated SQLCipher database and unique SecureStore key removed after result",
     };
   } finally {
     if (client) await client.closeAsync();

@@ -62,9 +62,7 @@ function createHarness(overrides?: {
       },
     ),
     saveRefreshState: jest.fn().mockResolvedValue(undefined),
-    getLatestQuote: jest
-      .fn()
-      .mockResolvedValue(overrides?.latestQuote ?? null),
+    getLatestQuote: jest.fn().mockResolvedValue(overrides?.latestQuote ?? null),
   } as unknown as AssetRepository;
   const settings = {
     get: jest.fn().mockResolvedValue({
@@ -89,15 +87,10 @@ function createHarness(overrides?: {
       getPrice: jest.fn().mockResolvedValue(quote),
     } satisfies PriceProvider);
   const createProvider = jest.fn().mockResolvedValue(provider);
-  const service = new AssetPriceRefreshService(
-    assets,
-    settings,
-    valuations,
-    {
-      now: () => now,
-      createProvider,
-    },
-  );
+  const service = new AssetPriceRefreshService(assets, settings, valuations, {
+    now: () => now,
+    createProvider,
+  });
   return { service, assets, settings, valuations, provider, createProvider };
 }
 
@@ -152,9 +145,11 @@ describe("AssetPriceRefreshService", () => {
   it("uses Retry-After backoff and marks the previous quote stale", async () => {
     const provider: PriceProvider = {
       source: "COINPAPRIKA",
-      getPrice: jest.fn().mockRejectedValue(
-        Object.assign(new Error("rate limited"), { retryAfter: "120" }),
-      ),
+      getPrice: jest
+        .fn()
+        .mockRejectedValue(
+          Object.assign(new Error("rate limited"), { retryAfter: "120" }),
+        ),
     };
     const harness = createHarness({
       provider,

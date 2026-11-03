@@ -34,7 +34,9 @@ describe("AssetSettingsService", () => {
 
   it("validates and persists custom timezone and refresh intervals", async () => {
     const repository = {
-      updateSettings: jest.fn().mockImplementation(async (settings) => settings),
+      updateSettings: jest
+        .fn()
+        .mockImplementation(async (settings) => settings),
     } as unknown as AssetRepository;
     const service = new AssetSettingsService(repository, {
       now: () => "2026-11-03T12:00:00.000Z",

@@ -345,7 +345,8 @@ export function AssetsScreen() {
                 <View style={styles.assetIdentity}>
                   <Text style={styles.assetSymbol}>{type.name}</Text>
                   <Text style={styles.muted}>
-                    {type.assetClass} · {type.valuationModel} · {profileCount} hồ sơ đang hoạt động
+                    {type.assetClass} · {type.valuationModel} · {profileCount}{" "}
+                    hồ sơ đang hoạt động
                   </Text>
                 </View>
                 {profileCount === 0 ? (

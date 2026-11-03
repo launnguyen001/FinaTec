@@ -89,10 +89,7 @@ export function AssetSettingsScreen() {
     setFailure(null);
     setMessage(null);
     try {
-      if (
-        primary === "COINGECKO" &&
-        !apiKey.trim()
-      ) {
+      if (primary === "COINGECKO" && !apiKey.trim()) {
         throw new Error(
           "CoinGecko Demo cần API key trước khi được chọn làm provider.",
         );
