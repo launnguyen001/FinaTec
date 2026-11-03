@@ -174,18 +174,25 @@ export function InterestScreen() {
     if (!selectedPlanId && nextPlans.length > 0) {
       setSelectedPlanId(nextPlans[0]!.id);
     }
-    if (!principalAccountId) {
-      setPrincipalAccountId(
-        nextAccounts.find(
-          (item) =>
-            !item.isArchived && item.type === "ASSET" && item.isInvestment,
-        )?.id ?? "",
-      );
+    const defaultPrincipal = nextAccounts.find(
+      (item) =>
+        !item.isArchived && item.type === "ASSET" && item.isInvestment,
+    );
+    const effectivePrincipalId = principalAccountId || defaultPrincipal?.id;
+    const principalCurrency = nextAccounts.find(
+      (item) => item.id === effectivePrincipalId,
+    )?.currencyCode;
+    if (!principalAccountId && defaultPrincipal) {
+      setPrincipalAccountId(defaultPrincipal.id);
     }
     if (!incomeAccountId) {
       setIncomeAccountId(
-        nextAccounts.find((item) => !item.isArchived && item.type === "INCOME")
-          ?.id ?? "",
+        nextAccounts.find(
+          (item) =>
+            !item.isArchived &&
+            item.type === "INCOME" &&
+            (!principalCurrency || item.currencyCode === principalCurrency),
+        )?.id ?? "",
       );
     }
   }, [runtime, principalAccountId, incomeAccountId, selectedPlanId]);
