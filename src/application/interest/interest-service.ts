@@ -2,7 +2,6 @@ import { Currency } from "../../domain/ledger/currency";
 import { calculateAccountBalance } from "../../domain/ledger/posting";
 import type { LedgerRepository } from "../../domain/ledger/repository";
 import {
-  addAccrualFractions,
   calculateSimpleInterest,
   countActualDays,
   roundHalfUp,
