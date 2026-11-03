@@ -167,7 +167,7 @@ export async function runInterestAcceptanceDiagnostic(): Promise<InterestAccepta
       accountId: principal.id,
       offsetAccountId: equity.id,
       amountMinor: 100_000n,
-      occurredAt: "2026-01-01T12:00:00.000Z",
+      occurredAt: "2025-12-31T12:00:00.000Z",
     });
 
     const interestRepository = new SqliteInterestRepository(db);
@@ -343,14 +343,14 @@ export async function runInterestAcceptanceDiagnostic(): Promise<InterestAccepta
       annualRatePpm: 55_000n,
       compounding: "SIMPLE",
       postingFrequency: "AT_MATURITY",
-      startDate: "2027-01-01",
-      maturityDate: "2028-01-01",
+      startDate: "2027-01-02",
+      maturityDate: "2028-01-02",
       timezoneId: "UTC",
     });
-    currentTime = "2028-01-01T00:00:00.000Z";
+    currentTime = "2028-01-02T00:00:00.000Z";
     const catchUpResults = await interest.catchUp(
       payoutPlan.id,
-      "2028-01-01",
+      "2028-01-02",
       "PAYOUT",
     );
     const paid = catchUpResults[0];
