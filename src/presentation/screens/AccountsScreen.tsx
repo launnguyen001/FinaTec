@@ -15,6 +15,7 @@ export function AccountsScreen() {
   const [name, setName] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
+  const [editingSubtype, setEditingSubtype] = useState<AccountSubtype>("CASH");
   const [type, setType] = useState<AccountType>("ASSET");
   const [subtype, setSubtype] = useState<AccountSubtype>("CASH");
   const [currencyCode, setCurrencyCode] = useState("VND");
@@ -45,7 +46,7 @@ export function AccountsScreen() {
   async function saveRename(id: string) {
     if (!runtime || busy) return;
     setBusy(true); setFailure(null); setMessage(null);
-    try { await runtime.accounts.rename(id, editingName); setEditingId(null); setEditingName(""); setMessage("Đã cập nhật tên tài khoản."); await refresh(); }
+    try { const current = items.find((item) => item.id === id); if (!current) throw new Error("Không tìm thấy tài khoản."); await runtime.accounts.updateMetadata(id, { name: editingName, subtype: current.type === "ASSET" ? editingSubtype : null }); setEditingId(null); setEditingName(""); setMessage("Đã cập nhật thông tin tài khoản."); await refresh(); }
     catch (cause) { setFailure(cause instanceof Error ? cause.message : "Không thể cập nhật tài khoản."); }
     finally { setBusy(false); }
   }
@@ -86,8 +87,8 @@ export function AccountsScreen() {
     </View>
     <Text style={styles.sectionTitle}>Danh sách tài khoản</Text>
     {items.length === 0 ? <Text style={styles.empty}>Chưa có tài khoản nào.</Text> : items.map((item) => <View key={item.id} style={styles.accountRow}>
-      <View style={styles.accountBody}>{editingId === item.id ? <TextInput accessibilityLabel={`Tên mới cho ${item.name}`} value={editingName} onChangeText={setEditingName} style={styles.input} maxLength={80} /> : <><Text style={styles.accountName}>{item.name}</Text><Text style={styles.accountMeta}>{item.type}{item.subtype ? ` · ${item.subtype}` : ""} · {item.currencyCode}{item.isArchived ? " · Đã archive" : ""}</Text></>}</View>
-      {!item.isArchived && !item.isSystem ? <>{editingId === item.id ? <Pressable accessibilityRole="button" disabled={busy || !editingName.trim()} onPress={() => void saveRename(item.id)} style={styles.archiveButton}><Text style={styles.archiveText}>Lưu</Text></Pressable> : <Pressable accessibilityRole="button" onPress={() => { setEditingId(item.id); setEditingName(item.name); }} style={styles.archiveButton}><Text style={styles.archiveText}>Sửa</Text></Pressable>}<Pressable accessibilityRole="button" accessibilityLabel={`Archive ${item.name}`} disabled={busy} onPress={() => void archiveAccount(item.id)} style={styles.archiveButton}><Text style={styles.archiveText}>Archive</Text></Pressable></> : item.isArchived && !item.isSystem ? <Pressable accessibilityRole="button" accessibilityLabel={`Restore ${item.name}`} disabled={busy} onPress={() => void restoreAccount(item.id)} style={styles.archiveButton}><Text style={styles.archiveText}>Khôi phục</Text></Pressable> : null}
+      <View style={styles.accountBody}>{editingId === item.id ? <View style={styles.accountEdit}><TextInput accessibilityLabel={`Tên mới cho ${item.name}`} value={editingName} onChangeText={setEditingName} style={styles.input} maxLength={80} />{item.type === "ASSET" ? <View style={styles.options}>{assetSubtypes.map((value) => <Option key={value} label={value} selected={editingSubtype === value} onPress={() => setEditingSubtype(value)} />)}</View> : null}</View> : <><Text style={styles.accountName}>{item.name}</Text><Text style={styles.accountMeta}>{item.type}{item.subtype ? ` · ${item.subtype}` : ""} · {item.currencyCode}{item.isArchived ? " · Đã archive" : ""}</Text></>}</View>
+      {!item.isArchived && !item.isSystem ? <>{editingId === item.id ? <Pressable accessibilityRole="button" disabled={busy || !editingName.trim()} onPress={() => void saveRename(item.id)} style={styles.archiveButton}><Text style={styles.archiveText}>Lưu</Text></Pressable> : <Pressable accessibilityRole="button" onPress={() => { setEditingId(item.id); setEditingName(item.name); setEditingSubtype(item.subtype ?? "OTHER"); }} style={styles.archiveButton}><Text style={styles.archiveText}>Sửa</Text></Pressable>}<Pressable accessibilityRole="button" accessibilityLabel={`Archive ${item.name}`} disabled={busy} onPress={() => void archiveAccount(item.id)} style={styles.archiveButton}><Text style={styles.archiveText}>Archive</Text></Pressable></> : item.isArchived && !item.isSystem ? <Pressable accessibilityRole="button" accessibilityLabel={`Restore ${item.name}`} disabled={busy} onPress={() => void restoreAccount(item.id)} style={styles.archiveButton}><Text style={styles.archiveText}>Khôi phục</Text></Pressable> : null}
     </View>)}
     <Text style={styles.note}>Chỉ archive tài khoản khi số dư Ledger bằng 0. Tài khoản đã archive giữ nguyên lịch sử; cần khôi phục trước khi giao dịch hoặc đảo bút toán.</Text>
   </ScrollView>;
@@ -118,6 +119,7 @@ const styles = StyleSheet.create({
   sectionTitle: { marginTop: spacing.md, color: colors.text, fontSize: typography.subtitle, fontWeight: "700" },
   accountRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border },
   accountBody: { flex: 1 },
+  accountEdit: { flex: 1, gap: spacing.xs },
   accountName: { color: colors.text, fontSize: typography.body, fontWeight: "700" },
   accountMeta: { marginTop: 3, color: colors.mutedText, fontSize: typography.caption },
   archiveButton: { paddingVertical: spacing.sm, paddingHorizontal: spacing.md, borderRadius: 10, backgroundColor: "#FFF2F2" },
