@@ -22,7 +22,9 @@ export interface LiabilityAcceptanceResult {
 }
 
 function toHex(bytes: Uint8Array): string {
-  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join(
+    "",
+  );
 }
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -50,7 +52,9 @@ export async function runLiabilityAcceptanceDiagnostic(): Promise<LiabilityAccep
   const secureStoreName = `ketso.task06.acceptance.${suffix}`;
   const directory = SQLite.defaultDatabaseDirectory;
   assert(directory, "SQLite database directory is unavailable");
-  const fileUri = directory.startsWith("file://") ? directory : `file://${directory}`;
+  const fileUri = directory.startsWith("file://")
+    ? directory
+    : `file://${directory}`;
   const file = new FileSystem.File(fileUri, databaseName);
   assert(!file.exists, "Refusing to open a pre-existing diagnostic database");
 
@@ -70,11 +74,21 @@ export async function runLiabilityAcceptanceDiagnostic(): Promise<LiabilityAccep
   try {
     await SecureStore.setItemAsync(secureStoreName, key);
     const restoredKey = await SecureStore.getItemAsync(secureStoreName);
-    assert(restoredKey === key, "Diagnostic SQLCipher key could not be restored");
+    assert(
+      restoredKey === key,
+      "Diagnostic SQLCipher key could not be restored",
+    );
 
-    client = await SQLite.openDatabaseAsync(databaseName, { useNewConnection: true });
-    const cipher = await client.getFirstAsync<{ cipher_version: string }>("PRAGMA cipher_version");
-    assert(cipher?.cipher_version, "SQLCipher is unavailable in this Development Build");
+    client = await SQLite.openDatabaseAsync(databaseName, {
+      useNewConnection: true,
+    });
+    const cipher = await client.getFirstAsync<{ cipher_version: string }>(
+      "PRAGMA cipher_version",
+    );
+    assert(
+      cipher?.cipher_version,
+      "SQLCipher is unavailable in this Development Build",
+    );
     cipherVersion = cipher.cipher_version;
     await client.execAsync(`PRAGMA key = "x'${restoredKey}'"`);
     await client.execAsync("PRAGMA foreign_keys = ON");
@@ -141,12 +155,22 @@ export async function runLiabilityAcceptanceDiagnostic(): Promise<LiabilityAccep
     const earlyLoanAccount = makeAccount("early-loan-account", "LIABILITY");
     const interestExpense = makeAccount("interest-expense", "EXPENSE");
     const feeExpense = makeAccount("fee-expense", "EXPENSE");
-    for (const account of [cashIn, cashOut, loanAccount, earlyLoanAccount, interestExpense, feeExpense]) {
+    for (const account of [
+      cashIn,
+      cashOut,
+      loanAccount,
+      earlyLoanAccount,
+      interestExpense,
+      feeExpense,
+    ]) {
       await ledger.createAccount(account);
     }
 
     const liabilityRepository = new SqliteLiabilityRepository(db);
-    const service = new LiabilityService(liabilityRepository, ledger, { createId, now });
+    const service = new LiabilityService(liabilityRepository, ledger, {
+      createId,
+      now,
+    });
     const loan = await service.create({
       name: "Scheduled repayment diagnostic",
       liabilityAccountId: loanAccount.id,
@@ -182,9 +206,9 @@ export async function runLiabilityAcceptanceDiagnostic(): Promise<LiabilityAccep
       idempotencyKey: `task06-${suffix}-partial-payment`,
     });
     const partialBalance = await service.reconcile(loan.id);
-    const journalCountAfterPayment = await client.getFirstAsync<{ count: number }>(
-      "SELECT COUNT(*) AS count FROM journal_entries",
-    );
+    const journalCountAfterPayment = await client.getFirstAsync<{
+      count: number;
+    }>("SELECT COUNT(*) AS count FROM journal_entries");
     const retry = await service.recordPayment({
       liabilityId: loan.id,
       sourceAccountId: cashOut.id,
@@ -192,9 +216,9 @@ export async function runLiabilityAcceptanceDiagnostic(): Promise<LiabilityAccep
       paidAt: currentTime,
       idempotencyKey: `task06-${suffix}-partial-payment`,
     });
-    const journalCountAfterRetry = await client.getFirstAsync<{ count: number }>(
-      "SELECT COUNT(*) AS count FROM journal_entries",
-    );
+    const journalCountAfterRetry = await client.getFirstAsync<{
+      count: number;
+    }>("SELECT COUNT(*) AS count FROM journal_entries");
     check(
       "Partial payment allocation and idempotency",
       partial.interestPaidMinor === 1_000n &&
@@ -239,9 +263,16 @@ export async function runLiabilityAcceptanceDiagnostic(): Promise<LiabilityAccep
       idempotencyKey: `task06-${suffix}-early-principal`,
     });
     const afterEarly = await service.getDetail(earlyLoan.id);
-    const cancelledOriginal = afterEarly.installments.filter((item) => item.status === "CANCELLED");
-    const activeFuture = afterEarly.installments.filter((item) => item.status === "UPCOMING");
-    const scheduledPrincipal = activeFuture.reduce((sum, item) => sum + item.principalDueMinor, 0n);
+    const cancelledOriginal = afterEarly.installments.filter(
+      (item) => item.status === "CANCELLED",
+    );
+    const activeFuture = afterEarly.installments.filter(
+      (item) => item.status === "UPCOMING",
+    );
+    const scheduledPrincipal = activeFuture.reduce(
+      (sum, item) => sum + item.principalDueMinor,
+      0n,
+    );
     check(
       "Early principal schedule recalculation",
       afterEarly.liability.outstandingPrincipalMinor === 80_000n &&
@@ -286,13 +317,25 @@ export async function runLiabilityAcceptanceDiagnostic(): Promise<LiabilityAccep
       paidAt: currentTime,
       idempotencyKey: `task06-${suffix}-fee-payment`,
     });
-    const feeJournal = await ledger.findJournalEntryById(feePayment.journalEntryId);
+    const feeJournal = await ledger.findJournalEntryById(
+      feePayment.journalEntryId,
+    );
     const feeLines = await ledger.listJournalLines(feePayment.journalEntryId);
     check(
       "Separate fee expense posting",
       feeJournal?.status === "POSTED" &&
-        feeLines.some((line) => line.accountId === feeExpense.id && line.side === "DEBIT" && line.amountMinor === 100n) &&
-        feeLines.some((line) => line.accountId === cashOut.id && line.side === "CREDIT" && line.amountMinor === 1_100n),
+        feeLines.some(
+          (line) =>
+            line.accountId === feeExpense.id &&
+            line.side === "DEBIT" &&
+            line.amountMinor === 100n,
+        ) &&
+        feeLines.some(
+          (line) =>
+            line.accountId === cashOut.id &&
+            line.side === "CREDIT" &&
+            line.amountMinor === 1_100n,
+        ),
       "fee was debited to a separate EXPENSE account while the payment source was credited for principal/interest plus fee",
     );
 
@@ -312,7 +355,8 @@ export async function runLiabilityAcceptanceDiagnostic(): Promise<LiabilityAccep
       databaseName,
       cipherVersion,
       checks,
-      cleanup: "The isolated diagnostic database and temporary SecureStore key are removed in finally.",
+      cleanup:
+        "The isolated diagnostic database and temporary SecureStore key are removed in finally.",
     };
   } finally {
     if (client) {

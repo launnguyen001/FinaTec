@@ -4,7 +4,11 @@ import type {
   LiabilityInstallment,
   LiabilityPayment,
 } from "../../domain/liability/liability";
-import type { Account, CurrencyRecord, LedgerRepository } from "../../domain/ledger/repository";
+import type {
+  Account,
+  CurrencyRecord,
+  LedgerRepository,
+} from "../../domain/ledger/repository";
 import type { LiabilityRepository } from "../../domain/liability/repository";
 import { calculateRepaymentSchedule } from "../../domain/liability/repayment-schedule";
 
@@ -18,13 +22,54 @@ const currency: CurrencyRecord = {
 };
 
 const accounts: Account[] = [
-  { id: "loan", name: "Loan", type: "LIABILITY", currencyCode: "VND", isSystem: false, isArchived: false, createdAt: timestamp, updatedAt: timestamp },
-  { id: "cash-in", name: "Cash received", type: "ASSET", currencyCode: "VND", isSystem: false, isArchived: false, subtype: "CASH", createdAt: timestamp, updatedAt: timestamp },
-  { id: "interest-expense", name: "Interest expense", type: "EXPENSE", currencyCode: "VND", isSystem: false, isArchived: false, createdAt: timestamp, updatedAt: timestamp },
-  { id: "cash-out", name: "Cash paid", type: "ASSET", currencyCode: "VND", isSystem: false, isArchived: false, subtype: "CASH", createdAt: timestamp, updatedAt: timestamp },
+  {
+    id: "loan",
+    name: "Loan",
+    type: "LIABILITY",
+    currencyCode: "VND",
+    isSystem: false,
+    isArchived: false,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  },
+  {
+    id: "cash-in",
+    name: "Cash received",
+    type: "ASSET",
+    currencyCode: "VND",
+    isSystem: false,
+    isArchived: false,
+    subtype: "CASH",
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  },
+  {
+    id: "interest-expense",
+    name: "Interest expense",
+    type: "EXPENSE",
+    currencyCode: "VND",
+    isSystem: false,
+    isArchived: false,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  },
+  {
+    id: "cash-out",
+    name: "Cash paid",
+    type: "ASSET",
+    currencyCode: "VND",
+    isSystem: false,
+    isArchived: false,
+    subtype: "CASH",
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  },
 ];
 
-function createHarness(liability: Liability, installments: LiabilityInstallment[] = []) {
+function createHarness(
+  liability: Liability,
+  installments: LiabilityInstallment[] = [],
+) {
   let id = 0;
   const createId = () => `test-id-${++id}`;
   const repository = {
@@ -33,7 +78,9 @@ function createHarness(liability: Liability, installments: LiabilityInstallment[
     list: jest.fn().mockResolvedValue([liability]),
     listInstallments: jest.fn().mockResolvedValue(installments),
     listPayments: jest.fn().mockResolvedValue([]),
-    commitPayment: jest.fn(async (input: { payment: LiabilityPayment }) => input.payment),
+    commitPayment: jest.fn(
+      async (input: { payment: LiabilityPayment }) => input.payment,
+    ),
     syncStatuses: jest.fn().mockResolvedValue(undefined),
     archive: jest.fn().mockResolvedValue(undefined),
     reconcile: jest.fn().mockResolvedValue({
@@ -45,7 +92,9 @@ function createHarness(liability: Liability, installments: LiabilityInstallment[
   const ledger = {
     getBaseCurrencyCode: jest.fn().mockResolvedValue("VND"),
     listCurrencies: jest.fn().mockResolvedValue([currency]),
-    findAccountById: jest.fn(async (id: string) => accounts.find((item) => item.id === id) ?? null),
+    findAccountById: jest.fn(
+      async (id: string) => accounts.find((item) => item.id === id) ?? null,
+    ),
     listPostedJournalLinesForAccount: jest.fn().mockResolvedValue([]),
   } as unknown as LedgerRepository;
   const service = new LiabilityService(repository, ledger, {
@@ -124,11 +173,15 @@ describe("LiabilityService", () => {
     const commit = (repository.createLiability as jest.Mock).mock.calls[0]![0];
     expect(created.outstandingPrincipalMinor).toBe(120_000n);
     expect(commit.installments).toHaveLength(3);
-    expect(commit.journal.journalLines.map((line: { accountId: string; side: string; amountMinor: bigint }) => ({
-      accountId: line.accountId,
-      side: line.side,
-      amountMinor: line.amountMinor,
-    }))).toEqual([
+    expect(
+      commit.journal.journalLines.map(
+        (line: { accountId: string; side: string; amountMinor: bigint }) => ({
+          accountId: line.accountId,
+          side: line.side,
+          amountMinor: line.amountMinor,
+        }),
+      ),
+    ).toEqual([
       { accountId: "cash-in", side: "DEBIT", amountMinor: 120_000n },
       { accountId: "loan", side: "CREDIT", amountMinor: 120_000n },
     ]);
@@ -156,11 +209,15 @@ describe("LiabilityService", () => {
       interestPaidMinor: 1_000n,
       status: "PARTIALLY_PAID",
     });
-    expect(commit.journalLines.map((line: { accountId: string; side: string; amountMinor: bigint }) => ({
-      accountId: line.accountId,
-      side: line.side,
-      amountMinor: line.amountMinor,
-    }))).toEqual([
+    expect(
+      commit.journalLines.map(
+        (line: { accountId: string; side: string; amountMinor: bigint }) => ({
+          accountId: line.accountId,
+          side: line.side,
+          amountMinor: line.amountMinor,
+        }),
+      ),
+    ).toEqual([
       { accountId: "loan", side: "DEBIT", amountMinor: 4_000n },
       { accountId: "interest-expense", side: "DEBIT", amountMinor: 1_000n },
       { accountId: "cash-out", side: "CREDIT", amountMinor: 5_000n },
@@ -200,9 +257,19 @@ describe("LiabilityService", () => {
     const commit = (repository.commitPayment as jest.Mock).mock.calls[0]![0];
     expect(commit.outstandingPrincipalMinor).toBe(80_000n);
     expect(commit.installmentUpdates).toHaveLength(3);
-    expect(commit.installmentUpdates.every((item: LiabilityInstallment) => item.status === "CANCELLED")).toBe(true);
+    expect(
+      commit.installmentUpdates.every(
+        (item: LiabilityInstallment) => item.status === "CANCELLED",
+      ),
+    ).toBe(true);
     expect(commit.newInstallments).toHaveLength(3);
-    expect(commit.newInstallments.reduce((sum: bigint, item: LiabilityInstallment) => sum + item.principalDueMinor, 0n)).toBe(80_000n);
+    expect(
+      commit.newInstallments.reduce(
+        (sum: bigint, item: LiabilityInstallment) =>
+          sum + item.principalDueMinor,
+        0n,
+      ),
+    ).toBe(80_000n);
     expect(commit.newInstallments[0]!.sequence).toBe(4);
   });
 
@@ -239,7 +306,11 @@ describe("LiabilityService", () => {
     const commit = (repository.commitPayment as jest.Mock).mock.calls[0]![0];
     expect(commit.outstandingPrincipalMinor).toBe(0n);
     expect(commit.installmentUpdates).toHaveLength(3);
-    expect(commit.installmentUpdates.every((item: LiabilityInstallment) => item.status === "CANCELLED")).toBe(true);
+    expect(
+      commit.installmentUpdates.every(
+        (item: LiabilityInstallment) => item.status === "CANCELLED",
+      ),
+    ).toBe(true);
     expect(commit.newInstallments).toHaveLength(0);
   });
 
@@ -278,10 +349,13 @@ describe("LiabilityService", () => {
     const commit = (repository.commitPayment as jest.Mock).mock.calls[0]![0];
     expect(commit.outstandingPrincipalMinor).toBe(80_000n);
     expect(commit.newInstallments).toHaveLength(2);
-    expect(commit.newInstallments.reduce(
-      (sum: bigint, item: LiabilityInstallment) => sum + item.principalDueMinor,
-      0n,
-    )).toBe(80_000n);
+    expect(
+      commit.newInstallments.reduce(
+        (sum: bigint, item: LiabilityInstallment) =>
+          sum + item.principalDueMinor,
+        0n,
+      ),
+    ).toBe(80_000n);
   });
 
   it("returns an existing payment for the same idempotency key", async () => {
@@ -303,12 +377,14 @@ describe("LiabilityService", () => {
     const { service, repository } = createHarness(current);
     (repository.listPayments as jest.Mock).mockResolvedValue([existing]);
 
-    await expect(service.recordPayment({
-      liabilityId: current.id,
-      sourceAccountId: "cash-out",
-      amountMinor: 5_000n,
-      idempotencyKey: "payment-retry",
-    })).resolves.toBe(existing);
+    await expect(
+      service.recordPayment({
+        liabilityId: current.id,
+        sourceAccountId: "cash-out",
+        amountMinor: 5_000n,
+        idempotencyKey: "payment-retry",
+      }),
+    ).resolves.toBe(existing);
     expect(repository.commitPayment).not.toHaveBeenCalled();
   });
 });

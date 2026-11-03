@@ -21,9 +21,7 @@ export interface LiabilityRepository {
   commitPayment(input: LiabilityPaymentCommit): Promise<LiabilityPayment>;
   syncStatuses(liabilityId: string, localDate: string): Promise<void>;
   archive(id: string, archivedAt: string): Promise<void>;
-  reconcile(
-    id: string,
-  ): Promise<{
+  reconcile(id: string): Promise<{
     ledgerPrincipalMinor: bigint;
     recordedPrincipalMinor: bigint;
     differenceMinor: bigint;

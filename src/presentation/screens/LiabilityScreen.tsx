@@ -124,7 +124,8 @@ export function LiabilityScreen() {
   );
   const [firstDueDate, setFirstDueDate] = useState("");
   const [method, setMethod] = useState<RepaymentMethod>("EQUAL_PRINCIPAL");
-  const [earlyPaymentPolicy, setEarlyPaymentPolicy] = useState<EarlyPaymentPolicy>("KEEP_MATURITY_REDUCE_INSTALLMENT");
+  const [earlyPaymentPolicy, setEarlyPaymentPolicy] =
+    useState<EarlyPaymentPolicy>("KEEP_MATURITY_REDUCE_INSTALLMENT");
   const [liabilityAccountId, setLiabilityAccountId] = useState("");
   const [receivingAccountId, setReceivingAccountId] = useState("");
   const [interestAccountId, setInterestAccountId] = useState("");
@@ -388,17 +389,23 @@ export function LiabilityScreen() {
                     {payment.paidAt.slice(0, 10)} · gốc{" "}
                     {formatMoney(
                       payment.principalPaidMinor,
-                      currencies.find((c) => c.code === activeLiability.currencyCode),
+                      currencies.find(
+                        (c) => c.code === activeLiability.currencyCode,
+                      ),
                     )}{" "}
                     · lãi{" "}
                     {formatMoney(
                       payment.interestPaidMinor,
-                      currencies.find((c) => c.code === activeLiability.currencyCode),
+                      currencies.find(
+                        (c) => c.code === activeLiability.currencyCode,
+                      ),
                     )}{" "}
                     · phí{" "}
                     {formatMoney(
                       payment.feePaidMinor,
-                      currencies.find((c) => c.code === activeLiability.currencyCode),
+                      currencies.find(
+                        (c) => c.code === activeLiability.currencyCode,
+                      ),
                     )}
                   </Text>
                 ))
@@ -505,13 +512,19 @@ export function LiabilityScreen() {
           <View style={styles.wrap}>
             <Choice
               label="Giữ ngày đáo hạn · giảm kỳ trả"
-              selected={earlyPaymentPolicy === "KEEP_MATURITY_REDUCE_INSTALLMENT"}
-              onPress={() => setEarlyPaymentPolicy("KEEP_MATURITY_REDUCE_INSTALLMENT")}
+              selected={
+                earlyPaymentPolicy === "KEEP_MATURITY_REDUCE_INSTALLMENT"
+              }
+              onPress={() =>
+                setEarlyPaymentPolicy("KEEP_MATURITY_REDUCE_INSTALLMENT")
+              }
             />
             <Choice
               label="Giữ mức trả · rút ngắn kỳ hạn"
               selected={earlyPaymentPolicy === "KEEP_INSTALLMENT_SHORTEN_TERM"}
-              onPress={() => setEarlyPaymentPolicy("KEEP_INSTALLMENT_SHORTEN_TERM")}
+              onPress={() =>
+                setEarlyPaymentPolicy("KEEP_INSTALLMENT_SHORTEN_TERM")
+              }
             />
           </View>
           <View style={styles.wrap}>

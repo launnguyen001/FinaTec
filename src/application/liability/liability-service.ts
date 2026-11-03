@@ -399,7 +399,10 @@ export class LiabilityService {
         item.status !== "PAID",
     );
     const newInstallments: LiabilityInstallment[] = [];
-    if ((extraPrincipal > 0n || outstanding - principalPaid === 0n) && future.length > 0) {
+    if (
+      (extraPrincipal > 0n || outstanding - principalPaid === 0n) &&
+      future.length > 0
+    ) {
       for (const item of future)
         installmentUpdates.push({
           ...item,
@@ -414,9 +417,10 @@ export class LiabilityService {
           const target = future[0]!.totalDueMinor;
           let selectedTerm = 1;
           for (let months = 1; months <= future.length; months += 1) {
-            const candidatePrincipal = liability.repaymentMethod === "DECLINING"
-              ? allocateEvenly(newBalance, months)
-              : undefined;
+            const candidatePrincipal =
+              liability.repaymentMethod === "DECLINING"
+                ? allocateEvenly(newBalance, months)
+                : undefined;
             const candidate = calculateRepaymentSchedule({
               principalMinor: newBalance,
               annualRatePpm: liability.annualRatePpm,
