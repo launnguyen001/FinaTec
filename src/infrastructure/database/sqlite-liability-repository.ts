@@ -456,6 +456,7 @@ export class SqliteLiabilityRepository implements LiabilityRepository {
         throw new Error("Payment reversal must reverse every original journal line");
       }
       this.insertPostedJournal(tx, input.reversal.journalEntry, input.reversal.journalLines);
+      tx.insert(liabilityPaymentReversals).values(input.record).run();
 
       const allocations = tx.select().from(liabilityPaymentAllocations)
         .where(eq(liabilityPaymentAllocations.paymentId, payment.id)).all();
@@ -491,7 +492,6 @@ export class SqliteLiabilityRepository implements LiabilityRepository {
         paidOffAt: null,
         updatedAt: input.record.createdAt,
       }).where(eq(liabilities.id, payment.liabilityId)).run();
-      tx.insert(liabilityPaymentReversals).values(input.record).run();
     });
   }
 
