@@ -149,7 +149,7 @@ export class SqliteInterestRepository implements InterestRepository {
         and(
           eq(journalLines.accountId, plan.principalAccountId),
           eq(journalEntries.status, "POSTED"),
-          gte(journalEntries.occurredAt, `${plan.startDate}T00:00:00.000Z`),
+          gte(journalEntries.occurredAt, `${this.nextDate(plan.startDate)}T00:00:00.000Z`),
         ),
       )
       .all();
@@ -238,6 +238,13 @@ export class SqliteInterestRepository implements InterestRepository {
       if (!result) throw new Error("Committed interest accrual disappeared");
       return mapAccrual(result);
     });
+  }
+
+  private nextDate(date: string): string {
+    const [year, month, day] = date.split("-").map(Number);
+    return new Date(Date.UTC(year, month - 1, day + 1))
+      .toISOString()
+      .slice(0, 10);
   }
 
   private readPostingContext(tx: InterestTransaction): PostingContext {
