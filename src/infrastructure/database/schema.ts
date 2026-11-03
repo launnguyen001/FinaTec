@@ -633,4 +633,6 @@ export const ledgerSchema = {
   assetTransactions,
   assetPriceQuotes,
   assetDailyValuations,
+  interestPlans,
+  interestAccruals,
 };
