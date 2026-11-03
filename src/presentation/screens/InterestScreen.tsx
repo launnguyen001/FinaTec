@@ -163,18 +163,14 @@ export function InterestScreen() {
       setPrincipalAccountId(
         nextAccounts.find(
           (item) =>
-            !item.isArchived &&
-            item.type === "ASSET" &&
-            item.isInvestment,
-        )
-          ?.id ?? "",
+            !item.isArchived && item.type === "ASSET" && item.isInvestment,
+        )?.id ?? "",
       );
     }
     if (!incomeAccountId) {
       setIncomeAccountId(
-        nextAccounts.find(
-          (item) => !item.isArchived && item.type === "INCOME",
-        )?.id ?? "",
+        nextAccounts.find((item) => !item.isArchived && item.type === "INCOME")
+          ?.id ?? "",
       );
     }
   }, [runtime, principalAccountId, incomeAccountId, selectedPlanId]);
@@ -404,7 +400,9 @@ export function InterestScreen() {
           accounts={principalAccounts}
           selectedId={principalAccountId}
           onSelect={(id) => {
-            const currencyCode = accounts.find((item) => item.id === id)?.currencyCode;
+            const currencyCode = accounts.find(
+              (item) => item.id === id,
+            )?.currencyCode;
             setPrincipalAccountId(id);
             setPayoutAccountId("");
             setIncomeAccountId(
