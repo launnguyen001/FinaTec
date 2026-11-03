@@ -6,8 +6,8 @@ Chuyển toàn bộ trách nhiệm tính và ghi nhận lãi từ acceptance c�
 
 ## Phân chia ownership
 
-- TASK-04: asset catalog/profile; phân loại stable-value/market-valued; lưu metadata khoản tiền gửi có lãi; principal, currency, ngày bắt đầu/đáo hạn, interest plan reference và lựa chọn capitalization/payout; hiển thị trạng thái/kết quả do Interest Engine cung cấp.
-- TASK-05: InterestPlan, InterestAccrual; APR/APY, day-count, compounding, period boundary, rounding; lifecycle accrued/posted/paid; catch-up/idempotency; atomic Journal Entry; capitalization và payout.
+- TASK-04: asset catalog/profile; phân loại stable-value/market-valued; asset lots, DCA, valuation, quote history và investment-account classification. Không tạo interest-specific metadata hoặc principal mirror.
+- TASK-05: InterestPlan tham chiếu một ASSET Account chuyên biệt làm principal source; đọc principal/currency từ Ledger, lưu start/maturity, APR/APY, day-count, compounding, period boundary, rounding; lifecycle accrued/posted/paid; catch-up/idempotency; atomic Journal Entry; capitalization và payout.
 - TASK-02: tiếp tục là nguồn chuẩn cho journal posting, transaction boundary, account và balance invariants.
 
 ## Dependency
