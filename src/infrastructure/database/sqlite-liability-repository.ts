@@ -347,9 +347,16 @@ export class SqliteLiabilityRepository implements LiabilityRepository {
       this.assertPaymentJournal(input, tx);
       this.insertPostedJournal(tx, input.journalEntry, input.journalLines);
 
+      const existingPayments = tx.select().from(liabilityPayments)
+        .where(eq(liabilityPayments.liabilityId, input.payment.liabilityId)).all();
+      const postingOrder = existingPayments.reduce(
+        (maximum, item) => Math.max(maximum, item.postingOrder),
+        0,
+      ) + 1;
       tx.insert(liabilityPayments)
         .values({
           ...input.payment,
+          postingOrder,
           principalPaidMinor: toSqliteSafeInteger(
             input.payment.principalPaidMinor,
           ),
@@ -441,8 +448,8 @@ export class SqliteLiabilityRepository implements LiabilityRepository {
         .where(eq(liabilityPayments.liabilityId, payment.liabilityId)).all();
       const reversals = tx.select().from(liabilityPaymentReversals).all();
       const reversedIds = new Set(reversals.map((item) => item.paymentId));
-      if (paymentRows.some((item) => item.id !== payment.id && item.paidAt >= payment.paidAt && !reversedIds.has(item.id))) {
-        throw new Error("Reverse payments in reverse chronological order");
+      if (paymentRows.some((item) => item.id !== payment.id && item.postingOrder > payment.postingOrder && !reversedIds.has(item.id))) {
+        throw new Error("Reverse payments in reverse posting order");
       }
       if (input.reversal.journalEntry.reversalOfId !== payment.journalEntryId ||
           input.reversal.journalEntry.transactionKind !== "REVERSAL" ||
