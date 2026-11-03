@@ -101,5 +101,3 @@ Additional `journal_entries` audit columns (TASK-03):
 
 | Column | Type | Null | Rule |
 |---|---|---:|---|
-| posting_purpose | TEXT | No | STANDARD, ARCHIVED_ACCOUNT_SETTLEMENT, ARCHIVED_ACCOUNT_ADJUSTMENT, ARCHIVED_ACCOUNT_REVERSAL; defaults to STANDARD |
-| audit_reason | TEXT | Yes | Required (minimum 8 trimmed characters) whenever a posting touches an archived Account through an approved purpose |
