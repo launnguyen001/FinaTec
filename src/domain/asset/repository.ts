@@ -1,4 +1,10 @@
-import type { AssetLot, AssetValuationModel, DcaAggregate } from "./asset";
+import type {
+  AssetLot,
+  AssetValuationModel,
+  DcaAggregate,
+  DailyValuation,
+  MarketQuote,
+} from "./asset";
 import type { PostingCommitInput } from "../ledger/repository";
 
 export interface AssetTypeRecord {
@@ -84,4 +90,15 @@ export interface AssetRepository {
     componentLotIds: string[];
     createdAt: string;
   }): Promise<DcaAggregate>;
+  recordQuoteAndSnapshot(input: {
+    quoteId: string;
+    snapshotId: string;
+    quote: MarketQuote;
+    quantity: string;
+    valuationDate: string;
+    snapshotCapturedAt: string;
+    quantityPrecision: number;
+    pricePrecision: number;
+    currencyMinorUnit: number;
+  }): Promise<DailyValuation | null>;
 }
