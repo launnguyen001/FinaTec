@@ -162,6 +162,38 @@ export async function runInterestAcceptanceDiagnostic(): Promise<InterestAccepta
     }
 
     const accounting = new AccountingService(ledger, { createId, now });
+    const latePrincipal = makeAccount("late-principal", "ASSET", true);
+    await ledger.createAccount(latePrincipal);
+    await accounting.createOpeningBalance({
+      idempotencyKey: `task05-${suffix}-opening-late-principal`,
+      accountId: latePrincipal.id,
+      offsetAccountId: equity.id,
+      amountMinor: 100_000n,
+      occurredAt: "2025-12-31T20:00:00.000Z",
+    });
+    await expectFailure(
+      () =>
+        interest.createPlan({
+          name: "Timezone boundary must reject late funding",
+          principalAccountId: latePrincipal.id,
+          interestIncomeAccountId: income.id,
+          annualRatePpm: 55_000n,
+          payoutAccountId: payout.id,
+          compounding: "SIMPLE",
+          postingFrequency: "AT_MATURITY",
+          startDate: "2026-01-01",
+          maturityDate: "2027-01-01",
+          timezoneId: "Asia/Ho_Chi_Minh",
+        }),
+      /fully funded before the plan start date/i,
+      "Timezone-aware principal start boundary",
+    );
+    check(
+      "Timezone-aware principal start boundary",
+      true,
+      "a 2025-12-31 20:00Z movement is after 2026-01-01 local midnight in Asia/Ho_Chi_Minh and is rejected",
+    );
+
     await accounting.createOpeningBalance({
       idempotencyKey: `task05-${suffix}-opening-principal`,
       accountId: principal.id,
