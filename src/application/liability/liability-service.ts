@@ -14,6 +14,8 @@ import type {
   LiabilityInstallment,
   LiabilityPayment,
   LiabilityRateChange,
+  LiabilityPaymentAllocation,
+  LiabilityPaymentScheduleChange,
   RepaymentStatus,
 } from "../../domain/liability/liability";
 import type { LiabilityRepository } from "../../domain/liability/repository";
@@ -52,6 +54,7 @@ export interface RecordLiabilityPaymentInput {
   note?: string | null;
   fxRateNumerator?: string;
   fxRateDenominator?: string;
+  replacesPaymentId?: string;
 }
 
 export interface LiabilityServiceOptions {
@@ -367,6 +370,9 @@ export class LiabilityService {
       await this.repository.listPayments(input.liabilityId)
     ).find((item) => item.idempotencyKey === key);
     if (existing) return existing;
+    if (input.replacesPaymentId && !(await this.repository.findPaymentReversal(input.replacesPaymentId))) {
+      throw new Error("A replacement payment must reference an already reversed payment");
+    }
     if (input.amountMinor <= 0n)
       throw new Error("Payment amount must be positive");
     const feeMinor = input.feeMinor ?? 0n;
@@ -642,6 +648,7 @@ export class LiabilityService {
       journalEntryId: journalEntry.id,
       fxRateNumerator,
       fxRateDenominator,
+      replacesPaymentId: input.replacesPaymentId ?? null,
       idempotencyKey: key,
       paidAt,
       principalPaidMinor: principalPaid,
@@ -650,13 +657,103 @@ export class LiabilityService {
       note: input.note?.trim() || null,
       createdAt: timestamp,
     };
+    const allocations: LiabilityPaymentAllocation[] = [];
+    for (const updated of installmentUpdates) {
+      const before = schedules.find((item) => item.id === updated.id);
+      if (!before) continue;
+      const principalDelta = updated.principalPaidMinor - before.principalPaidMinor;
+      const interestDelta = updated.interestPaidMinor - before.interestPaidMinor;
+      if (principalDelta === 0n && interestDelta === 0n) continue;
+      allocations.push({
+        id: this.options.createId(),
+        paymentId,
+        installmentId: updated.id,
+        principalMinor: principalDelta,
+        interestMinor: interestDelta,
+        principalBeforeMinor: before.principalPaidMinor,
+        interestBeforeMinor: before.interestPaidMinor,
+        statusBefore: before.status,
+      });
+    }
+    const scheduleChanges: LiabilityPaymentScheduleChange[] = [
+      ...installmentUpdates
+        .filter((item) => item.status === "CANCELLED")
+        .map((item) => ({
+          id: this.options.createId(),
+          paymentId,
+          installmentId: item.id,
+          action: "CANCELLED" as const,
+          previousStatus: schedules.find((before) => before.id === item.id)?.status ?? null,
+        })),
+      ...newInstallments.map((item) => ({
+        id: this.options.createId(),
+        paymentId,
+        installmentId: item.id,
+        action: "CREATED" as const,
+        previousStatus: null,
+      })),
+    ];
     return this.repository.commitPayment({
       payment,
+      allocations,
+      scheduleChanges,
       journalEntry,
       journalLines,
       outstandingPrincipalMinor: outstanding - principalPaid,
       installmentUpdates,
       newInstallments,
+    });
+  }
+
+  async reversePayment(paymentId: string, reason?: string | null): Promise<void> {
+    const payments = await this.repository.listPayments((await this.repository.findById(paymentId))?.id ?? "");
+    const payment = payments.find((item) => item.id === paymentId);
+    if (!payment) throw new Error("Liability payment does not exist");
+    if (await this.repository.findPaymentReversal(paymentId)) {
+      throw new Error("Payment has already been reversed");
+    }
+    const laterPayments = payments.filter((item) => item.id !== paymentId && item.paidAt >= payment.paidAt);
+    for (const later of laterPayments) {
+      if (!(await this.repository.findPaymentReversal(later.id))) {
+        throw new Error("Reverse payments in reverse chronological order; a later payment is still active");
+      }
+    }
+    const original = await this.ledger.findJournalEntryById(payment.journalEntryId);
+    if (!original || original.status !== "POSTED") throw new Error("Original payment journal is missing or not POSTED");
+    const originalLines = await this.ledger.listJournalLines(original.id);
+    const timestamp = this.now();
+    const reversalEntry: JournalEntry = {
+      ...this.createJournalEntry(
+        `liability:payment-reversal:${payment.id}`,
+        `Reversal of loan payment ${payment.id}`,
+        timestamp,
+        original.baseCurrencyCode,
+      ),
+      reversalOfId: original.id,
+      transactionKind: "REVERSAL",
+      categoryId: original.categoryId ?? null,
+    };
+    const reversalLines = originalLines
+      .slice()
+      .sort((a, b) => a.lineNumber - b.lineNumber)
+      .map((line, index) => ({
+        ...line,
+        id: this.options.createId(),
+        entryId: reversalEntry.id,
+        lineNumber: index + 1,
+        side: line.side === "DEBIT" ? "CREDIT" as const : "DEBIT" as const,
+        createdAt: timestamp,
+      }));
+    await this.repository.reversePayment({
+      paymentId,
+      reversal: { journalEntry: reversalEntry, journalLines: reversalLines },
+      record: {
+        id: this.options.createId(),
+        paymentId,
+        journalEntryId: reversalEntry.id,
+        reason: reason?.trim() || null,
+        createdAt: timestamp,
+      },
     });
   }
 
