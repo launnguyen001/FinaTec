@@ -27,7 +27,12 @@ export async function createFinanceRuntime() {
     createId,
     ledger,
     assetRepository,
-    assetTransactions: new AssetTransactionService(assetRepository, ledger, categoryRepository, { now }),
+    assetTransactions: new AssetTransactionService(
+      assetRepository,
+      ledger,
+      categoryRepository,
+      { now },
+    ),
     accounts: new AccountService(accountRepository, ledger, { createId, now }),
     categories: new CategoryService(categoryRepository, { createId, now }),
     transactions: new FinanceTransactionService(
