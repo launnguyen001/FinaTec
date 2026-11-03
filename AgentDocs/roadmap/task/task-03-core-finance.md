@@ -39,10 +39,12 @@ Người dùng thao tác bằng ngôn ngữ tài chính thông thường. Mọi 
 
 ### 2.2 Vòng đời Account và số dư đầu kỳ
 
-- Vòng đời Account: ACTIVE → ARCHIVED; không có thao tác hard-delete.
+- Vòng đời Account: ACTIVE ↔ ARCHIVED; không có thao tác hard-delete. Bổ sung use case `restoreAccount()` để khôi phục Account đã archive.
+- Chỉ được archive Account khi số dư Ledger hiện tại bằng chính xác 0 theo native currency của Account. Số dư phải được tính từ Journal Entry POSTED, không dùng số dư cache hoặc giá trị do UI truyền lên.
+- Nếu số dư khác 0 (dương hoặc âm), từ chối archive. Người dùng phải đưa số dư về 0 bằng các giao dịch hợp lệ khi Account còn ACTIVE.
+- Archive phải kiểm tra số dư và cập nhật trạng thái trong một transaction/critical section có tính nguyên tử để không xảy ra race với posting đồng thời.
 - Account archive vẫn xuất hiện trong lịch sử, chi tiết giao dịch và truy vấn lịch sử số dư.
-- Account archive không được chọn cho giao dịch thông thường mới.
-- Cho phép tất toán/điều chỉnh Account archive thông qua Application use case chuyên biệt, có kiểm soát theo mục 5. Không cho phép UI/caller tự bật cờ bỏ qua archive validation.
+- Account archive bị cấm tham gia mọi posting mới, không có ngoại lệ theo posting purpose. Muốn giao dịch liên quan Account này, người dùng phải Restore trước.
 - Số dư đầu kỳ phải được ghi bằng Opening Balance Journal Entry qua AccountingService.createOpeningBalance; không có số dư khởi tạo lưu trực tiếp trên Account.
 - Account và offset EQUITY tuân theo giới hạn cùng currency hiện tại của TASK-02.
 
@@ -54,7 +56,6 @@ Cung cấp Application use case riêng cho:
 - Internal transfer.
 - Opening balance.
 - Reversal và tạo giao dịch thay thế.
-- Archived-account settlement/adjustment.
 - Truy vấn lịch sử, chi tiết, số dư Account và Dashboard.
 
 Các use case nghiệp vụ dùng chung Accounting Engine. Không tạo cơ chế ghi sổ thứ hai.
@@ -164,21 +165,20 @@ App hiện mới ở mức khung/skeleton và diagnostic/acceptance screens. TAS
 
 ## 5. Hai điểm kiến trúc bắt buộc xử lý
 
-### 5.1 Archived-account settlement — policy extension của TASK-02
+### 5.1 Archived Account — strict zero-balance lifecycle policy
 
-**Xung đột đã xác định:** TASK-02 hiện từ chối mọi posting vào Account archive, trong khi scope được duyệt yêu cầu tất toán/điều chỉnh có kiểm soát.
+**Quyết định scope:** TASK-02 từ chối posting vào Account Archived và TASK-03 giữ nguyên invariant này. Không mở rộng Accounting Engine bằng settlement/adjustment/reversal exception.
 
-Đây là thay đổi có chủ đích đối với policy TASK-02, không được bỏ qua hoặc xử lý bằng bypass ở UI/Repository.
-
-Yêu cầu:
-- Mặc định Account archive vẫn bị từ chối trong giao dịch thông thường.
-- Chỉ Application use case chuyên biệt được phép yêu cầu posting có purpose ARCHIVED_ACCOUNT_SETTLEMENT hoặc ARCHIVED_ACCOUNT_ADJUSTMENT; reversal chạm Account archive dùng ARCHIVED_ACCOUNT_REVERSAL.
-- Reversal của giao dịch cũ liên quan Account archive phải qua luồng reversal chuyên biệt và giữ audit link.
-- Domain/Accounting Engine kiểm tra purpose, command type, Account archive liên quan và điều kiện tất toán. Caller không được truyền boolean allowArchived tùy ý.
-- Ghi reason/audit metadata và idempotency key.
-- Không cho phép giao dịch thu/chi/chuyển tiền thông thường mới trên Account archive.
-- Cập nhật AgentDocs/accounting-rules.md và task02 policy note/kiến trúc tương ứng; giữ invariant cân bằng, atomicity, immutability và idempotency.
-- Có test hợp lệ và test từ chối.
+Yêu cầu bắt buộc:
+- `archiveAccount()` chỉ thành công khi số dư Ledger của Account bằng chính xác 0 theo native currency. Balance phải được tính từ các Journal Entry POSTED.
+- Từ chối archive khi số dư dương hoặc âm; không tự tạo bút toán, không tự chuyển tiền và không tự điều chỉnh số dư trong quá trình archive.
+- Kiểm tra zero-balance và cập nhật `is_archived` phải nguyên tử với các thao tác ghi sổ để ngăn race condition. Repository phải bảo đảm không có posting mới lọt vào giữa bước kiểm tra balance và archive.
+- Bổ sung `restoreAccount()` để chuyển ARCHIVED → ACTIVE. Restore không tạo Journal Entry và không thay đổi số dư/lịch sử.
+- Mọi posting mới đều từ chối nếu có bất kỳ line nào tham chiếu Account Archived, bất kể transaction kind hoặc posting purpose; bao gồm INCOME, EXPENSE, TRANSFER, OPENING_BALANCE, ADJUSTMENT và REVERSAL.
+- Nếu cần reversal một entry cũ có tham chiếu Account Archived, người dùng phải Restore Account liên quan trước, sau đó mới thực hiện reversal qua luồng AccountingService thông thường.
+- Không dùng `allowedArchivedAccountIds`, `allowArchived`, `ARCHIVED_ACCOUNT_SETTLEMENT`, `ARCHIVED_ACCOUNT_ADJUSTMENT` hoặc `ARCHIVED_ACCOUNT_REVERSAL` để vượt qua policy. Loại bỏ các nhánh exception đã thêm riêng cho TASK-03 khỏi implementation và persisted purpose model nếu chưa phát hành migration ra người dùng; nếu đã phát hành schema v2 thì migration tiếp theo phải xử lý tương thích, không sửa migration đã chạy.
+- Giữ nguyên immutability, balancing, atomicity, idempotency và audit trace của TASK-02.
+- Có unit và repository integration tests cho zero-balance archive, non-zero archive rejection, restore, archived posting rejection và race/atomicity.
 
 ### 5.2 Dashboard đa tiền tệ
 
@@ -216,7 +216,7 @@ Nhóm use case/repository:
 1. Account: create, update metadata, archive, list/detail, balance query.
 2. Category: create, rename, reparent, archive, list/tree query; validate kind và cycle.
 3. Transaction: income, expense, internal transfer, opening balance, reversal/replacement.
-4. Archived account: settlement/adjustment chuyên biệt theo mục 5.1.
+4. Account lifecycle: archive chỉ khi Ledger balance = 0; restore để cho phép sử dụng lại.
 5. History: list/detail/filter by date range, category, account.
 6. Dashboard: available balances grouped by currency, income, expense, net flow theo kỳ.
 
@@ -226,7 +226,7 @@ Mọi command ghi dữ liệu phải có Domain/Application validation, idempote
 
 1. Đọc Core, schema TASK-01, accounting rules TASK-02, code và design system.
 2. Thiết kế ERD/schema delta cho Category, Account subtype, Journal Entry metadata; xác định migration/backfill.
-3. Cập nhật policy TASK-02 cho archived-account settlement/reversal theo mục 5.1. Không triển khai use case trước khi validator và repository contract nhất quán.
+3. Giữ nguyên policy TASK-02: mọi posting vào Account Archived đều bị từ chối; loại bỏ exception settlement/adjustment/reversal của TASK-03. Bổ sung kiểm tra zero-balance nguyên tử cho archive và use case restore.
 4. Xây Category Domain/Repository/Application và Account subtype/lifecycle use cases.
 5. Xây use case thu, chi, chuyển tiền, opening balance và reversal/replacement dùng Accounting Engine.
 6. Xây query layer cho số dư, history và Dashboard; kiểm tra multi-currency theo mục 2.5.
@@ -248,7 +248,9 @@ Mọi command ghi dữ liệu phải có Domain/Application validation, idempote
 - Opening balance dùng đúng offset EQUITY, không ghi balance trực tiếp.
 - Posted entry không sửa/xóa; reversal giữ audit trace và replacement là entry mới.
 - Reversal triệt tiêu đúng ảnh hưởng thu/chi của entry gốc trong báo cáo.
-- Account archive bị từ chối ở use case thông thường; settlement/adjustment chỉ qua use case chuyên biệt; command không đủ điều kiện bị từ chối.
+- Account archive chỉ thành công khi Ledger balance bằng 0; số dư khác 0 bị từ chối. Restore cho phép sử dụng lại Account.
+- Mọi posting có line tham chiếu Account Archived đều bị từ chối, bao gồm reversal; phải restore trước.
+- Archive zero-balance check và state update nguyên tử, không có race với posting.
 - Idempotent retry không tạo duplicate entry.
 
 ### Repository / migration integration
@@ -279,7 +281,9 @@ Mọi command ghi dữ liệu phải có Domain/Application validation, idempote
 - [ ] Journal Entry liên kết tối đa một Category; dữ liệu cũ migrate an toàn.
 - [ ] Có use case riêng income, expense, transfer; cùng dùng Accounting Engine.
 - [ ] Opening balance được ghi bằng Journal Entry.
-- [ ] Archived Account chỉ tất toán/điều chỉnh qua policy và use case chuyên biệt đã kiểm thử.
+- [ ] Archive Account chỉ thành công khi số dư Ledger chính xác bằng 0 theo native currency; thao tác kiểm tra và cập nhật trạng thái nguyên tử.
+- [ ] Có `restoreAccount()`; restore không tạo posting và giữ nguyên lịch sử.
+- [ ] Không có posting exception cho Account Archived; mọi posting, kể cả reversal, phải restore trước.
 - [ ] Posted transaction chỉ điều chỉnh bằng reversal và replacement.
 - [ ] Quick Expense thông thường hoàn tất tối đa 3 thao tác.
 - [ ] History lọc đúng ngày, Category, Account; dùng occurredAt làm business date.
@@ -299,7 +303,7 @@ Mọi command ghi dữ liệu phải có Domain/Application validation, idempote
 - **Done:** Domain/Application/SQLite repository cho Category tree, parent-kind validation, cycle protection và archive lifecycle.
 - **Done:** Account create/list/rename/update metadata/archive; ASSET subtype được validate ở Application và database migration.
 - **Done:** Income/Expense use cases dùng chung AccountingService; transfer, opening balance và reversal được phân loại theo transaction kind; reversal kế thừa Category.
-- **Done:** Archived Account policy: ordinary posting tiếp tục bị chặn; settlement chỉ chuyển số dư dương từ một archived ASSET sang một active ASSET cùng currency, yêu cầu audit reason; archived reversal yêu cầu reason và mirror chính xác bút toán gốc. Repository revalidate trong transaction.
+- **Superseded by scope decision (2026-11-03):** Loại bỏ archived-account settlement/adjustment/reversal exceptions. Account chỉ được archive khi Ledger balance chính xác bằng 0; Account Archived không tham gia bất kỳ posting mới nào; phải restore trước khi posting/reversal. Bổ sung zero-balance archive atomicity và restore vào implementation/test plan.
 - **Done:** Dashboard query/service tổng hợp available balance, income, expense và net flow theo native currency; history query/service lọc occurredAt, Category và Account.
 - **Done:** UI khung sản phẩm cho Dashboard, Account, Category, Quick Expense, Quick Income, Transfer (có FX snapshot), Opening Balance, History/reversal và archived-account settlement; có base-currency setup, empty/error/loading states và điều hướng.
 - **Done:** Unit tests được bổ sung cho AccountService, CategoryService, income/expense, Dashboard multi-currency và archived-account settlement/reversal.
