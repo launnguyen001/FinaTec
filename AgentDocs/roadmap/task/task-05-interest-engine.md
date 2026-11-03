@@ -2,7 +2,7 @@
 
 - Giai đoạn: 3 — MVP 2
 - Ưu tiên: P1
-- Trạng thái: IMPLEMENTATION COMPLETE — GitHub CI PASS; awaiting Android SQLCipher/device acceptance
+- Trạng thái: COMPLETED — GitHub CI PASS; Android SQLCipher acceptance 8/8 PASS; liability interest deferred to TASK-06
 - Phụ thuộc: TASK-02, TASK-04
 - Branch triển khai: `task/05-interest-engine`
 - Base: `main` tại `14db998`; branch đã được đồng bộ với toàn bộ baseline Task04 và closeout docs
@@ -151,14 +151,14 @@ Rates are represented as parts per million: 5.5% = 55,000 ppm; 100% = 1,000,000 
 
 - [x] Công thức và convention MVP được owner duyệt; ACT/365 Fixed reference vectors đã được ghi trong mục 5.2.
 - [x] Pure calculator unit tests khớp reference vectors, bao gồm leap-year, HALF_UP, 365-day fractional carry và APR ceiling.
-- [ ] Accrued / posted / paid tách biệt và truy vết được.
-- [ ] Lãi phát sinh truy vết được tới Journal Entry.
-- [ ] Xử lý lại không tạo trùng kỳ hoặc trùng bút toán.
-- [ ] Asset-interest posting được SQLCipher acceptance xác nhận; liability interest deferred sang TASK-06.
-- [ ] Capitalization/payout đúng và không double-count.
-- [ ] Kiểm thử bao phủ ranh giới ngày, timezone, năm nhuận và rounding.
-- [ ] Catch-up hoạt động khi app mở lại sau thời gian offline.
-- [ ] Migration và SQLCipher repository acceptance PASS.
+- [x] Accrued / posted / paid tách biệt và truy vết được.
+- [x] Lãi phát sinh truy vết được tới Journal Entry.
+- [x] Xử lý lại không tạo trùng kỳ hoặc trùng bút toán.
+- [x] Asset-interest posting được SQLCipher acceptance xác nhận; liability interest deferred sang TASK-06.
+- [x] Capitalization/payout đúng và không double-count.
+- [x] Kiểm thử bao phủ ranh giới ngày, timezone, năm nhuận và rounding.
+- [x] Catch-up hoạt động khi app mở lại sau thời gian offline.
+- [x] Migration và SQLCipher repository acceptance PASS.
 
 ## 10. Nhật ký tiến độ
 
@@ -175,6 +175,8 @@ Rates are represented as parts per million: 5.5% = 55,000 ppm; 100% = 1,000,000 
 - Đã implement foreground catch-up khi app khởi chạy/resume; UI route `/interest` (create/list/preview/accrue/post/catch-up/pause/resume/close); development SQLCipher acceptance route `/task05-interest-acceptance`.
 - MVP limitation: posting chỉ hỗ trợ account cùng Ledger base currency; liability interest (TASK-06), staking rewards, APY, early-withdrawal penalty và variable-principal schedules chưa hỗ trợ. Principal phải được funding trước ngày bắt đầu theo timezone của plan; mọi external movement từ ngày bắt đầu trở đi khiến preview/accrual/catch-up bị từ chối để không tính sai lịch sử.
 - CI PASS trên latest PR head `d663e86` (workflow run `41695810327`): dependency install, TypeScript, ESLint, Prettier format check và unit tests đều SUCCESS.
-- Đã bổ sung development route `/task05-interest-acceptance`: migration upgrade, timezone-aware funding cutoff, duplicate active plan, monthly month-end catch-up, at-maturity payout, capitalization, exact rounding, atomic rollback, journal idempotency và cleanup isolated SQLCipher DB/key. Chưa chạy trên Android Development Build; CLI/device acceptance vẫn PENDING.
+- Đã bổ sung development route `/task05-interest-acceptance`: migration upgrade, timezone-aware funding cutoff, duplicate active plan, monthly month-end catch-up, at-maturity payout, capitalization, exact rounding, atomic rollback, journal idempotency và cleanup isolated SQLCipher DB/key.
+- 2026-11-04: Android Development Build SQLCipher acceptance PASS 8/8: Core Finance upgrade + Task05 migration; timezone-aware principal start boundary; monthly month-end catch-up; accrued không ảnh hưởng Ledger; atomic rollback; capitalization + idempotent retry; simple-interest payout; SQLCipher encrypted database. Diagnostic dùng database/key cô lập và xác nhận cleanup trong `finally`.
+- 2026-11-04: `npx expo lint` và `npx tsc --noEmit` PASS trên branch acceptance.
 - PR #7 đang Draft; chưa merge. Branch `task/05-interest-engine` đã đồng bộ với `main` (behind 0); PR #7 hiện có 16 files changed. Khi hoàn tất nghiệm thu, squash merge để giữ main history gọn.
 - Branch sync: `task/05-interest-engine` đã chứa baseline Task04; compare hiện ahead 98 / behind 0 so với `main`. Không force-push và không sửa trực tiếp `main` trong quá trình triển khai Task05.
