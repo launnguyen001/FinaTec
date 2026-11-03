@@ -5,8 +5,8 @@ import type {
 } from "./interest";
 import type { JournalEntry, JournalLine } from "../ledger/repository";
 
-export interface CreateInterestPlanRecord extends InterestPlan {}
-export interface CreateInterestAccrualRecord extends InterestAccrual {}
+export type CreateInterestPlanRecord = InterestPlan;
+export type CreateInterestAccrualRecord = InterestAccrual;
 
 export interface InterestPostingCommit {
   accrualId: string;
