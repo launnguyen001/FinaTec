@@ -9,13 +9,27 @@ import {
   View,
 } from "react-native";
 import type { Account } from "../../domain/ledger/repository";
-import type {
-  InterestAccrual,
-  InterestPlan,
+import {
+  roundHalfUp,
+  type InterestAccrual,
+  type InterestPlan,
 } from "../../domain/interest/interest";
 import { ScreenBackLink } from "../components/ScreenBackLink";
 import { useFinanceRuntime } from "../providers/FinanceRuntimeProvider";
 import { colors, spacing } from "../../shared/theme/tokens";
+
+function getLocalDate(): string {
+  const values = new Map(
+    new Intl.DateTimeFormat("en-CA", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    })
+      .formatToParts(new Date())
+      .map((part) => [part.type, part.value]),
+  );
+  return `${values.get("year")}-${values.get("month")}-${values.get("day")}`;
+}
 
 function Action({
   label,
@@ -90,7 +104,7 @@ export function InterestScreen() {
   const [name, setName] = useState("");
   const [ratePercent, setRatePercent] = useState("5.5");
   const [startDate, setStartDate] = useState(
-    new Date().toISOString().slice(0, 10),
+    getLocalDate(),
   );
   const [maturityDate, setMaturityDate] = useState("");
   const [principalAccountId, setPrincipalAccountId] = useState("");
@@ -133,6 +147,7 @@ export function InterestScreen() {
         (!currencyCode || account.currencyCode === currencyCode),
     );
   }, [accounts, principalAccountId]);
+  const selectedPlan = plans.find((plan) => plan.id === selectedPlanId);
   const payoutAccounts = useMemo(
     () =>
       accounts.filter(
@@ -329,6 +344,34 @@ export function InterestScreen() {
     }
   }
 
+  async function changePlanStatus(status: InterestPlan["status"]) {
+    if (!runtime || !selectedPlanId) return;
+    setBusy(true);
+    setFailure(null);
+    setMessage(null);
+    try {
+      await runtime.interest.setPlanStatus(selectedPlanId, status);
+      if (status === "CLOSED") {
+        setSelectedPlanId("");
+        setAccruals([]);
+      }
+      setMessage(
+        status === "PAUSED"
+          ? "Đã tạm dừng kế hoạch lãi."
+          : status === "CLOSED"
+            ? "Đã đóng kế hoạch lãi."
+            : "Đã kích hoạt lại kế hoạch lãi.",
+      );
+      await load();
+    } catch (cause) {
+      setFailure(
+        cause instanceof Error ? cause.message : "Không thể cập nhật trạng thái kế hoạch.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function post(accrualId: string) {
     if (!runtime) return;
     setBusy(true);
@@ -481,6 +524,33 @@ export function InterestScreen() {
 
       {selectedPlanId ? (
         <View style={styles.card}>
+          {selectedPlan ? (
+            <>
+              <Text style={styles.muted}>
+                Trạng thái: {selectedPlan.status} · {selectedPlan.timezoneId}
+              </Text>
+              <View style={styles.wrap}>
+                {selectedPlan.status === "ACTIVE" ? (
+                  <Action
+                    label="Tạm dừng"
+                    disabled={busy}
+                    onPress={() => void changePlanStatus("PAUSED")}
+                  />
+                ) : (
+                  <Action
+                    label="Tiếp tục"
+                    disabled={busy}
+                    onPress={() => void changePlanStatus("ACTIVE")}
+                  />
+                )}
+                <Action
+                  label="Đóng kế hoạch"
+                  disabled={busy}
+                  onPress={() => void changePlanStatus("CLOSED")}
+                />
+              </View>
+            </>
+          ) : null}
           <Text style={styles.sectionTitle}>Preview và ghi nhận kỳ lãi</Text>
           <Text style={styles.label}>Từ ngày (inclusive)</Text>
           <TextInput
@@ -538,7 +608,7 @@ export function InterestScreen() {
                 </Text>
                 <Text style={styles.muted}>
                   {item.accrualKind} · {item.status} ·{" "}
-                  {item.amountMinor.toString()} minor units
+                  {roundHalfUp(item.accruedNumerator, item.accruedDenominator).toString()} minor units (HALF_UP at posting)
                 </Text>
                 {item.journalEntryId ? (
                   <Text style={styles.muted}>
