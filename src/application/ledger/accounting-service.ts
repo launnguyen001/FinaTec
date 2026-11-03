@@ -75,7 +75,6 @@ export interface ReverseEntryInput {
   originalEntryId: string;
   occurredAt?: string;
   description?: string | null;
-  reason?: string;
 }
 
 interface LoadedContext {
