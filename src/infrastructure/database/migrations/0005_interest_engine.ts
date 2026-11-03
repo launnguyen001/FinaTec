@@ -5,7 +5,7 @@ CREATE TABLE interest_plans (
   principal_account_id TEXT NOT NULL REFERENCES accounts(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
   interest_income_account_id TEXT NOT NULL REFERENCES accounts(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
   payout_account_id TEXT REFERENCES accounts(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
-  annual_rate_ppm INTEGER NOT NULL CHECK (annual_rate_ppm BETWEEN 0 AND 1000000000),
+  annual_rate_ppm INTEGER NOT NULL CHECK (annual_rate_ppm BETWEEN 0 AND 10000000),
   rate_convention TEXT NOT NULL DEFAULT 'NOMINAL_APR' CHECK (rate_convention = 'NOMINAL_APR'),
   day_count TEXT NOT NULL DEFAULT 'ACT_365_FIXED' CHECK (day_count = 'ACT_365_FIXED'),
   compounding TEXT NOT NULL CHECK (compounding IN ('SIMPLE', 'AFTER_CAPITALIZATION')),
