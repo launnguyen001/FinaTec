@@ -26,11 +26,6 @@ ALTER TABLE journal_entries ADD COLUMN transaction_kind TEXT NOT NULL DEFAULT 'L
 --> statement-breakpoint
 ALTER TABLE journal_entries ADD COLUMN category_id TEXT REFERENCES categories(id) ON UPDATE RESTRICT ON DELETE RESTRICT;
 --> statement-breakpoint
-ALTER TABLE journal_entries ADD COLUMN posting_purpose TEXT NOT NULL DEFAULT 'STANDARD'
-  CHECK (posting_purpose IN ('STANDARD', 'ARCHIVED_ACCOUNT_SETTLEMENT', 'ARCHIVED_ACCOUNT_ADJUSTMENT', 'ARCHIVED_ACCOUNT_REVERSAL'));
---> statement-breakpoint
-ALTER TABLE journal_entries ADD COLUMN audit_reason TEXT;
---> statement-breakpoint
 CREATE INDEX journal_entries_category_idx ON journal_entries(category_id);
 --> statement-breakpoint
 CREATE INDEX journal_entries_kind_occurred_idx ON journal_entries(transaction_kind, occurred_at);
@@ -39,6 +34,44 @@ CREATE TRIGGER accounts_no_hard_delete
 BEFORE DELETE ON accounts
 BEGIN
   SELECT RAISE(ABORT, 'accounts cannot be hard-deleted; archive the account instead');
+END;
+--> statement-breakpoint
+CREATE TRIGGER accounts_archive_requires_zero_balance
+BEFORE UPDATE OF is_archived ON accounts
+WHEN NEW.is_archived = 1 AND OLD.is_archived = 0
+BEGIN
+  SELECT CASE WHEN (
+    SELECT COALESCE(SUM(
+      CASE
+        WHEN (a.type IN ('ASSET', 'EXPENSE') AND jl.side = 'DEBIT')
+          OR (a.type NOT IN ('ASSET', 'EXPENSE') AND jl.side = 'CREDIT')
+        THEN jl.amount_minor ELSE -jl.amount_minor
+      END
+    ), 0)
+    FROM journal_lines jl
+    INNER JOIN journal_entries je ON je.id = jl.entry_id
+    INNER JOIN accounts a ON a.id = jl.account_id
+    WHERE jl.account_id = OLD.id AND je.status = 'POSTED'
+  ) <> 0 THEN RAISE(ABORT, 'account must have an exact zero Ledger balance before archive') END;
+END;
+--> statement-breakpoint
+CREATE TRIGGER journal_lines_no_archived_account_insert
+BEFORE INSERT ON journal_lines
+WHEN (SELECT is_archived FROM accounts WHERE id = NEW.account_id) = 1
+BEGIN
+  SELECT RAISE(ABORT, 'archived account cannot be used by a new journal line; restore it first');
+END;
+--> statement-breakpoint
+CREATE TRIGGER journal_entries_no_archived_account_posting
+BEFORE UPDATE OF status ON journal_entries
+WHEN NEW.status = 'POSTED' AND OLD.status <> 'POSTED'
+  AND EXISTS (
+    SELECT 1 FROM journal_lines jl
+    INNER JOIN accounts a ON a.id = jl.account_id
+    WHERE jl.entry_id = NEW.id AND a.is_archived = 1
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'archived account cannot be posted; restore it first');
 END;
 --> statement-breakpoint
 CREATE TRIGGER categories_parent_kind_insert
