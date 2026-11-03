@@ -194,6 +194,9 @@ export class InterestService {
     if (input.periodStart < plan.startDate) {
       throw new Error("Accrual period cannot start before the plan start date");
     }
+    if (input.periodEnd > this.todayForTimeZone(plan.timezoneId)) {
+      throw new Error("Accrual period cannot end in the future");
+    }
     if (plan.maturityDate && input.periodEnd > plan.maturityDate) {
       throw new Error("Accrual period cannot end after plan maturity");
     }
@@ -594,6 +597,17 @@ export class InterestService {
       if (raced) return raced;
       throw error;
     }
+  }
+
+  private todayForTimeZone(timezoneId: string): string {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: timezoneId,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(new Date(this.now()));
+    const values = new Map(parts.map((part) => [part.type, part.value]));
+    return `${values.get("year")}-${values.get("month")}-${values.get("day")}`;
   }
 
   private addMonthsFromAnchor(anchor: string, months: number): string {
