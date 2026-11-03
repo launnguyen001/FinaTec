@@ -27,6 +27,7 @@ export interface JournalPostingSpec {
   baseCurrencyCode: string;
   idempotencyKey: string | null;
   reversalOfId: string | null;
+  replacementOfId: string | null;
   transactionKind?: import("./repository").TransactionKind;
   categoryId?: string | null;
   createdAt: string;
@@ -98,6 +99,7 @@ export function buildJournalPosting(
     baseCurrencyCode: spec.baseCurrencyCode,
     idempotencyKey: spec.idempotencyKey,
     reversalOfId: spec.reversalOfId,
+    replacementOfId: spec.replacementOfId,
     transactionKind: spec.transactionKind ?? "LEGACY",
     categoryId: spec.categoryId ?? null,
     createdAt: spec.createdAt,

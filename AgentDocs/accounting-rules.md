@@ -1,7 +1,7 @@
 # Két Số — Accounting Engine Rules (TASK-02)
 
-**Status:** Implemented on `task/02-accounting-engine`  
-**Schema:** TASK-01 schema version 1 (no migration required)  
+**Status:** TASK-02 engine extended for TASK-03 on `task/03-core-finance`
+**Schema:** TASK-03 schema version 2 (`0001_core_finance.ts`)
 **Layers:** pure Domain rules + Application use cases + SQLite repository adapter
 
 ## 1. Posting lifecycle
@@ -59,6 +59,7 @@ No rounding line is created. Rounding is half-up once per line, then the resulti
 - The original entry and lines remain untouched.
 - The unique partial index on `reversal_of_id` guarantees at most one reversal per original entry.
 - An adjustment is a new posting; it never mutates posted history.
+- `replaceEntry` commits a linked reversal of the original and a new entry with `replacement_of_id` in one repository transaction. An original can have at most one replacement; retrying the command returns both persisted results.
 
 ## 7. Idempotency and transactions
 

@@ -26,7 +26,15 @@ ALTER TABLE journal_entries ADD COLUMN transaction_kind TEXT NOT NULL DEFAULT 'L
 --> statement-breakpoint
 ALTER TABLE journal_entries ADD COLUMN category_id TEXT REFERENCES categories(id) ON UPDATE RESTRICT ON DELETE RESTRICT;
 --> statement-breakpoint
+ALTER TABLE journal_entries ADD COLUMN replacement_of_id TEXT REFERENCES journal_entries(id) ON UPDATE RESTRICT ON DELETE RESTRICT
+  CHECK (replacement_of_id IS NULL OR (replacement_of_id <> id AND reversal_of_id IS NULL));
+--> statement-breakpoint
 CREATE INDEX journal_entries_category_idx ON journal_entries(category_id);
+--> statement-breakpoint
+CREATE INDEX journal_entries_replacement_idx ON journal_entries(replacement_of_id);
+--> statement-breakpoint
+CREATE UNIQUE INDEX journal_entries_replacement_unique
+  ON journal_entries(replacement_of_id) WHERE replacement_of_id IS NOT NULL;
 --> statement-breakpoint
 CREATE INDEX journal_entries_kind_occurred_idx ON journal_entries(transaction_kind, occurred_at);
 --> statement-breakpoint
@@ -160,4 +168,4 @@ WHEN NEW.category_id IS NOT NULL AND (
 BEGIN
   SELECT RAISE(ABORT, 'journal entry category does not match transaction kind');
 END;
-`
+`;

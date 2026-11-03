@@ -94,6 +94,7 @@ The Domain `Money` value object uses `bigint`. Before writing to SQLite INTEGER 
 |---|---|---:|---|
 | transaction_kind | TEXT | No | INCOME, EXPENSE, TRANSFER, OPENING_BALANCE, ADJUSTMENT, REVERSAL, LEGACY; existing entries backfill to LEGACY |
 | category_id | TEXT | Yes | FK categories.id; at most one Category per entry; income/expense kind must match transaction kind |
+| replacement_of_id | TEXT | Yes | Self-FK to the corrected original; unique when present; a replacement cannot also be a reversal |
 
 TRANSFER and OPENING_BALANCE entries must not carry a Category. Historical entries whose kind cannot be inferred remain LEGACY and uncategorized.
 

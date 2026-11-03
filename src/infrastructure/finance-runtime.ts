@@ -25,7 +25,12 @@ export async function createFinanceRuntime() {
     ledger,
     accounts: new AccountService(accountRepository, ledger, { createId, now }),
     categories: new CategoryService(categoryRepository, { createId, now }),
-    transactions: new FinanceTransactionService(accounting, ledger, categoryRepository, { now }),
+    transactions: new FinanceTransactionService(
+      accounting,
+      ledger,
+      categoryRepository,
+      { now },
+    ),
     dashboard: new DashboardService(ledger, accounting, readRepository),
     history: new TransactionHistoryService(readRepository),
   };

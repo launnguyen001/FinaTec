@@ -48,6 +48,7 @@ const entry: JournalEntry = {
   baseCurrencyCode: "VND",
   idempotencyKey: null,
   reversalOfId: null,
+  replacementOfId: null,
   createdAt: timestamp,
   postedAt: null,
 };

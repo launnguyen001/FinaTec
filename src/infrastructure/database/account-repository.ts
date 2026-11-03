@@ -1,5 +1,8 @@
 import { asc, eq } from "drizzle-orm";
-import type { AccountRepository, CreateAccountInput } from "../../domain/ledger/account-repository";
+import type {
+  AccountRepository,
+  CreateAccountInput,
+} from "../../domain/ledger/account-repository";
 import type { Account } from "../../domain/ledger/repository";
 import type { LedgerDatabase } from "./database";
 import { accounts } from "./schema";
@@ -8,14 +11,20 @@ export class SqliteAccountRepository implements AccountRepository {
   constructor(private readonly db: LedgerDatabase) {}
 
   async create(input: CreateAccountInput): Promise<Account> {
-    await this.db.insert(accounts).values({ ...input, isSystem: false, isArchived: false });
+    await this.db
+      .insert(accounts)
+      .values({ ...input, isSystem: false, isArchived: false });
     const account = await this.findById(input.id);
     if (!account) throw new Error("Account was not persisted");
     return account;
   }
 
   async findById(id: string): Promise<Account | null> {
-    const row = await this.db.select().from(accounts).where(eq(accounts.id, id)).get();
+    const row = await this.db
+      .select()
+      .from(accounts)
+      .where(eq(accounts.id, id))
+      .get();
     return row ?? null;
   }
 
@@ -25,7 +34,14 @@ export class SqliteAccountRepository implements AccountRepository {
     return query.where(eq(accounts.isArchived, false)).all();
   }
 
-  async updateMetadata(id: string, input: { name: string; subtype: import("../../domain/ledger/repository").AccountSubtype | null; updatedAt: string }): Promise<Account> {
+  async updateMetadata(
+    id: string,
+    input: {
+      name: string;
+      subtype: import("../../domain/ledger/repository").AccountSubtype | null;
+      updatedAt: string;
+    },
+  ): Promise<Account> {
     await this.db.update(accounts).set(input).where(eq(accounts.id, id)).run();
     const account = await this.findById(id);
     if (!account) throw new Error(`Account does not exist: ${id}`);
@@ -35,18 +51,22 @@ export class SqliteAccountRepository implements AccountRepository {
   async archive(id: string, updatedAt: string): Promise<void> {
     // The database trigger independently verifies a zero Ledger balance in
     // the same SQLite write transaction as this state transition.
-    const result = await this.db.update(accounts)
+    const result = await this.db
+      .update(accounts)
       .set({ isArchived: true, updatedAt })
       .where(eq(accounts.id, id))
       .run();
-    if (result.changes !== 1) throw new Error(`Account could not be archived: ${id}`);
+    if (result.changes !== 1)
+      throw new Error(`Account could not be archived: ${id}`);
   }
 
   async restore(id: string, updatedAt: string): Promise<void> {
-    const result = await this.db.update(accounts)
+    const result = await this.db
+      .update(accounts)
       .set({ isArchived: false, updatedAt })
       .where(eq(accounts.id, id))
       .run();
-    if (result.changes !== 1) throw new Error(`Account could not be restored: ${id}`);
+    if (result.changes !== 1)
+      throw new Error(`Account could not be restored: ${id}`);
   }
 }

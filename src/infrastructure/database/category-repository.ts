@@ -1,5 +1,8 @@
 import { asc, eq } from "drizzle-orm";
-import type { CategoryRepository, CreateCategoryRecord } from "../../domain/category/repository";
+import type {
+  CategoryRepository,
+  CreateCategoryRecord,
+} from "../../domain/category/repository";
 import type { Category } from "../../domain/category/category";
 import type { LedgerDatabase } from "./database";
 import { categories } from "./schema";
@@ -15,24 +18,42 @@ export class SqliteCategoryRepository implements CategoryRepository {
   }
 
   async findById(id: string): Promise<Category | null> {
-    const row = await this.db.select().from(categories).where(eq(categories.id, id)).get();
+    const row = await this.db
+      .select()
+      .from(categories)
+      .where(eq(categories.id, id))
+      .get();
     return row ?? null;
   }
 
   async list(includeArchived = false): Promise<Category[]> {
-    const query = this.db.select().from(categories).orderBy(asc(categories.kind), asc(categories.name));
+    const query = this.db
+      .select()
+      .from(categories)
+      .orderBy(asc(categories.kind), asc(categories.name));
     if (includeArchived) return query.all();
     return query.where(eq(categories.isArchived, false)).all();
   }
 
-  async update(id: string, input: { name: string; parentId: string | null; updatedAt: string }): Promise<Category> {
-    await this.db.update(categories).set(input).where(eq(categories.id, id)).run();
+  async update(
+    id: string,
+    input: { name: string; parentId: string | null; updatedAt: string },
+  ): Promise<Category> {
+    await this.db
+      .update(categories)
+      .set(input)
+      .where(eq(categories.id, id))
+      .run();
     const updated = await this.findById(id);
     if (!updated) throw new Error(`Category does not exist: ${id}`);
     return updated;
   }
 
   async archive(id: string, updatedAt: string): Promise<void> {
-    await this.db.update(categories).set({ isArchived: true, updatedAt }).where(eq(categories.id, id)).run();
+    await this.db
+      .update(categories)
+      .set({ isArchived: true, updatedAt })
+      .where(eq(categories.id, id))
+      .run();
   }
 }

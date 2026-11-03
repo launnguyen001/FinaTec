@@ -1,4 +1,8 @@
-import type { AccountType, JournalEntry, JournalLine } from "../ledger/repository";
+import type {
+  AccountType,
+  JournalEntry,
+  JournalLine,
+} from "../ledger/repository";
 
 export interface FinanceReadLine {
   entry: JournalEntry;

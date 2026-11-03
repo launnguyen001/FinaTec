@@ -11,11 +11,14 @@ import {
   type BuiltJournalPosting,
   type PostingLineSpec,
 } from "../../domain/ledger/posting-plan";
+import type { CategoryRepository } from "../../domain/category/repository";
 import type {
   Account,
   JournalStatus,
   LedgerRepository,
   PostingResult,
+  ReplacementResult,
+  TransactionKind,
 } from "../../domain/ledger/repository";
 
 export interface AccountingServiceOptions {
@@ -23,6 +26,11 @@ export interface AccountingServiceOptions {
   createId: () => string;
   /** ISO-8601 UTC clock. Defaults to the system clock. */
   now?: () => string;
+  /**
+   * Category reader used to validate INCOME/EXPENSE metadata. Production
+   * always supplies it; leaving it out is only safe for uncategorized posts.
+   */
+  categories?: CategoryRepository;
 }
 
 export interface JournalLinesInput {
@@ -30,7 +38,7 @@ export interface JournalLinesInput {
   idempotencyKey: string;
   occurredAt?: string;
   description?: string | null;
-  transactionKind?: import("../../domain/ledger/repository").TransactionKind;
+  transactionKind?: TransactionKind;
   categoryId?: string | null;
   lines: readonly PostingLineSpec[];
 }
@@ -77,12 +85,34 @@ export interface ReverseEntryInput {
   description?: string | null;
 }
 
+/** Body of the new entry created by {@link AccountingService.replaceEntry}. */
+export interface ReplacementPostingInput {
+  occurredAt?: string;
+  description?: string | null;
+  transactionKind?: TransactionKind;
+  categoryId?: string | null;
+  baseCurrencyCode?: string;
+  /** Defaults to the original entry's lines (same sides and amounts). */
+  lines?: readonly PostingLineSpec[];
+}
+
+export interface ReplaceEntryInput {
+  /** Stable key for the whole reversal-plus-replacement command. */
+  idempotencyKey: string;
+  originalEntryId: string;
+  replacement: ReplacementPostingInput;
+}
+
 interface LoadedContext {
   baseCurrencyCode: string;
   accounts: ReadonlyMap<string, Account>;
   currencies: ReadonlyMap<
     string,
     { code: string; minorUnit: number; isActive: boolean }
+  >;
+  categories: ReadonlyMap<
+    string,
+    { id: string; kind: "INCOME" | "EXPENSE"; isArchived: boolean }
   >;
 }
 
@@ -93,6 +123,7 @@ interface LoadedContext {
 export class AccountingService {
   private readonly createId: () => string;
   private readonly now: () => string;
+  private readonly categories: CategoryRepository | undefined;
 
   constructor(
     private readonly repository: LedgerRepository,
@@ -100,6 +131,7 @@ export class AccountingService {
   ) {
     this.createId = options.createId;
     this.now = options.now ?? (() => new Date().toISOString());
+    this.categories = options.categories;
   }
 
   /**
@@ -126,6 +158,7 @@ export class AccountingService {
       baseCurrencyCode: input.baseCurrencyCode ?? context.baseCurrencyCode,
       idempotencyKey: key,
       reversalOfId: null,
+      replacementOfId: null,
       transactionKind: input.transactionKind ?? "LEGACY",
       categoryId: input.categoryId ?? null,
       createdAt: this.now(),
@@ -166,6 +199,7 @@ export class AccountingService {
       baseCurrencyCode: input.baseCurrencyCode ?? context.baseCurrencyCode,
       idempotencyKey: key,
       reversalOfId: null,
+      replacementOfId: null,
       transactionKind: input.transactionKind ?? "LEGACY",
       categoryId: input.categoryId ?? null,
       createdAt: this.now(),
@@ -251,6 +285,7 @@ export class AccountingService {
       baseCurrencyCode: context.baseCurrencyCode,
       idempotencyKey: key,
       reversalOfId: null,
+      replacementOfId: null,
       transactionKind: "OPENING_BALANCE",
       categoryId: null,
       createdAt: this.now(),
@@ -368,6 +403,7 @@ export class AccountingService {
       baseCurrencyCode: context.baseCurrencyCode,
       idempotencyKey: key,
       reversalOfId: null,
+      replacementOfId: null,
       transactionKind: "TRANSFER",
       categoryId: null,
       createdAt: this.now(),
@@ -440,6 +476,7 @@ export class AccountingService {
       baseCurrencyCode: original.baseCurrencyCode,
       idempotencyKey: key,
       reversalOfId: original.id,
+      replacementOfId: null,
       transactionKind: "REVERSAL",
       categoryId: original.categoryId ?? null,
       createdAt: this.now(),
@@ -459,6 +496,139 @@ export class AccountingService {
     });
 
     return this.repository.commitPostedEntry(built);
+  }
+
+  /**
+   * Corrects a posted entry by creating its linked reversal and a new linked
+   * replacement in one atomic repository command. The original entry remains
+   * untouched. Retrying the same command key returns the persisted pair.
+   */
+  async replaceEntry(input: ReplaceEntryInput): Promise<ReplacementResult> {
+    const key = this.requireIdempotencyKey(input.idempotencyKey);
+    const reversalKey = `${key}#reversal`;
+    const replacementKey = `${key}#replacement`;
+
+    const [existingReversal, existingReplacement] = await Promise.all([
+      this.repository.findJournalEntryByIdempotencyKey(reversalKey),
+      this.repository.findJournalEntryByIdempotencyKey(replacementKey),
+    ]);
+    if (existingReversal && existingReplacement) {
+      return {
+        reversal: {
+          entry: existingReversal,
+          lines: await this.repository.listJournalLines(existingReversal.id),
+          created: false,
+        },
+        replacement: {
+          entry: existingReplacement,
+          lines: await this.repository.listJournalLines(existingReplacement.id),
+          created: false,
+        },
+      };
+    }
+    if (existingReversal || existingReplacement) {
+      throw new Error(
+        "Replacement command is partially applied; refusing to create a duplicate",
+      );
+    }
+
+    const original = await this.repository.findJournalEntryById(
+      input.originalEntryId,
+    );
+    if (!original) {
+      throw new Error(
+        `Original journal entry does not exist: ${input.originalEntryId}`,
+      );
+    }
+    if (original.status !== "POSTED") {
+      throw new Error("Only a POSTED journal entry can be replaced");
+    }
+    if (await this.repository.findReversalOfEntry(original.id)) {
+      throw new Error(
+        `Journal entry has already been reversed: ${original.id}`,
+      );
+    }
+    if (await this.repository.findReplacementOfEntry(original.id)) {
+      throw new Error(
+        `Journal entry already has a replacement: ${original.id}`,
+      );
+    }
+
+    const context = await this.loadContext();
+    const originalLines = await this.repository.listJournalLines(original.id);
+    validateJournalEntry(original, originalLines, context);
+
+    const reversal = this.buildPosting({
+      status: "POSTED",
+      occurredAt: this.now(),
+      description: `Reversal of ${original.id}`,
+      baseCurrencyCode: original.baseCurrencyCode,
+      idempotencyKey: reversalKey,
+      reversalOfId: original.id,
+      replacementOfId: null,
+      transactionKind: "REVERSAL",
+      categoryId: original.categoryId ?? null,
+      createdAt: this.now(),
+      postedAt: this.now(),
+      lines: originalLines
+        .slice()
+        .sort((left, right) => left.lineNumber - right.lineNumber)
+        .map((line) => ({
+          accountId: line.accountId,
+          side: line.side === "DEBIT" ? "CREDIT" : "DEBIT",
+          amountMinor: line.amountMinor,
+          fxRateNumerator: line.fxRateNumerator,
+          fxRateDenominator: line.fxRateDenominator,
+          memo: line.memo,
+        })),
+      context,
+    });
+
+    const replacementInput = input.replacement;
+    const transactionKind =
+      replacementInput.transactionKind ??
+      original.transactionKind ??
+      "ADJUSTMENT";
+    const defaultCategoryId =
+      transactionKind === "TRANSFER" || transactionKind === "OPENING_BALANCE"
+        ? null
+        : (original.categoryId ?? null);
+    const replacementLines =
+      replacementInput.lines ??
+      originalLines
+        .slice()
+        .sort((left, right) => left.lineNumber - right.lineNumber)
+        .map((line) => ({
+          accountId: line.accountId,
+          side: line.side,
+          amountMinor: line.amountMinor,
+          fxRateNumerator: line.fxRateNumerator,
+          fxRateDenominator: line.fxRateDenominator,
+          memo: line.memo,
+        }));
+
+    const replacement = this.buildPosting({
+      status: "POSTED",
+      occurredAt: replacementInput.occurredAt ?? this.now(),
+      description:
+        replacementInput.description ?? `Replacement of ${original.id}`,
+      baseCurrencyCode:
+        replacementInput.baseCurrencyCode ?? original.baseCurrencyCode,
+      idempotencyKey: replacementKey,
+      reversalOfId: null,
+      replacementOfId: original.id,
+      transactionKind,
+      categoryId:
+        replacementInput.categoryId !== undefined
+          ? replacementInput.categoryId
+          : defaultCategoryId,
+      createdAt: this.now(),
+      postedAt: this.now(),
+      lines: replacementLines,
+      context,
+    });
+
+    return this.repository.commitReplacement({ reversal, replacement });
   }
 
   /** Returns a native-currency balance derived only from posted lines. */
@@ -493,7 +663,8 @@ export class AccountingService {
     baseCurrencyCode: string;
     idempotencyKey: string | null;
     reversalOfId: string | null;
-    transactionKind?: import("../../domain/ledger/repository").TransactionKind;
+    replacementOfId: string | null;
+    transactionKind?: TransactionKind;
     categoryId?: string | null;
     createdAt: string;
     postedAt: string | null;
@@ -509,6 +680,7 @@ export class AccountingService {
         baseCurrencyCode: params.baseCurrencyCode,
         idempotencyKey: params.idempotencyKey,
         reversalOfId: params.reversalOfId,
+        replacementOfId: params.replacementOfId,
         transactionKind: params.transactionKind,
         categoryId: params.categoryId,
         createdAt: params.createdAt,
@@ -521,11 +693,13 @@ export class AccountingService {
   }
 
   private async loadContext(): Promise<LoadedContext> {
-    const [baseCurrencyCode, accounts, currencies] = await Promise.all([
-      this.repository.getBaseCurrencyCode(),
-      this.repository.listAccounts(true),
-      this.repository.listCurrencies(false),
-    ]);
+    const [baseCurrencyCode, accounts, currencies, categories] =
+      await Promise.all([
+        this.repository.getBaseCurrencyCode(),
+        this.repository.listAccounts(true),
+        this.repository.listCurrencies(false),
+        this.categories ? this.categories.list(true) : Promise.resolve([]),
+      ]);
     if (!baseCurrencyCode) {
       throw new Error("Ledger base currency is not configured");
     }
@@ -535,6 +709,9 @@ export class AccountingService {
       accounts: new Map(accounts.map((account) => [account.id, account])),
       currencies: new Map(
         currencies.map((currency) => [currency.code, currency]),
+      ),
+      categories: new Map(
+        categories.map((category) => [category.id, category]),
       ),
     };
   }

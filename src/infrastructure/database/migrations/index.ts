@@ -7,8 +7,18 @@ const coreFinanceMigrationTime = 1_793_700_000_000;
 export const ledgerMigrations = {
   journal: {
     entries: [
-      { idx: 0, when: migrationTime, tag: "0000_ledger_foundation", breakpoints: true },
-      { idx: 1, when: coreFinanceMigrationTime, tag: "0001_core_finance", breakpoints: true },
+      {
+        idx: 0,
+        when: migrationTime,
+        tag: "0000_ledger_foundation",
+        breakpoints: true,
+      },
+      {
+        idx: 1,
+        when: coreFinanceMigrationTime,
+        tag: "0001_core_finance",
+        breakpoints: true,
+      },
     ],
   },
   migrations: {

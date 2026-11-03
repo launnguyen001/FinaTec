@@ -63,7 +63,9 @@ export const accounts = sqliteTable(
       }),
     isSystem: integer("is_system", { mode: "boolean" }).notNull(),
     isArchived: integer("is_archived", { mode: "boolean" }).notNull(),
-    subtype: text("subtype", { enum: ["CASH", "BANK", "EWALLET", "SAVINGS", "OTHER"] }),
+    subtype: text("subtype", {
+      enum: ["CASH", "BANK", "EWALLET", "SAVINGS", "OTHER"],
+    }),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
@@ -88,7 +90,10 @@ export const categories = sqliteTable(
     id: text("id").primaryKey(),
     name: text("name").notNull(),
     kind: text("kind", { enum: ["INCOME", "EXPENSE"] }).notNull(),
-    parentId: text("parent_id").references((): AnySQLiteColumn => categories.id, { onDelete: "restrict", onUpdate: "restrict" }),
+    parentId: text("parent_id").references(
+      (): AnySQLiteColumn => categories.id,
+      { onDelete: "restrict", onUpdate: "restrict" },
+    ),
     isArchived: integer("is_archived", { mode: "boolean" }).notNull(),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
@@ -98,7 +103,10 @@ export const categories = sqliteTable(
     index("categories_kind_archived_idx").on(table.kind, table.isArchived),
     check("categories_name_nonempty", sql`length(trim(${table.name})) > 0`),
     check("categories_kind_check", sql`${table.kind} IN ('INCOME', 'EXPENSE')`),
-    check("categories_not_self_parent", sql`${table.parentId} IS NULL OR ${table.parentId} <> ${table.id}`),
+    check(
+      "categories_not_self_parent",
+      sql`${table.parentId} IS NULL OR ${table.parentId} <> ${table.id}`,
+    ),
   ],
 );
 
@@ -116,9 +124,28 @@ export const journalEntries = sqliteTable(
         onUpdate: "restrict",
       }),
     idempotencyKey: text("idempotency_key"),
-    transactionKind: text("transaction_kind", { enum: ["INCOME", "EXPENSE", "TRANSFER", "OPENING_BALANCE", "ADJUSTMENT", "REVERSAL", "LEGACY"] }).notNull().default("LEGACY"),
-    categoryId: text("category_id").references((): AnySQLiteColumn => categories.id, { onDelete: "restrict", onUpdate: "restrict" }),
+    transactionKind: text("transaction_kind", {
+      enum: [
+        "INCOME",
+        "EXPENSE",
+        "TRANSFER",
+        "OPENING_BALANCE",
+        "ADJUSTMENT",
+        "REVERSAL",
+        "LEGACY",
+      ],
+    })
+      .notNull()
+      .default("LEGACY"),
+    categoryId: text("category_id").references(
+      (): AnySQLiteColumn => categories.id,
+      { onDelete: "restrict", onUpdate: "restrict" },
+    ),
     reversalOfId: text("reversal_of_id").references(
+      (): AnySQLiteColumn => journalEntries.id,
+      { onDelete: "restrict", onUpdate: "restrict" },
+    ),
+    replacementOfId: text("replacement_of_id").references(
       (): AnySQLiteColumn => journalEntries.id,
       { onDelete: "restrict", onUpdate: "restrict" },
     ),
@@ -129,13 +156,20 @@ export const journalEntries = sqliteTable(
     index("journal_entries_occurred_at_idx").on(table.occurredAt),
     index("journal_entries_status_idx").on(table.status),
     index("journal_entries_category_idx").on(table.categoryId),
-    index("journal_entries_kind_occurred_idx").on(table.transactionKind, table.occurredAt),
+    index("journal_entries_kind_occurred_idx").on(
+      table.transactionKind,
+      table.occurredAt,
+    ),
+    index("journal_entries_replacement_idx").on(table.replacementOfId),
     uniqueIndex("journal_entries_idempotency_unique")
       .on(table.idempotencyKey)
       .where(sql`${table.idempotencyKey} IS NOT NULL`),
     uniqueIndex("journal_entries_reversal_unique")
       .on(table.reversalOfId)
       .where(sql`${table.reversalOfId} IS NOT NULL`),
+    uniqueIndex("journal_entries_replacement_unique")
+      .on(table.replacementOfId)
+      .where(sql`${table.replacementOfId} IS NOT NULL`),
     check(
       "journal_entries_status_check",
       sql`${table.status} IN ('DRAFT', 'POSTED')`,
@@ -147,6 +181,10 @@ export const journalEntries = sqliteTable(
     check(
       "journal_entries_not_self_reversal",
       sql`${table.reversalOfId} IS NULL OR ${table.reversalOfId} <> ${table.id}`,
+    ),
+    check(
+      "journal_entries_replacement_not_self_or_reversal",
+      sql`${table.replacementOfId} IS NULL OR (${table.replacementOfId} <> ${table.id} AND ${table.reversalOfId} IS NULL)`,
     ),
   ],
 );

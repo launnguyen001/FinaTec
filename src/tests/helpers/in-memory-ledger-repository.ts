@@ -7,6 +7,8 @@ import type {
   LedgerRepository,
   PostingCommitInput,
   PostingResult,
+  ReplacementCommitInput,
+  ReplacementResult,
 } from "../../domain/ledger/repository";
 
 /**
@@ -93,6 +95,14 @@ export class InMemoryLedgerRepository implements LedgerRepository {
     );
   }
 
+  async findReplacementOfEntry(entryId: string): Promise<JournalEntry | null> {
+    return (
+      [...this.entries.values()].find(
+        (entry) => entry.replacementOfId === entryId,
+      ) ?? null
+    );
+  }
+
   async listJournalLines(entryId: string): Promise<JournalLine[]> {
     return [...(this.linesByEntry.get(entryId) ?? [])].sort(
       (left, right) => left.lineNumber - right.lineNumber,
@@ -136,9 +146,13 @@ export class InMemoryLedgerRepository implements LedgerRepository {
   }
 
   private assertNoArchivedAccounts(lines: readonly JournalLine[]): void {
-    const archivedLine = lines.find((line) => this.accounts.get(line.accountId)?.isArchived);
+    const archivedLine = lines.find(
+      (line) => this.accounts.get(line.accountId)?.isArchived,
+    );
     if (archivedLine) {
-      throw new Error(`Archived account cannot receive a new posting: ${archivedLine.accountId}`);
+      throw new Error(
+        `Archived account cannot receive a new posting: ${archivedLine.accountId}`,
+      );
     }
   }
 
@@ -149,6 +163,40 @@ export class InMemoryLedgerRepository implements LedgerRepository {
       this.failNextCommit = null;
       throw failure;
     }
+    return this.persistPostedEntry(input);
+  }
+
+  async commitReplacement(
+    input: ReplacementCommitInput,
+  ): Promise<ReplacementResult> {
+    this.commitCount += 1;
+    if (this.failNextCommit) {
+      const failure = this.failNextCommit;
+      this.failNextCommit = null;
+      throw failure;
+    }
+
+    const entriesSnapshot = new Map(this.entries);
+    const linesSnapshot = new Map(
+      [...this.linesByEntry].map(([entryId, lines]) => [entryId, [...lines]]),
+    );
+    try {
+      return {
+        reversal: this.persistPostedEntry(input.reversal),
+        replacement: this.persistPostedEntry(input.replacement),
+      };
+    } catch (error) {
+      this.entries.clear();
+      for (const [entryId, entry] of entriesSnapshot)
+        this.entries.set(entryId, entry);
+      this.linesByEntry.clear();
+      for (const [entryId, lines] of linesSnapshot)
+        this.linesByEntry.set(entryId, lines);
+      throw error;
+    }
+  }
+
+  private persistPostedEntry(input: PostingCommitInput): PostingResult {
     if (input.entry.status !== "POSTED" || input.entry.postedAt === null) {
       throw new Error("Repository accepts posted entries only");
     }
@@ -159,10 +207,22 @@ export class InMemoryLedgerRepository implements LedgerRepository {
     this.assertNoArchivedAccounts(input.lines);
     this.assertIdempotencyUnused(input.entry);
     if (input.entry.reversalOfId !== null) {
-      const reversal = await this.findReversalOfEntry(input.entry.reversalOfId);
+      const reversal = [...this.entries.values()].find(
+        (entry) => entry.reversalOfId === input.entry.reversalOfId,
+      );
       if (reversal) {
         throw new Error(
           `Journal entry has already been reversed: ${input.entry.reversalOfId}`,
+        );
+      }
+    }
+    if (input.entry.replacementOfId !== null) {
+      const replacement = [...this.entries.values()].find(
+        (entry) => entry.replacementOfId === input.entry.replacementOfId,
+      );
+      if (replacement) {
+        throw new Error(
+          `Journal entry already has a replacement: ${input.entry.replacementOfId}`,
         );
       }
     }

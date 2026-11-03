@@ -13,6 +13,9 @@ export interface CategoryRepository {
   create(input: CreateCategoryRecord): Promise<Category>;
   findById(id: string): Promise<Category | null>;
   list(includeArchived?: boolean): Promise<Category[]>;
-  update(id: string, input: { name: string; parentId: string | null; updatedAt: string }): Promise<Category>;
+  update(
+    id: string,
+    input: { name: string; parentId: string | null; updatedAt: string },
+  ): Promise<Category>;
   archive(id: string, updatedAt: string): Promise<void>;
 }
