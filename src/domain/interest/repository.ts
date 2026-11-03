@@ -13,6 +13,7 @@ export interface InterestPostingCommit {
   journalEntry: JournalEntry;
   journalLines: JournalLine[];
   postedAt: string;
+  amountMinor: bigint;
 }
 
 export interface InterestRepository {
