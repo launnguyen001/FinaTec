@@ -1,3 +1,5 @@
+import { Currency } from "../../domain/ledger/currency";
+import { calculateAccountBalance } from "../../domain/ledger/posting";
 import type { Account, AccountSubtype, AccountType, CurrencyRecord } from "../../domain/ledger/repository";
 import type { AccountRepository } from "../../domain/ledger/account-repository";
 import type { LedgerRepository } from "../../domain/ledger/repository";
@@ -44,7 +46,33 @@ export class AccountService {
     const current = await this.requireAccount(id);
     if (current.isArchived) return;
     if (current.isSystem) throw new Error("System accounts cannot be archived");
+
+    const currency = (await this.ledger.listCurrencies(false)).find(
+      (item) => item.code === current.currencyCode,
+    );
+    if (!currency) throw new Error(`Account currency does not exist: ${current.currencyCode}`);
+    const lines = await this.ledger.listPostedJournalLinesForAccount(current.id);
+    const balance = calculateAccountBalance(
+      current,
+      lines,
+      new Currency(currency.code, currency.minorUnit),
+    );
+    if (balance.minorUnits !== 0n) {
+      throw new Error(
+        `Account must have an exact zero Ledger balance before archive; current balance is ${balance.minorUnits} ${current.currencyCode}`,
+      );
+    }
+
+    // The SQLite repository's archive trigger rechecks zero balance in the
+    // same write statement, closing the race with concurrent postings.
     await this.accounts.archive(id, this.options.now());
+  }
+
+  async restore(id: string): Promise<void> {
+    const current = await this.requireAccount(id);
+    if (!current.isArchived) return;
+    if (current.isSystem) throw new Error("System accounts cannot be restored");
+    await this.accounts.restore(id, this.options.now());
   }
 
   async list(includeArchived = false): Promise<Account[]> { return this.accounts.list(includeArchived); }
