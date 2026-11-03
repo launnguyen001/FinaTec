@@ -463,8 +463,8 @@ export class SqliteLiabilityRepository implements LiabilityRepository {
         if (
           source.accountId !== reversed.accountId ||
           source.currencyCode !== reversed.currencyCode ||
-          source.amountMinor !== reversed.amountMinor ||
-          source.baseAmountMinor !== reversed.baseAmountMinor ||
+          fromSqliteInteger(source.amountMinor) !== reversed.amountMinor ||
+          fromSqliteInteger(source.baseAmountMinor) !== reversed.baseAmountMinor ||
           source.fxRateNumerator !== reversed.fxRateNumerator ||
           source.fxRateDenominator !== reversed.fxRateDenominator ||
           source.side === reversed.side
