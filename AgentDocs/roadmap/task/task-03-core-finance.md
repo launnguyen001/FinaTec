@@ -1,67 +1,301 @@
 # TASK-03 — Tài chính cốt lõi
 
-- Giai đoạn: 2 — MVP 1
-- Ưu tiên: P0
-- Trạng thái: BLOCKED
-- Phụ thuộc: TASK-02
+- **Giai đoạn:** 2 — MVP 1
+- **Ưu tiên:** P0
+- **Trạng thái:** PLANNED — scope đã chốt; chưa triển khai
+- **Phụ thuộc:** TASK-02 (DONE; cần mở rộng có kiểm soát policy posting theo mục 5)
+- **Scope được duyệt:** 2026-11-03
 
 ## 1. Mục tiêu
-Hoàn thiện các nghiệp vụ quản lý tiền hằng ngày gồm tài khoản, số dư đầu kỳ, thu, chi, chuyển tiền, danh mục, lịch sử giao dịch và dashboard dòng tiền.
 
-## 2. Phạm vi
-- Tạo, sửa và ngừng sử dụng tài khoản theo quy tắc đã duyệt.
-- Quản lý danh mục thu và chi.
-- Ghi nhận thu, chi, chuyển tiền qua Application use case.
-- Lịch sử giao dịch, lọc theo ngày, danh mục, tài khoản và xem chi tiết.
-- Luồng nhập nhanh (Quick Entry), tối đa ba thao tác cho khoản chi thông thường.
-- Dashboard tổng hợp tiền khả dụng, thu, chi và dòng tiền ròng.
+Hoàn thiện nghiệp vụ quản lý tiền hằng ngày: Account, Category, số dư đầu kỳ, thu, chi, chuyển tiền, lịch sử giao dịch, Quick Entry và Dashboard dòng tiền.
 
-Không bao gồm quản lý tài sản, khoản vay, ngân sách, báo cáo nâng cao, tích hợp ngân hàng.
+Người dùng thao tác bằng ngôn ngữ tài chính thông thường. Mọi biến động tiền phải đi qua Application use case và Accounting Engine. Presentation không tự định khoản, ghi journal tables hoặc cập nhật số dư.
 
-## 3. Bối cảnh và phụ thuộc
-TASK-02 phải cung cấp nghiệp vụ ghi sổ và truy vấn số dư đã kiểm thử. Đọc mô tả màn hình và ví dụ bút toán trong đặc tả; kiểm tra route, component và design token hiện có trước khi triển khai.
+## 2. Phạm vi được duyệt
 
-## 4. Quy tắc nghiệp vụ
-- Người dùng không nhập Nợ/Có thủ công.
-- Chuyển tiền không phải thu nhập hoặc chi phí.
-- Số dư được tính từ ledger đã ghi sổ.
-- Giao dịch đã ghi sổ không được sửa trực tiếp; mọi điều chỉnh phải giữ lịch sử.
-- Phân biệt thời điểm phát sinh và thời điểm hệ thống ghi nhận.
-- Tài khoản ngừng hoạt động vẫn xem được trong lịch sử nhưng không nhận giao dịch mới, trừ khi chính sách cho phép.
+### 2.1 Account và Category
 
-## 5. Thay đổi dự kiến
-- Repository và use case cho tài khoản, danh mục.
-- Use case thu, chi và chuyển tiền.
-- Màn hình tài khoản, nhập nhanh, lịch sử/chi tiết giao dịch và dashboard.
-- View model/hook gọi Application interface.
-- Validation và ánh xạ lỗi thành thông báo dễ hiểu.
+**Account**
+- Tạo, xem, cập nhật metadata và archive tài khoản.
+- Account đã tạo không được hard-delete, kể cả khi chưa có giao dịch.
+- Giữ nguyên Account.type hiện tại: ASSET, LIABILITY, EQUITY, INCOME, EXPENSE.
+- Account loại ASSET có subtype: CASH, BANK, EWALLET, SAVINGS, OTHER. Danh sách có thể mở rộng ở task sau bằng migration; không tạo Account.type mới để biểu diễn nguồn tiền.
+- subtype chỉ áp dụng cho ASSET; các loại Account khác để null.
+- Không lưu số dư trực tiếp trên Account. Số dư luôn suy ra từ journal lines thuộc Journal Entry POSTED.
 
-## 6. Kế hoạch triển khai
-1. Xác định vòng đời tài khoản và danh mục.
-2. Xây repository và use case.
-3. Ánh xạ giao dịch thành journal entry.
-4. Xây màn hình tài khoản.
-5. Xây form nhập nhanh.
-6. Xây lịch sử, bộ lọc và chi tiết.
-7. Xây dashboard từ truy vấn Application.
-8. Kiểm tra hoạt động offline và đa nền tảng.
+**Category**
+- Tạo bảng categories riêng, độc lập với accounts.
+- Có cấu trúc cha–con bằng parent_id.
+- kind của Category là INCOME hoặc EXPENSE.
+- Một Journal Entry có tối đa một Category; category_id được phép null.
+- Giao dịch thu dùng Category INCOME; giao dịch chi dùng Category EXPENSE.
+- Chuyển tiền nội bộ và Opening Balance không có Category.
+- Account là đối tượng kế toán; Category là nhãn phân loại nghiệp vụ. Không dùng Account INCOME/EXPENSE để thay Category.
+- Category đã được tham chiếu không hard-delete; chỉ archive để ngừng chọn cho giao dịch mới và giữ lịch sử.
+- Không cho phép tự làm cha, tạo chu trình phân cấp hoặc tạo Category con khác kind với cha.
+- Được đổi tên mà không làm thay đổi lịch sử. Không đổi kind sau khi Category đã được sử dụng.
 
-## 7. Kế hoạch kiểm thử
-Kiểm thử use case thu/chi/chuyển tiền; đối soát số dư với journal line; loại chuyển tiền khỏi tổng thu/chi; điều chỉnh có lưu vết; bộ lọc ngày/múi giờ; trạng thái rỗng, tải, lỗi; hồi quy offline.
+### 2.2 Vòng đời Account và số dư đầu kỳ
 
-## 8. Tiêu chí nghiệm thu
-- [ ] Quản lý tài khoản và danh mục hoạt động offline.
-- [ ] Tạo và xem được giao dịch thu, chi, chuyển tiền.
-- [ ] Mọi thay đổi tài chính đi qua Application/Accounting Engine.
-- [ ] Số dư khớp ledger, chuyển tiền không bị tính trùng.
-- [ ] Nhập khoản chi thông thường hướng tới tối đa ba thao tác.
-- [ ] Bộ lọc lịch sử chính xác.
-- [ ] Màn hình có trạng thái rỗng, tải và lỗi.
-- [ ] Kiểm thử không làm sai lệch lịch sử đã ghi sổ.
+- Vòng đời Account: ACTIVE → ARCHIVED; không có thao tác hard-delete.
+- Account archive vẫn xuất hiện trong lịch sử, chi tiết giao dịch và truy vấn lịch sử số dư.
+- Account archive không được chọn cho giao dịch thông thường mới.
+- Cho phép tất toán/điều chỉnh Account archive thông qua Application use case chuyên biệt, có kiểm soát theo mục 5. Không cho phép UI/caller tự bật cờ bỏ qua archive validation.
+- Số dư đầu kỳ phải được ghi bằng Opening Balance Journal Entry qua AccountingService.createOpeningBalance; không có số dư khởi tạo lưu trực tiếp trên Account.
+- Account và offset EQUITY tuân theo giới hạn cùng currency hiện tại của TASK-02.
 
-## 9. Nhật ký tiến độ
-- Đã làm: Tạo task theo Giai đoạn 2.
-- Đang làm: Chờ TASK-02.
-- Tiếp theo: Xây luồng tài khoản, danh mục và giao dịch.
-- Vấn đề: Cần chốt vòng đời tài khoản và quy tắc chỉnh sửa danh mục.
-- Kiểm chứng: Chưa chạy.
+### 2.3 Giao dịch thu, chi và chuyển tiền
+
+Cung cấp Application use case riêng cho:
+- Income.
+- Expense.
+- Internal transfer.
+- Opening balance.
+- Reversal và tạo giao dịch thay thế.
+- Archived-account settlement/adjustment.
+- Truy vấn lịch sử, chi tiết, số dư Account và Dashboard.
+
+Các use case nghiệp vụ dùng chung Accounting Engine. Không tạo cơ chế ghi sổ thứ hai.
+
+Quy tắc:
+- Người dùng không nhập DEBIT/CREDIT.
+- Transfer chỉ giữa hai Account ASSET, không phải INCOME hoặc EXPENSE.
+- Mọi Journal Entry POSTED phải cân bằng theo invariant TASK-02.
+- Giao dịch POSTED không được sửa/xóa trực tiếp.
+- Điều chỉnh giao dịch POSTED: tạo reversal liên kết entry gốc, sau đó tạo entry thay thế nếu cần.
+- occurredAt là mốc thời gian nghiệp vụ dùng cho lịch sử và báo cáo. createdAt/postedAt vẫn được giữ để audit và phân biệt thời điểm nhập với thời điểm ghi sổ.
+- Báo cáo thu/chi dùng occurredAt, không dùng postedAt làm ngày phát sinh.
+- Reversal giữ liên kết tới entry gốc và kế thừa Category để truy vết. Báo cáo thu/chi phải tính ảnh hưởng ròng của posting và reversal, không đếm reversal thành khoản thu/chi độc lập gây sai tổng.
+
+### 2.4 Quick Entry
+
+- Khoản chi thông thường phải hoàn tất trong tối đa 3 thao tác người dùng sau khi mở luồng Quick Expense.
+- Luồng mặc định ưu tiên nhập số tiền, dùng Account/Category gần nhất hoặc mặc định hợp lệ, sau đó lưu.
+- Không hy sinh tính chính xác: trước khi lưu phải xác định amount, Account nguồn và Category EXPENSE hợp lệ.
+- Có thể mở rộng form để đổi Account, Category, ngày phát sinh hoặc mô tả; các trường mở rộng không làm tăng thao tác của luồng mặc định.
+
+### 2.5 Dashboard
+
+Dashboard TASK-03 chỉ gồm:
+- Tiền khả dụng.
+- Tổng thu.
+- Tổng chi.
+- Dòng tiền ròng = tổng thu − tổng chi.
+
+Quy tắc:
+- Tiền khả dụng là tổng số dư của tất cả Account type ASSET đang ACTIVE; không chỉ CASH/BANK/EWALLET.
+- Account archive không được tính vào tiền khả dụng hiện tại.
+- Số dư ASSET lấy từ posted journal lines; không đọc số dư lưu trực tiếp nếu chưa có cơ chế bảo đảm nhất quán.
+- Tổng thu/chi là ảnh hưởng của journal lines thuộc Account INCOME/EXPENSE trong khoảng ngày được chọn, dựa trên occurredAt.
+- Dòng tiền ròng = tổng thu trừ tổng chi trong cùng khoảng thời gian.
+- Transfer không được tính vào tổng thu hoặc tổng chi.
+- Reversal và replacement được phản ánh theo ảnh hưởng ròng của Ledger.
+- Khoảng thời gian mặc định là tháng hiện tại; query Dashboard nhận khoảng ngày rõ ràng.
+
+**Đa tiền tệ:**
+- TASK-02 trả số dư theo native currency. Không cộng trực tiếp VND, USD hoặc currency khác thành một scalar total không có đơn vị.
+- Tiền khả dụng phải tổng hợp/hiển thị riêng theo từng currency.
+- Chỉ hiển thị tổng quy đổi sang base currency khi có FX quote báo cáo hợp lệ. Nếu thiếu tỷ giá, hiển thị phần chưa quy đổi; không tự giả định tỷ giá.
+- TASK-03 không triển khai FX market feed, FX revaluation hoặc FX gain/loss. Đây là phạm vi ngoài task.
+
+### 2.6 Lịch sử giao dịch
+
+- Hiển thị theo occurredAt, mới nhất trước.
+- Bộ lọc bắt buộc: khoảng ngày, Category, Account.
+- Chi tiết hiển thị amount, description, occurredAt, createdAt/postedAt, Category, Account liên quan, trạng thái và reversal link.
+- Giao dịch liên quan tới Account/Category đã archive vẫn xem được.
+- Không sửa trực tiếp Journal Entry POSTED; điều chỉnh bằng reversal/replacement.
+
+### 2.7 UI và UX
+
+- UI hoàn chỉnh theo design system hiện có; không dừng ở wireframe hoặc màn hình demo.
+- Responsive trên kích thước màn hình Android/iOS mục tiêu.
+- Accessibility cho luồng chính: label cho control, focus order hợp lý, tương phản màu, trạng thái không chỉ biểu đạt bằng màu, touch target đủ lớn, hỗ trợ font scale và screen reader.
+- Có loading, empty, error, validation và success states.
+- Không yêu cầu người dùng hiểu DEBIT/CREDIT.
+- Kiểm tra và tái sử dụng design tokens/components hiện có; ghi rõ nếu phải mở rộng design system.
+
+## 3. Ngoài phạm vi
+
+- Asset, Asset Lot, cost basis, market price, P&L: TASK-04.
+- Interest plan/accrual/staking: TASK-05.
+- Liability và repayment schedule: TASK-06.
+- Recurring transaction và budget: TASK-07.
+- Báo cáo nâng cao, net-worth snapshot, FX reporting và reconciliation nâng cao: TASK-08.
+- PIN, biometric, encrypted backup/restore và release hardening: task bảo mật/phát hành tương ứng.
+- Kết nối ngân hàng, tự động lấy giao dịch hoặc thực hiện thanh toán thật.
+
+## 4. Bối cảnh kiến trúc hiện tại
+
+### 4.1 TASK-01 — Database Foundation
+
+Schema version 1 hiện có currencies, ledger_settings, accounts, journal_entries, journal_lines.
+
+Invariant cần giữ:
+- Account cố định currency; journal line phải cùng currency với Account.
+- Journal Entry có occurred_at, created_at, posted_at, status, base currency snapshot, idempotency key và reversal link.
+- Posted entries/lines bất biến.
+- Foreign keys dùng RESTRICT.
+- Không có account balance column.
+- Schema chưa có Category, Account subtype hoặc transaction kind.
+
+### 4.2 TASK-02 — Accounting Engine
+
+Tái sử dụng:
+- src/domain/ledger/posting.ts
+- src/domain/ledger/posting-plan.ts
+- src/application/ledger/accounting-service.ts
+- src/infrastructure/database/sqlite-ledger-repository.ts
+
+AccountingService đã có các use case nền: draft/post, opening balance, internal transfer, reversal và balance lookup.
+
+Không được:
+- Ghi trực tiếp journal tables từ Presentation.
+- Bỏ qua Domain validator hoặc Repository transaction.
+- Sửa/xóa posted history.
+- Thêm nguồn số dư độc lập trên Account.
+- Tạo logic thu/chi tách rời khỏi Ledger.
+
+### 4.3 Presentation
+
+App hiện mới ở mức khung/skeleton và diagnostic/acceptance screens. TASK-03 phải xây luồng sản phẩm thực tế, không coi diagnostic screen là UI hoàn thành. Kiểm tra route, component, theme token và provider trước khi thay đổi; không xóa acceptance workflow nếu chưa có phương án thay thế.
+
+## 5. Hai điểm kiến trúc bắt buộc xử lý
+
+### 5.1 Archived-account settlement — cần mở rộng policy TASK-02
+
+**Xung đột đã xác định:** TASK-02 hiện từ chối mọi posting vào Account archive, trong khi scope được duyệt yêu cầu tất toán/điều chỉnh có kiểm soát.
+
+Đây là thay đổi có chủ đích đối với policy TASK-02, không được bỏ qua hoặc xử lý bằng bypass ở UI/Repository.
+
+Yêu cầu:
+- Mặc định Account archive vẫn bị từ chối trong giao dịch thông thường.
+- Chỉ Application use case chuyên biệt được phép yêu cầu posting có purpose ARCHIVED_ACCOUNT_SETTLEMENT hoặc ARCHIVED_ACCOUNT_ADJUSTMENT.
+- Reversal của giao dịch cũ liên quan Account archive phải qua luồng reversal chuyên biệt và giữ audit link.
+- Domain/Accounting Engine kiểm tra purpose, command type, Account archive liên quan và điều kiện tất toán. Caller không được truyền boolean allowArchived tùy ý.
+- Ghi reason/audit metadata và idempotency key.
+- Không cho phép giao dịch thu/chi/chuyển tiền thông thường mới trên Account archive.
+- Cập nhật AgentDocs/accounting-rules.md và task02 policy note/kiến trúc tương ứng; giữ invariant cân bằng, atomicity, immutability và idempotency.
+- Có test hợp lệ và test từ chối.
+
+### 5.2 Dashboard đa tiền tệ
+
+**Xung đột đã xác định:** không thể cộng native balance nhiều currency thành một scalar total có ý nghĩa.
+
+Cách đáp ứng scope là tổng hợp theo từng currency; tổng quy đổi base currency là thông tin bổ sung có điều kiện, không phải điều kiện để TASK-03 hoạt động. Không kéo FX provider hoặc FX revaluation vào task này.
+
+## 6. Data changes và migration strategy
+
+TASK-03 được phép tái cấu trúc schema khi có lý do, nhưng phải bảo toàn dữ liệu. Không sửa migration TASK-01 đã phát hành theo cách làm mất khả năng nâng cấp database hiện hữu.
+
+Schema delta dự kiến, xác nhận lại trong migration design:
+- Thêm accounts.subtype, chỉ áp dụng cho ASSET.
+- Tạo categories với ID, name, kind, parent reference, archive state và timestamps.
+- Thêm journal_entries.category_id nullable, FK tới Category.
+- Thêm transaction kind cho Journal Entry để phân biệt nghiệp vụ: INCOME, EXPENSE, TRANSFER, OPENING_BALANCE, ADJUSTMENT, REVERSAL; có thể có LEGACY cho dữ liệu cũ không thể phân loại chắc chắn.
+- Index cho Category hierarchy, account subtype/archive, occurredAt và history filters.
+- Bổ sung FK/check/unique constraints phù hợp; invariant không biểu diễn được bằng SQL phải validate ở Domain/Application.
+
+Migration rules:
+- Tạo migration version mới; không viết lại 0000_ledger_foundation.ts đã chạy trên database người dùng.
+- Test nâng cấp schema version 1 lên version mới với database rỗng và database có ledger history.
+- Không tự gán Category hoặc transaction kind sai cho dữ liệu lịch sử. Nếu không thể suy luận an toàn, giữ Category null và kind LEGACY; dữ liệu cũ vẫn đọc được.
+- Account ASSET hiện hữu backfill subtype OTHER nếu không có nguồn dữ liệu đáng tin cậy để suy luận; Account không phải ASSET giữ subtype null.
+- Bảo toàn IDs, journal lines, FX snapshots, idempotency keys, reversal links, timestamps và posted state.
+- Không drop/recreate ledger tables theo cách làm mất dữ liệu. Nếu buộc rebuild do giới hạn SQLite, dùng migration transaction, copy/verify row counts và invariant trước khi swap.
+- Migration lỗi phải rollback an toàn; không plaintext fallback, không xóa database hoặc tái tạo key.
+
+Sau khi schema được duyệt, cập nhật đồng bộ AgentDocs/database-schema.md, AgentDocs/data-dictionary.md, migration registry, Drizzle schema và repository contracts/adapters bị ảnh hưởng.
+
+## 7. Application và Domain deliverables
+
+Nhóm use case/repository:
+1. Account: create, update metadata, archive, list/detail, balance query.
+2. Category: create, rename, reparent, archive, list/tree query; validate kind và cycle.
+3. Transaction: income, expense, internal transfer, opening balance, reversal/replacement.
+4. Archived account: settlement/adjustment chuyên biệt theo mục 5.1.
+5. History: list/detail/filter by date range, category, account.
+6. Dashboard: available balances grouped by currency, income, expense, net flow theo kỳ.
+
+Mọi command ghi dữ liệu phải có Domain/Application validation, idempotency key ổn định, Repository transaction phù hợp và kết quả truy vết được tới Journal Entry. Lỗi Domain/Infrastructure phải được ánh xạ thành thông báo dễ hiểu ở Presentation.
+
+## 8. Kế hoạch triển khai
+
+1. Đọc Core, schema TASK-01, accounting rules TASK-02, code và design system.
+2. Thiết kế ERD/schema delta cho Category, Account subtype, Journal Entry metadata; xác định migration/backfill.
+3. Cập nhật policy TASK-02 cho archived-account settlement/reversal theo mục 5.1. Không triển khai use case trước khi validator và repository contract nhất quán.
+4. Xây Category Domain/Repository/Application và Account subtype/lifecycle use cases.
+5. Xây use case thu, chi, chuyển tiền, opening balance và reversal/replacement dùng Accounting Engine.
+6. Xây query layer cho số dư, history và Dashboard; kiểm tra multi-currency theo mục 2.5.
+7. Xây UI Account, Category, Quick Entry, transaction history/detail và Dashboard theo design system.
+8. Bổ sung responsive, accessibility và đầy đủ UI states.
+9. Chạy migration tests, unit/integration tests, regression và offline checks trên Android development build.
+10. Cập nhật schema, dictionary, accounting rules và progress log bằng bằng chứng kiểm chứng.
+
+## 9. Kế hoạch kiểm thử
+
+### Domain / use case
+- Tạo, cập nhật, archive Account; không có hard-delete use case.
+- Chỉ ASSET có subtype; subtype không hợp lệ bị từ chối.
+- Category INCOME/EXPENSE; từ chối self-parent, cycle và parent/child khác kind.
+- Category đã tham chiếu không hard-delete; archive không làm mất lịch sử.
+- Thu yêu cầu Category INCOME; chi yêu cầu Category EXPENSE; transfer/opening balance không có Category.
+- Income/expense/transfer tạo posting qua Accounting Engine.
+- Transfer không ảnh hưởng tổng thu/chi.
+- Opening balance dùng đúng offset EQUITY, không ghi balance trực tiếp.
+- Posted entry không sửa/xóa; reversal giữ audit trace và replacement là entry mới.
+- Reversal triệt tiêu đúng ảnh hưởng thu/chi của entry gốc trong báo cáo.
+- Account archive bị từ chối ở use case thông thường; settlement/adjustment chỉ qua use case chuyên biệt; command không đủ điều kiện bị từ chối.
+- Idempotent retry không tạo duplicate entry.
+
+### Repository / migration integration
+- Migration version 1 → version mới với database rỗng và database có ledger history.
+- Bảo toàn row count, IDs, journal lines, posted state, FX snapshots, idempotency, reversal links và timestamps.
+- Backfill subtype/category/kind an toàn; dữ liệu không phân loại được dùng LEGACY, không gán giả.
+- Foreign key, unique constraint, archive policy và Category hierarchy.
+- Atomic rollback khi migration hoặc multi-table transaction thất bại.
+- Balance Account khớp posted journal lines.
+- History filter chính xác theo occurredAt, Category và Account.
+- Dashboard tính đúng theo từng currency; không cộng chéo currency khi thiếu FX.
+- Dashboard loại transfer và phản ánh reversal theo ảnh hưởng ròng.
+
+### Presentation / regression
+- Quick Expense mặc định hoàn tất tối đa 3 thao tác.
+- Loading, empty, error, validation và success states.
+- Responsive trên kích thước màn hình mục tiêu.
+- Accessibility: labels, focus order, contrast, touch target, font scale và screen reader cho luồng chính.
+- Account/category/transaction/history/dashboard cốt lõi hoạt động offline.
+- Không lộ dữ liệu tài chính trong log.
+- Regression toàn bộ TASK-01/TASK-02 acceptance flows.
+
+## 10. Tiêu chí nghiệm thu
+
+- [ ] Quản lý Account hoạt động offline; chỉ archive, không hard-delete.
+- [ ] ASSET subtype được lưu và validate đúng.
+- [ ] Category độc lập Account, có cây cha–con và kind INCOME/EXPENSE.
+- [ ] Journal Entry liên kết tối đa một Category; dữ liệu cũ migrate an toàn.
+- [ ] Có use case riêng income, expense, transfer; cùng dùng Accounting Engine.
+- [ ] Opening balance được ghi bằng Journal Entry.
+- [ ] Archived Account chỉ tất toán/điều chỉnh qua policy và use case chuyên biệt đã kiểm thử.
+- [ ] Posted transaction chỉ điều chỉnh bằng reversal và replacement.
+- [ ] Quick Expense thông thường hoàn tất tối đa 3 thao tác.
+- [ ] History lọc đúng ngày, Category, Account; dùng occurredAt làm business date.
+- [ ] Dashboard có tiền khả dụng, tổng thu, tổng chi, dòng tiền ròng; transfer không tính thu/chi.
+- [ ] Tiền khả dụng tổng hợp theo currency; không cộng sai native currency khác nhau.
+- [ ] Số dư Account khớp Ledger; không có nguồn số dư thứ hai.
+- [ ] Migration từ schema version 1 bảo toàn dữ liệu và có test.
+- [ ] Unit và integration tests cho repository/use case pass.
+- [ ] UI hoàn chỉnh theo design system, responsive và accessibility cho luồng chính.
+- [ ] Offline regression và TASK-01/TASK-02 accounting regression pass.
+- [ ] Schema, data dictionary và accounting rules được cập nhật đồng bộ.
+
+## 11. Nhật ký tiến độ
+
+- **Done:** Chủ dự án chốt scope và các lựa chọn nghiệp vụ ngày 2026-11-03.
+- **Done:** Đối chiếu Core, TASK-01 schema, TASK-02 accounting rules và dependency TASK-04/05/06/07/08.
+- **Doing:** Chưa triển khai code; task spec ghi rõ schema delta, migration strategy, archived-account policy và Dashboard multi-currency.
+- **Next:** Thiết kế chi tiết ERD/schema delta và implementation proposal; sau đó triển khai theo scope đã duyệt.
+- **Issues:** TASK-02 hiện cấm posting vào Account archive; cần mở rộng có kiểm soát trước khi triển khai settlement. Dashboard không thể biểu diễn một scalar total khi có nhiều native currency; scope được đáp ứng bằng tổng hợp theo từng currency.
+- **Decisions:** Category riêng, tree hierarchy, một Category/Journal Entry; ASSET subtype; archive-only Account; opening balance qua journal; archived settlement có kiểm soát; business use cases dùng chung Accounting Engine; reversal + replacement; Quick Entry tối đa 3 thao tác; occurredAt; Dashboard 4 chỉ số; available balance gồm mọi active ASSET; history filter ngày/Category/Account; migration tiến về phía trước và bảo toàn dữ liệu; unit + integration tests; UI hoàn chỉnh responsive/accessibility.
+- **Verification:** Đã rà soát tài liệu nguồn trên main; chưa chạy test vì chưa có thay đổi code.
