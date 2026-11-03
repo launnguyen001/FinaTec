@@ -299,7 +299,7 @@ Mọi command ghi dữ liệu phải có Domain/Application validation, idempote
 ## 11. Nhật ký tiến độ
 
 - **Done:** Chủ dự án chốt scope ngày 2026-11-03; branch `task/03-core-finance` được tạo từ `main`.
-- **Done:** Migration `0001_core_finance.ts` và migration registry cho schema v2; bổ sung Category, Account subtype, transaction kind/category FK, posting purpose/audit reason, index và integrity triggers. Migration v1 không bị sửa.
+- **Done, needs revision before release:** Migration `0001_core_finance.ts` và migration registry cho schema v2; bổ sung Category, Account subtype, transaction kind/category FK, index và integrity triggers. Loại bỏ posting purpose/audit reason nếu chỉ phục vụ archived-account exceptions. Migration v1 không bị sửa.
 - **Done:** Domain/Application/SQLite repository cho Category tree, parent-kind validation, cycle protection và archive lifecycle.
 - **Done:** Account create/list/rename/update metadata/archive; ASSET subtype được validate ở Application và database migration.
 - **Done:** Income/Expense use cases dùng chung AccountingService; transfer, opening balance và reversal được phân loại theo transaction kind; reversal kế thừa Category.
