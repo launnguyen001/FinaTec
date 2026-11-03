@@ -26,6 +26,18 @@ export class CategoryService {
     return this.repository.update(id, { name: normalizeCategoryName(name), parentId: current.parentId, updatedAt: this.options.now() });
   }
 
+  async updateMetadata(id: string, input: { name: string; parentId: string | null }): Promise<Category> {
+    const current = await this.requireCategory(id);
+    if (current.isArchived) throw new Error("Archived categories cannot be updated");
+    const name = normalizeCategoryName(input.name);
+    const parent = input.parentId ? await this.repository.findById(input.parentId) : null;
+    if (input.parentId && !parent) throw new Error(`Category parent does not exist: ${input.parentId}`);
+    assertValidCategoryParent(current, parent);
+    const all = await this.repository.list(true);
+    assertNoCategoryCycle(id, input.parentId, all);
+    return this.repository.update(id, { name, parentId: input.parentId, updatedAt: this.options.now() });
+  }
+
   async reparent(id: string, parentId: string | null): Promise<Category> {
     const current = await this.requireCategory(id);
     if (current.isArchived) throw new Error("Archived categories cannot be reparented");
