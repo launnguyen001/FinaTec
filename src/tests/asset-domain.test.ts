@@ -29,13 +29,16 @@ const lot = (overrides: Partial<AssetLot> = {}): AssetLot => ({
 
 describe("Task04 asset domain rules", () => {
   it("aggregates DCA lots without mutating their source records", () => {
-    const source = [lot(), lot({
-      id: "lot-2",
-      quantity: "2",
-      remainingQuantity: "2",
-      costBasisMinor: 30_000n,
-      remainingCostBasisMinor: 30_000n,
-    })];
+    const source = [
+      lot(),
+      lot({
+        id: "lot-2",
+        quantity: "2",
+        remainingQuantity: "2",
+        costBasisMinor: 30_000n,
+        remainingCostBasisMinor: 30_000n,
+      }),
+    ];
     const aggregate = aggregateDcaLots(source, 8);
     expect(aggregate.quantity).toBe("3");
     expect(aggregate.costBasisMinor).toBe(40_000n);
@@ -44,19 +47,21 @@ describe("Task04 asset domain rules", () => {
   });
 
   it("rejects DCA across assets or inactive lots", () => {
-    expect(() => aggregateDcaLots([
-      lot(),
-      lot({ id: "other", assetId: "eth" }),
-    ], 8)).toThrow(/same asset/);
-    expect(() => aggregateDcaLots([
-      lot(),
-      lot({ id: "merged", status: "MERGED" }),
-    ], 8)).toThrow(/ACTIVE/);
+    expect(() =>
+      aggregateDcaLots([lot(), lot({ id: "other", assetId: "eth" })], 8),
+    ).toThrow(/same asset/);
+    expect(() =>
+      aggregateDcaLots([lot(), lot({ id: "merged", status: "MERGED" })], 8),
+    ).toThrow(/ACTIVE/);
   });
 
   it("sells only the explicitly selected lot quantity and preserves residual basis", () => {
     const result = calculateSale({
-      lot: lot({ remainingQuantity: "2", costBasisMinor: 20_000n, remainingCostBasisMinor: 20_000n }),
+      lot: lot({
+        remainingQuantity: "2",
+        costBasisMinor: 20_000n,
+        remainingCostBasisMinor: 20_000n,
+      }),
       quantitySold: "0.5",
       quantityPrecision: 8,
       grossProceedsMinor: 15_000n,
@@ -70,14 +75,20 @@ describe("Task04 asset domain rules", () => {
   });
 
   it("allows a sale from a verified DCA component but rejects an unverified merged lot", () => {
-    const component = lot({ status: "MERGED", remainingQuantity: "0.5", remainingCostBasisMinor: 5_000n });
-    expect(() => calculateSale({
-      lot: component,
-      quantitySold: "0.25",
-      quantityPrecision: 8,
-      grossProceedsMinor: 2_000n,
-      feeMinor: 0n,
-    })).toThrow(/ACTIVE lot or a verified DCA component/);
+    const component = lot({
+      status: "MERGED",
+      remainingQuantity: "0.5",
+      remainingCostBasisMinor: 5_000n,
+    });
+    expect(() =>
+      calculateSale({
+        lot: component,
+        quantitySold: "0.25",
+        quantityPrecision: 8,
+        grossProceedsMinor: 2_000n,
+        feeMinor: 0n,
+      }),
+    ).toThrow(/ACTIVE lot or a verified DCA component/);
     const result = calculateSale({
       lot: component,
       isDcaComponent: true,
@@ -92,10 +103,18 @@ describe("Task04 asset domain rules", () => {
   });
 
   it("uses remaining cost basis when aggregating a partially sold lot into DCA", () => {
-    const aggregate = aggregateDcaLots([
-      lot({ remainingQuantity: "0.5", remainingCostBasisMinor: 5_000n }),
-      lot({ id: "lot-2", remainingQuantity: "2", costBasisMinor: 30_000n, remainingCostBasisMinor: 30_000n }),
-    ], 8);
+    const aggregate = aggregateDcaLots(
+      [
+        lot({ remainingQuantity: "0.5", remainingCostBasisMinor: 5_000n }),
+        lot({
+          id: "lot-2",
+          remainingQuantity: "2",
+          costBasisMinor: 30_000n,
+          remainingCostBasisMinor: 30_000n,
+        }),
+      ],
+      8,
+    );
     expect(aggregate.quantity).toBe("2.5");
     expect(aggregate.costBasisMinor).toBe(35_000n);
   });
@@ -116,13 +135,15 @@ describe("Task04 asset domain rules", () => {
   });
 
   it("rejects overselling and fee without an expense category", () => {
-    expect(() => calculateSale({
-      lot: lot(),
-      quantitySold: "1.01",
-      quantityPrecision: 8,
-      grossProceedsMinor: 100n,
-      feeMinor: 0n,
-    })).toThrow(/exceeds/);
+    expect(() =>
+      calculateSale({
+        lot: lot(),
+        quantitySold: "1.01",
+        quantityPrecision: 8,
+        grossProceedsMinor: 100n,
+        feeMinor: 0n,
+      }),
+    ).toThrow(/exceeds/);
     expect(() => assertTransactionFee(10n, null)).toThrow(/EXPENSE category/);
     expect(() => assertTransactionFee(0n, null)).not.toThrow();
   });
@@ -138,42 +159,54 @@ describe("Task04 asset domain rules", () => {
       capturedAt: "2026-11-03T10:00:05.000Z",
     };
     expect(resolveQuoteAfterRefresh(previous, null)?.status).toBe("STALE");
-    expect(resolveQuoteAfterRefresh(previous, {
-      ...previous,
-      price: "0",
-    })?.status).toBe("STALE");
+    expect(
+      resolveQuoteAfterRefresh(previous, {
+        ...previous,
+        price: "0",
+      })?.status,
+    ).toBe("STALE");
   });
 
   it("uses application timezone for valuation date and clamps refresh intervals", () => {
-    expect(getValuationDate("2026-11-03T18:00:00.000Z", "Asia/Ho_Chi_Minh"))
-      .toBe("2026-11-04");
+    expect(
+      getValuationDate("2026-11-03T18:00:00.000Z", "Asia/Ho_Chi_Minh"),
+    ).toBe("2026-11-04");
     expect(getMinimumRefreshIntervalMs("CRYPTO", 15)).toBe(900_000);
-    expect(() => getMinimumRefreshIntervalMs("CRYPTO", 1)).toThrow(/15 minutes/);
+    expect(() => getMinimumRefreshIntervalMs("CRYPTO", 1)).toThrow(
+      /15 minutes/,
+    );
     expect(getMinimumRefreshIntervalMs("FIAT_FX")).toBe(86_400_000);
   });
 
   it("enforces scheduled refresh intervals and manual cooldown", () => {
-    expect(canRefreshPrice({
-      nowMs: 60_000,
-      lastSuccessAtMs: null,
-      intervalMs: 900_000,
-    })).toBe(true);
-    expect(canRefreshPrice({
-      nowMs: 60_000,
-      lastSuccessAtMs: 0,
-      intervalMs: 900_000,
-    })).toBe(false);
+    expect(
+      canRefreshPrice({
+        nowMs: 60_000,
+        lastSuccessAtMs: null,
+        intervalMs: 900_000,
+      }),
+    ).toBe(true);
+    expect(
+      canRefreshPrice({
+        nowMs: 60_000,
+        lastSuccessAtMs: 0,
+        intervalMs: 900_000,
+      }),
+    ).toBe(false);
     expect(canManualRefresh(0, 29_999)).toBe(false);
     expect(canManualRefresh(0, 30_000)).toBe(true);
   });
 
   it("uses device timezone by default and validates custom timezone", () => {
-    expect(resolveAssetTimeZone("DEVICE", "UTC", "Asia/Ho_Chi_Minh"))
-      .toBe("Asia/Ho_Chi_Minh");
-    expect(resolveAssetTimeZone("CUSTOM", "Europe/London", "Asia/Ho_Chi_Minh"))
-      .toBe("Europe/London");
-    expect(() => resolveAssetTimeZone("CUSTOM", "Not/A_Timezone"))
-      .toThrow(/timezone is invalid/);
+    expect(resolveAssetTimeZone("DEVICE", "UTC", "Asia/Ho_Chi_Minh")).toBe(
+      "Asia/Ho_Chi_Minh",
+    );
+    expect(
+      resolveAssetTimeZone("CUSTOM", "Europe/London", "Asia/Ho_Chi_Minh"),
+    ).toBe("Europe/London");
+    expect(() => resolveAssetTimeZone("CUSTOM", "Not/A_Timezone")).toThrow(
+      /timezone is invalid/,
+    );
   });
 
   it("uses bounded exponential backoff and Retry-After", () => {
