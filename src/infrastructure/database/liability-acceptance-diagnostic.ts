@@ -5,7 +5,9 @@ import * as SQLite from "expo-sqlite";
 import { drizzle } from "drizzle-orm/expo-sqlite";
 import { migrate } from "drizzle-orm/expo-sqlite/migrator";
 
-import { LiabilityService } from "../../application/liability/liability-service";
+import {
+  LiabilityService,
+} from "../../application/liability/liability-service";
 import { Currency } from "../../domain/ledger/currency";
 import { calculateAccountBalance } from "../../domain/ledger/posting";
 import type { Account } from "../../domain/ledger/repository";
