@@ -333,6 +333,8 @@ export async function runInterestAcceptanceDiagnostic(): Promise<InterestAccepta
       "principal increased once by 5,500 minor units and retry did not create another journal",
     );
 
+    await interest.setPlanStatus(capitalizationPlan.id, "CLOSED");
+
     const payoutPlan = await interest.createPlan({
       name: "One-year simple interest payout",
       principalAccountId: principal.id,
