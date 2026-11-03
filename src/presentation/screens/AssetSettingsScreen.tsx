@@ -16,7 +16,10 @@ import type { AssetSettingsRecord } from "../../domain/asset/repository";
 import { ScreenBackLink } from "../components/ScreenBackLink";
 import { useFinanceRuntime } from "../providers/FinanceRuntimeProvider";
 import { colors, spacing, typography } from "../../shared/theme/tokens";
-import { ASSET_REFRESH_TASK } from "../../infrastructure/background/asset-refresh-task";
+import {
+  ASSET_REFRESH_TASK,
+  registerAssetRefreshTask,
+} from "../../infrastructure/background/asset-refresh-task";
 
 const COINGECKO_KEY = "ketso.asset.coingecko-demo-key.v1";
 
@@ -65,6 +68,9 @@ export function AssetSettingsScreen() {
 
   const load = useCallback(async () => {
     if (!runtime) return;
+    if (Platform.OS !== "web") {
+      await registerAssetRefreshTask();
+    }
     const [settings, key] = await Promise.all([
       runtime.assetSettings.get(),
       SecureStore.getItemAsync(COINGECKO_KEY),

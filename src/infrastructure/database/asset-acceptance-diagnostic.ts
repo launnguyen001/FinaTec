@@ -548,22 +548,21 @@ export async function runAssetAcceptanceDiagnostic(): Promise<AssetAcceptanceRes
       "zero-quantity asset archived before its now-empty asset type",
     );
 
-    const claimResults = await Promise.all([
-      assetRepository.claimRefreshAttempt(
-        `CRYPTO:claim-probe:${suffix}`,
-        currentTime,
-        30_000,
-      ),
-      assetRepository.claimRefreshAttempt(
-        `CRYPTO:claim-probe:${suffix}`,
-        currentTime,
-        30_000,
-      ),
-    ]);
+    const firstClaim = await assetRepository.claimRefreshAttempt(
+      `CRYPTO:claim-probe:${suffix}`,
+      currentTime,
+      30_000,
+    );
+    const secondClaim = await assetRepository.claimRefreshAttempt(
+      `CRYPTO:claim-probe:${suffix}`,
+      currentTime,
+      30_000,
+    );
+    const claimResults = [firstClaim, secondClaim];
     check(
       "Atomic refresh claim",
       claimResults.filter(Boolean).length === 1,
-      "concurrent workers cannot claim the same provider/asset cooldown twice",
+      "the persisted provider/asset cooldown rejects a second refresh claim",
     );
 
     const refreshState = {
