@@ -2,7 +2,7 @@
 
 - Giai đoạn: 3 — MVP 2
 - Ưu tiên: P1
-- Trạng thái: ANALYSIS — cross-task contract audit complete; owner approval required for interest conventions before implementation
+- Trạng thái: IMPLEMENTATION IN PROGRESS — owner approved baseline MVP on 2026-11-04
 - Phụ thuộc: TASK-02, TASK-04
 - Branch triển khai: `task/05-interest-engine`
 - Base: `main` tại `14db998`; branch đã được đồng bộ với toàn bộ baseline Task04 và closeout docs
@@ -82,7 +82,7 @@ Phải chốt công thức và quy tắc làm tròn trước khi lập trình. K
 
 Không implement formula cho đến khi các quyết định liên quan được ghi thành bảng ví dụ tham chiếu và được owner duyệt.
 
-### 5.1. Đề xuất baseline MVP — CHỜ OWNER DUYỆT
+### 5.1. Baseline MVP — OWNER APPROVED (2026-11-04)
 
 | Quyết định | Đề xuất | Lý do / giới hạn |
 |---|---|---|
@@ -98,7 +98,7 @@ Không implement formula cho đến khi các quyết định liên quan được
 | Liability | Engine/calculator dùng chung; MVP triển khai asset-interest trước, liability posting sau khi TASK-06 chốt debt contract | Tránh trùng phạm vi với TASK-06 |
 | Catch-up | Tính từng kỳ còn thiếu theo plan version; giới hạn batch, unique plan-period key | Retry an toàn và có thể audit |
 
-Các đề xuất trên chưa phải business rules đã khóa. Cần owner duyệt hoặc chỉnh trước khi viết calculator/migration.
+Các quy tắc trên đã được owner duyệt ngày 2026-11-04 và là business rules cho MVP. APY conversion, liability posting, early-withdrawal penalty và variable-principal scheduling vẫn nằm ngoài MVP cho đến khi có đặc tả riêng.
 
 
 ## 6. Thay đổi dự kiến
@@ -156,7 +156,8 @@ Các đề xuất trên chưa phải business rules đã khóa. Cần owner duy�
 - 2026-11-04: Chốt ranh giới kiến trúc: term deposit dùng ASSET Account riêng làm nguồn principal; TASK-05 sở hữu InterestPlan và toàn bộ calculation/accrual/posting. TASK-04 không cần schema interest-specific và không được tự xây interest engine thứ hai.
 - Đã audit TASK-02 LedgerRepository/AccountingService: atomic commitPostedEntry, balance validation, native currency, idempotency và posted journal immutability là contract nền. TASK-05 phải mở rộng repository atomic command để commit accrual + Journal Entry cùng transaction, không gọi AccountingService rồi ghi accrual độc lập.
 - Đã audit TASK-04: Account ASSET và cờ INVESTMENT là nguồn phân loại sẵn có; term deposit sẽ dùng dedicated ASSET Account, InterestPlan giữ lịch/điều khoản và tham chiếu accountId; không duplicate principal.
-- Đã đề xuất baseline MVP tại mục 5.1: nominal APR, ACT/365 Fixed, daily accrual, monthly/at-maturity posting, simple interest mặc định, calendar-day boundaries, HALF_UP tại posting và fractional carry. Đề xuất đang CHỜ owner duyệt; chưa áp dụng như business rule.
-- Next: owner duyệt/chỉnh bảng convention và ví dụ tham chiếu; sau đó mới thiết kế schema/migration và pure calculator.
-- Chưa làm: chưa có công thức APR/APY, day-count, frequency và rounding được owner duyệt; chưa implement calculator/schema/UI.
+- 2026-11-04: Owner APPROVED baseline MVP tại mục 5.1. Implementation bắt đầu bằng pure ACT/365 Fixed calculator dùng BigInt rational arithmetic và reference-vector tests.
+- Đã implement pure calculator: nominal APR (ppm), ACT/365 Fixed, start-inclusive/end-exclusive, HALF_UP và exact fractional carry; domain unit tests đã thêm.
+- Đang làm: schema/migration, repository atomic commit và application lifecycle.
+- Chưa làm: UI, catch-up scheduler, SQLCipher device acceptance và Ledger reconciliation acceptance.
 - Branch sync: `task/05-interest-engine` hiện ahead 9 / behind 0 so với `main`; baseline Task04 đã được merge vào branch bằng merge commit `90a8617`, không force-push và không bỏ commit.
