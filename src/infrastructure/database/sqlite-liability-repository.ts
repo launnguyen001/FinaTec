@@ -455,6 +455,23 @@ export class SqliteLiabilityRepository implements LiabilityRepository {
       if (originalLines.length !== input.reversal.journalLines.length) {
         throw new Error("Payment reversal must reverse every original journal line");
       }
+      const originalByLine = originalLines.slice().sort((a, b) => a.lineNumber - b.lineNumber);
+      const reversalByLine = input.reversal.journalLines.slice().sort((a, b) => a.lineNumber - b.lineNumber);
+      for (let index = 0; index < originalByLine.length; index += 1) {
+        const source = originalByLine[index]!;
+        const reversed = reversalByLine[index]!;
+        if (
+          source.accountId !== reversed.accountId ||
+          source.currencyCode !== reversed.currencyCode ||
+          source.amountMinor !== reversed.amountMinor ||
+          source.baseAmountMinor !== reversed.baseAmountMinor ||
+          source.fxRateNumerator !== reversed.fxRateNumerator ||
+          source.fxRateDenominator !== reversed.fxRateDenominator ||
+          source.side === reversed.side
+        ) {
+          throw new Error("Payment reversal lines must exactly invert the original journal");
+        }
+      }
       this.insertPostedJournal(tx, input.reversal.journalEntry, input.reversal.journalLines);
       tx.insert(liabilityPaymentReversals).values(input.record).run();
 
