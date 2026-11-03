@@ -3,7 +3,6 @@ import type {
   Liability,
   LiabilityInstallment,
   LiabilityPayment,
-  LiabilityRateChange,
 } from "../../domain/liability/liability";
 import type {
   Account,
