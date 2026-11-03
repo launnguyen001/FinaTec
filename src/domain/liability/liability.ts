@@ -33,6 +33,8 @@ export interface LiabilityInstallment extends RepaymentInstallment {
   principalPaidMinor: bigint;
   interestPaidMinor: bigint;
   status: RepaymentStatus;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface LiabilityPayment {
