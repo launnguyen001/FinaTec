@@ -68,3 +68,12 @@ export interface LiabilityPaymentCommit extends LiabilityJournalCommit {
   installmentUpdates: LiabilityInstallment[];
   newInstallments: LiabilityInstallment[];
 }
+
+export interface LiabilityRateChange {
+  id: string;
+  liabilityId: string;
+  annualRatePpm: bigint;
+  effectiveDate: string;
+  reason: string | null;
+  createdAt: string;
+}
