@@ -66,7 +66,6 @@ export function LiabilityScreen() {
   const [message, setMessage] = useState<string | null>(null);
 
   const currencyCode = accounts.find((item) => item.id === liabilityAccountId)?.currencyCode;
-  const currency = currencies.find((item) => item.code === currencyCode);
   const assetAccounts = useMemo(() => accounts.filter((item) => !item.isArchived && item.type === "ASSET"), [accounts]);
   const liabilityAccounts = useMemo(() => accounts.filter((item) => !item.isArchived && item.type === "LIABILITY"), [accounts]);
   const expenseAccounts = useMemo(() => accounts.filter((item) => !item.isArchived && item.type === "EXPENSE"), [accounts]);
@@ -96,8 +95,8 @@ export function LiabilityScreen() {
     setReconciliation(detail.reconciliation.differenceMinor.toString());
   }, [runtime, selectedId]);
 
-  useEffect(() => { if (runtime) void refresh().catch((cause) => setFailure(cause instanceof Error ? cause.message : "Không thể tải dữ liệu")); }, [runtime, refresh]);
-  useEffect(() => { if (runtime && selectedId) void loadDetail().catch((cause) => setFailure(cause instanceof Error ? cause.message : "Không thể tải lịch trả nợ")); }, [runtime, selectedId, loadDetail]);
+  useEffect(() => {\n    // The loader synchronizes remote persistence state after runtime initialization.\n    // eslint-disable-next-line react-hooks/set-state-in-effect\n    if (runtime) void refresh().catch((cause) => setFailure(cause instanceof Error ? cause.message : "Không thể tải dữ liệu"));\n  }, [runtime, refresh]);
+  useEffect(() => {\n    // Detail is read from the repository when the selected liability changes.\n    // eslint-disable-next-line react-hooks/set-state-in-effect\n    if (runtime && selectedId) void loadDetail().catch((cause) => setFailure(cause instanceof Error ? cause.message : "Không thể tải lịch trả nợ"));\n  }, [runtime, selectedId, loadDetail]);
 
   const run = async (action: () => Promise<void>) => {
     setBusy(true); setFailure(null); setMessage(null);
