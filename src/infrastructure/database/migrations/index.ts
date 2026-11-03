@@ -8,6 +8,7 @@ import { migration0006 } from "./0006_liability_management";
 import { migration0007 } from "./0007_liability_rate_history";
 import { migration0008 } from "./0008_liability_fx_snapshots";
 import { migration0009 } from "./0009_liability_payment_corrections";
+import { migration0010 } from "./0010_liability_payment_order";
 
 const migrationTime = 1_793_520_000_000;
 const coreFinanceMigrationTime = 1_793_700_000_000;
@@ -19,6 +20,7 @@ const liabilityManagementMigrationTime = 1_794_200_000_000;
 const liabilityRateHistoryMigrationTime = 1_794_300_000_000;
 const liabilityFxSnapshotMigrationTime = 1_794_400_000_000;
 const liabilityPaymentCorrectionMigrationTime = 1_794_500_000_000;
+const liabilityPaymentOrderMigrationTime = 1_794_600_000_000;
 
 export const ledgerMigrations = {
   journal: {
@@ -83,6 +85,12 @@ export const ledgerMigrations = {
         tag: "0009_liability_payment_corrections",
         breakpoints: true,
       },
+      {
+        idx: 10,
+        when: liabilityPaymentOrderMigrationTime,
+        tag: "0010_liability_payment_order",
+        breakpoints: true,
+      },
     ],
   },
   migrations: {
@@ -96,5 +104,6 @@ export const ledgerMigrations = {
     m0007: migration0007,
     m0008: migration0008,
     m0009: migration0009,
+    m0010: migration0010,
   },
 };
