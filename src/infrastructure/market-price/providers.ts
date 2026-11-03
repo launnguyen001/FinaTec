@@ -1,15 +1,6 @@
 import type { MarketQuote, QuoteSource } from "../../domain/asset/asset";
-
-export interface PriceRequest {
-  assetId: string;
-  providerSymbol: string;
-  quoteCurrency: "USD" | "USDT";
-}
-
-export interface PriceProvider {
-  readonly source: QuoteSource;
-  getPrice(request: PriceRequest): Promise<MarketQuote>;
-}
+import type { PriceProvider, PriceRequest } from "../../domain/asset/price-provider";
+export type { PriceProvider, PriceRequest } from "../../domain/asset/price-provider";
 
 async function readJson(
   url: string,

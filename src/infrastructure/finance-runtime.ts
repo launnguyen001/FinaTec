@@ -6,6 +6,12 @@ import { AssetCatalogService } from "../application/asset/asset-catalog-service"
 import { AssetValuationService } from "../application/asset/asset-valuation-service";
 import { AssetSettingsService } from "../application/asset/asset-settings-service";
 import { AssetPriceRefreshService } from "../application/asset/asset-price-refresh-service";
+import {
+  CoinGeckoDemoProvider,
+  CoinPaprikaProvider,
+  FallbackPriceProvider,
+  type PriceProvider,
+} from "./market-price/providers";
 import { CategoryService } from "../application/category/category-service";
 import { DashboardService } from "../application/finance/dashboard-service";
 import { FinanceTransactionService } from "../application/finance/finance-transaction-service";
@@ -55,8 +61,26 @@ export async function createFinanceRuntime() {
       assetValuations,
       {
         now,
-        getCoinGeckoApiKey: () =>
-          SecureStore.getItemAsync("ketso.asset.coingecko-demo-key.v1"),
+        createProvider: async (primary, fallback) => {
+          const apiKey = await SecureStore.getItemAsync(
+            "ketso.asset.coingecko-demo-key.v1",
+          );
+          const providerMap: Record<string, PriceProvider> = {
+            COINPAPRIKA: new CoinPaprikaProvider(),
+          };
+          if (apiKey?.trim()) {
+            providerMap.COINGECKO = new CoinGeckoDemoProvider(apiKey);
+          }
+          const providers = [primary, fallback]
+            .map((name) => providerMap[name])
+            .filter((provider): provider is PriceProvider => provider !== undefined);
+          if (providers.length === 0) {
+            throw new Error(
+              "No configured crypto provider is available; configure a CoinGecko Demo key or enable CoinPaprika",
+            );
+          }
+          return new FallbackPriceProvider(providers);
+        },
       },
     ),
     accounts: new AccountService(accountRepository, ledger, { createId, now }),

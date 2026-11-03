@@ -7,16 +7,14 @@ import {
 import type { AssetRepository } from "../../domain/asset/repository";
 import { AssetSettingsService } from "./asset-settings-service";
 import { AssetValuationService } from "./asset-valuation-service";
-import {
-  CoinGeckoDemoProvider,
-  CoinPaprikaProvider,
-  FallbackPriceProvider,
-  type PriceProvider,
-} from "../../infrastructure/market-price/providers";
+import type { PriceProvider } from "../../domain/asset/price-provider";
 
 export interface AssetPriceRefreshServiceOptions {
   now: () => string;
-  getCoinGeckoApiKey: () => Promise<string | null>;
+  createProvider: (
+    primary: "COINPAPRIKA" | "COINGECKO",
+    fallback: "COINPAPRIKA" | "COINGECKO",
+  ) => Promise<PriceProvider>;
 }
 
 export interface AssetRefreshOutcome {
@@ -113,25 +111,10 @@ export class AssetPriceRefreshService {
     });
 
     try {
-      const apiKey = await this.options.getCoinGeckoApiKey();
-      const providerMap: Record<string, PriceProvider> = {
-        COINPAPRIKA: new CoinPaprikaProvider(),
-      };
-      if (apiKey?.trim()) {
-        providerMap.COINGECKO = new CoinGeckoDemoProvider(apiKey);
-      }
-      const providers = [
+      const provider = await this.options.createProvider(
         settings.primaryCryptoProvider,
         settings.fallbackCryptoProvider,
-      ]
-        .map((name) => providerMap[name])
-        .filter((provider): provider is PriceProvider => provider !== undefined);
-      if (providers.length === 0) {
-        throw new Error(
-          "No configured crypto provider is available; configure a CoinGecko Demo key or enable CoinPaprika",
-        );
-      }
-      const provider = new FallbackPriceProvider(providers);
+      );
       const quote = await provider.getPrice({
         assetId,
         providerSymbol: facts.asset.providerSymbol,

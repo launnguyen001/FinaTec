@@ -37,6 +37,7 @@ export interface MarketQuote {
 }
 
 export interface DailyValuation {
+  id: string;
   assetId: string;
   valuationDate: string;
   quantity: string;
