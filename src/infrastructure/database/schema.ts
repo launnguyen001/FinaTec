@@ -514,10 +514,16 @@ export const interestPlans = sqliteTable(
     name: text("name").notNull(),
     principalAccountId: text("principal_account_id")
       .notNull()
-      .references(() => accounts.id, { onDelete: "restrict", onUpdate: "restrict" }),
+      .references(() => accounts.id, {
+        onDelete: "restrict",
+        onUpdate: "restrict",
+      }),
     interestIncomeAccountId: text("interest_income_account_id")
       .notNull()
-      .references(() => accounts.id, { onDelete: "restrict", onUpdate: "restrict" }),
+      .references(() => accounts.id, {
+        onDelete: "restrict",
+        onUpdate: "restrict",
+      }),
     payoutAccountId: text("payout_account_id").references(() => accounts.id, {
       onDelete: "restrict",
       onUpdate: "restrict",
@@ -567,7 +573,10 @@ export const interestAccruals = sqliteTable(
     id: text("id").primaryKey(),
     planId: text("plan_id")
       .notNull()
-      .references(() => interestPlans.id, { onDelete: "restrict", onUpdate: "restrict" }),
+      .references(() => interestPlans.id, {
+        onDelete: "restrict",
+        onUpdate: "restrict",
+      }),
     periodStart: text("period_start").notNull(),
     periodEnd: text("period_end").notNull(),
     principalMinor: integer("principal_minor").notNull(),
@@ -580,10 +589,12 @@ export const interestAccruals = sqliteTable(
     accrualKind: text("accrual_kind", {
       enum: ["CAPITALIZATION", "PAYOUT"],
     }).notNull(),
-    journalEntryId: text("journal_entry_id").unique().references(() => journalEntries.id, {
-      onDelete: "restrict",
-      onUpdate: "restrict",
-    }),
+    journalEntryId: text("journal_entry_id")
+      .unique()
+      .references(() => journalEntries.id, {
+        onDelete: "restrict",
+        onUpdate: "restrict",
+      }),
     idempotencyKey: text("idempotency_key").notNull().unique(),
     createdAt: text("created_at").notNull(),
     postedAt: text("posted_at"),
@@ -596,8 +607,14 @@ export const interestAccruals = sqliteTable(
       table.periodEnd,
       table.accrualKind,
     ),
-    index("interest_accruals_plan_period_idx").on(table.planId, table.periodEnd),
-    check("interest_accruals_period_check", sql`${table.periodEnd} > ${table.periodStart}`),
+    index("interest_accruals_plan_period_idx").on(
+      table.planId,
+      table.periodEnd,
+    ),
+    check(
+      "interest_accruals_period_check",
+      sql`${table.periodEnd} > ${table.periodStart}`,
+    ),
     check(
       "interest_accruals_principal_range",
       sql`${table.principalMinor} > 0 AND ${table.principalMinor} <= 9007199254740991`,

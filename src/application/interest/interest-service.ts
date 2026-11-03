@@ -54,7 +54,10 @@ export class InterestService {
       throw new Error("Annual APR must be between 0% and 1000%");
     }
     const maturityDate = input.maturityDate ?? null;
-    countActualDays(input.startDate, maturityDate ?? this.nextDate(input.startDate));
+    countActualDays(
+      input.startDate,
+      maturityDate ?? this.nextDate(input.startDate),
+    );
     if (maturityDate && maturityDate <= input.startDate) {
       throw new Error("Maturity date must be after start date");
     }
@@ -63,7 +66,9 @@ export class InterestService {
     }
     const compounding = input.compounding ?? "SIMPLE";
     if (compounding === "SIMPLE" && !input.payoutAccountId) {
-      throw new Error("Simple-interest plans require a payout destination; capitalization would compound interest");
+      throw new Error(
+        "Simple-interest plans require a payout destination; capitalization would compound interest",
+      );
     }
 
     const principal = await this.requireAccount(input.principalAccountId);
@@ -83,13 +88,17 @@ export class InterestService {
       throw new Error("Payout destination must be an ASSET account");
     }
     if (payout && payout.id === principal.id) {
-      throw new Error("Payout destination must differ from the principal account");
+      throw new Error(
+        "Payout destination must differ from the principal account",
+      );
     }
     if (
       principal.currencyCode !== income.currencyCode ||
       (payout && payout.currencyCode !== principal.currencyCode)
     ) {
-      throw new Error("All accounts in an interest plan must use the same currency");
+      throw new Error(
+        "All accounts in an interest plan must use the same currency",
+      );
     }
     if (principal.currencyCode !== baseCurrency) {
       throw new Error(
@@ -150,17 +159,15 @@ export class InterestService {
         (item) => item.status === "ACCRUED",
       );
       if (pending) {
-        throw new Error("An interest plan with unposted accruals cannot be closed");
+        throw new Error(
+          "An interest plan with unposted accruals cannot be closed",
+        );
       }
     }
     await this.repository.setPlanStatus(planId, status, this.now());
   }
 
-  async preview(
-    planId: string,
-    startDate: string,
-    endDate: string,
-  ) {
+  async preview(planId: string, startDate: string, endDate: string) {
     const plan = await this.requirePlan(planId);
     const principalMinor = await this.readPrincipalBalance(plan);
     return calculateSimpleInterest({
@@ -176,7 +183,10 @@ export class InterestService {
     periodStart: string;
     periodEnd: string;
     kind: InterestAccrualKind;
-  }): Promise<{ accrual: InterestAccrual | null; calculation: ReturnType<typeof calculateSimpleInterest> }> {
+  }): Promise<{
+    accrual: InterestAccrual | null;
+    calculation: ReturnType<typeof calculateSimpleInterest>;
+  }> {
     const plan = await this.requirePlan(input.planId);
     if (plan.status !== "ACTIVE") {
       throw new Error("Only an ACTIVE interest plan can accrue");
@@ -190,8 +200,13 @@ export class InterestService {
     if (input.kind === "PAYOUT" && !plan.payoutAccountId) {
       throw new Error("This plan has no payout destination account");
     }
-    if (input.kind === "CAPITALIZATION" && plan.compounding !== "AFTER_CAPITALIZATION") {
-      throw new Error("Simple-interest plans cannot capitalize interest; use payout instead");
+    if (
+      input.kind === "CAPITALIZATION" &&
+      plan.compounding !== "AFTER_CAPITALIZATION"
+    ) {
+      throw new Error(
+        "Simple-interest plans cannot capitalize interest; use payout instead",
+      );
     }
 
     const history = await this.repository.listAccruals(plan.id);
@@ -201,29 +216,41 @@ export class InterestService {
         item.periodEnd === input.periodEnd &&
         item.accrualKind === input.kind,
     );
-    if (existing) return { accrual: existing, calculation: {
-      dayCount: countActualDays(input.periodStart, input.periodEnd),
-      principalMinor: existing.principalMinor,
-      annualRatePpm: plan.annualRatePpm,
-      numerator: existing.accruedNumerator,
-      denominator: existing.accruedDenominator,
-      amountMinor: roundHalfUp(existing.accruedNumerator, existing.accruedDenominator),
-    } };
+    if (existing)
+      return {
+        accrual: existing,
+        calculation: {
+          dayCount: countActualDays(input.periodStart, input.periodEnd),
+          principalMinor: existing.principalMinor,
+          annualRatePpm: plan.annualRatePpm,
+          numerator: existing.accruedNumerator,
+          denominator: existing.accruedDenominator,
+          amountMinor: roundHalfUp(
+            existing.accruedNumerator,
+            existing.accruedDenominator,
+          ),
+        },
+      };
     if (history.some((item) => item.status === "ACCRUED")) {
       throw new Error("An earlier accrual is still pending posting");
     }
     const settled = history
       .filter((item) => item.status === "POSTED" || item.status === "PAID")
       .sort((a, b) => a.periodEnd.localeCompare(b.periodEnd));
-    const expectedStart = settled.length > 0
-      ? settled[settled.length - 1]!.periodEnd
-      : plan.startDate;
+    const expectedStart =
+      settled.length > 0
+        ? settled[settled.length - 1]!.periodEnd
+        : plan.startDate;
     if (input.periodStart !== expectedStart) {
-      throw new Error(`Accrual must continue from the last settled boundary: ${expectedStart}`);
+      throw new Error(
+        `Accrual must continue from the last settled boundary: ${expectedStart}`,
+      );
     }
 
     if (await this.repository.hasExternalPrincipalMovements(plan)) {
-      throw new Error("Principal changed outside this InterestPlan after its start date; variable-principal accrual is not supported in this MVP");
+      throw new Error(
+        "Principal changed outside this InterestPlan after its start date; variable-principal accrual is not supported in this MVP",
+      );
     }
     const principalMinor = await this.readPrincipalBalance(plan);
     const calculation = calculateSimpleInterest({
@@ -267,7 +294,8 @@ export class InterestService {
       postedAt: null,
       paidAt: null,
     };
-    const raced = await this.repository.findAccrualByIdempotencyKey(idempotencyKey);
+    const raced =
+      await this.repository.findAccrualByIdempotencyKey(idempotencyKey);
     if (raced) return { accrual: raced, calculation };
     await this.repository.createAccrual(accrual);
     return { accrual, calculation };
@@ -275,7 +303,8 @@ export class InterestService {
 
   async postAccrual(accrualId: string): Promise<InterestAccrual> {
     const accrual = await this.repository.findAccrualById(accrualId);
-    if (!accrual) throw new Error(`Interest accrual does not exist: ${accrualId}`);
+    if (!accrual)
+      throw new Error(`Interest accrual does not exist: ${accrualId}`);
     if (accrual.status !== "ACCRUED") return accrual;
     const plan = await this.requirePlan(accrual.planId);
     const amountMinor = roundHalfUp(
@@ -283,7 +312,9 @@ export class InterestService {
       accrual.accruedDenominator,
     );
     if (amountMinor <= 0n) {
-      throw new Error("Accrued interest is below one currency minor unit; extend the accrual period before posting");
+      throw new Error(
+        "Accrued interest is below one currency minor unit; extend the accrual period before posting",
+      );
     }
 
     const debitAccountId =
@@ -294,7 +325,8 @@ export class InterestService {
       throw new Error("Payout destination account is not configured");
     }
     const baseCurrencyCode = await this.ledger.getBaseCurrencyCode();
-    if (!baseCurrencyCode) throw new Error("Ledger base currency is not configured");
+    if (!baseCurrencyCode)
+      throw new Error("Ledger base currency is not configured");
     const timestamp = this.now();
     const entryId = this.options.createId();
     const description =
@@ -369,9 +401,14 @@ export class InterestService {
     const plan = await this.requirePlan(planId);
     if (plan.status !== "ACTIVE") return [];
     if (await this.repository.hasExternalPrincipalMovements(plan)) {
-      throw new Error("Principal changed outside this InterestPlan after its start date; variable-principal catch-up is not supported in this MVP");
+      throw new Error(
+        "Principal changed outside this InterestPlan after its start date; variable-principal catch-up is not supported in this MVP",
+      );
     }
-    if (kind === "CAPITALIZATION" && plan.compounding !== "AFTER_CAPITALIZATION") {
+    if (
+      kind === "CAPITALIZATION" &&
+      plan.compounding !== "AFTER_CAPITALIZATION"
+    ) {
       throw new Error("Simple-interest plans cannot capitalize interest");
     }
     if (kind === "PAYOUT" && !plan.payoutAccountId) {
@@ -382,14 +419,19 @@ export class InterestService {
 
     const completed: InterestAccrual[] = [];
     let existing = await this.repository.listAccruals(planId);
-    for (const pending of existing.filter((item) => item.status === "ACCRUED")) {
+    for (const pending of existing.filter(
+      (item) => item.status === "ACCRUED",
+    )) {
       completed.push(await this.postAccrual(pending.id));
     }
     existing = await this.repository.listAccruals(planId);
     const settled = existing
       .filter((item) => item.status === "POSTED" || item.status === "PAID")
       .sort((a, b) => a.periodEnd.localeCompare(b.periodEnd));
-    let periodStart = settled.length > 0 ? settled[settled.length - 1]!.periodEnd : plan.startDate;
+    let periodStart =
+      settled.length > 0
+        ? settled[settled.length - 1]!.periodEnd
+        : plan.startDate;
     if (plan.maturityDate && periodStart >= plan.maturityDate) return completed;
 
     if (plan.postingFrequency === "AT_MATURITY") {
@@ -408,9 +450,14 @@ export class InterestService {
     }
 
     let monthOffset = 1;
-    while (this.addMonthsFromAnchor(plan.startDate, monthOffset) <= periodStart) {
+    while (
+      this.addMonthsFromAnchor(plan.startDate, monthOffset) <= periodStart
+    ) {
       monthOffset += 1;
-      if (monthOffset > 1200) throw new Error("Interest plan period history exceeds the supported range");
+      if (monthOffset > 1200)
+        throw new Error(
+          "Interest plan period history exceeds the supported range",
+        );
     }
 
     let carryStart = periodStart;
@@ -436,7 +483,9 @@ export class InterestService {
         carryStart = periodStart;
         carryPrincipal = principalMinor;
       } else if (carryPrincipal !== principalMinor) {
-        throw new Error("Principal changed while fractional interest was carried; reconcile the principal change before catch-up");
+        throw new Error(
+          "Principal changed while fractional interest was carried; reconcile the principal change before catch-up",
+        );
       }
       carryNumerator += calculation.numerator;
       const rounded = roundHalfUp(carryNumerator, denominator);
@@ -479,7 +528,8 @@ export class InterestService {
       input.periodEnd,
       input.kind,
     ].join(":");
-    const existing = await this.repository.findAccrualByIdempotencyKey(idempotencyKey);
+    const existing =
+      await this.repository.findAccrualByIdempotencyKey(idempotencyKey);
     if (existing) return existing;
     const accrual: InterestAccrual = {
       id: this.options.createId(),
@@ -502,7 +552,8 @@ export class InterestService {
       await this.repository.createAccrual(accrual);
       return accrual;
     } catch (error) {
-      const raced = await this.repository.findAccrualByIdempotencyKey(idempotencyKey);
+      const raced =
+        await this.repository.findAccrualByIdempotencyKey(idempotencyKey);
       if (raced) return raced;
       throw error;
     }
@@ -513,7 +564,9 @@ export class InterestService {
     const monthIndex = year * 12 + month - 1 + months;
     const targetYear = Math.floor(monthIndex / 12);
     const targetMonth = monthIndex % 12;
-    const lastDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+    const lastDay = new Date(
+      Date.UTC(targetYear, targetMonth + 1, 0),
+    ).getUTCDate();
     const targetDay = Math.min(day, lastDay);
     return `${targetYear.toString().padStart(4, "0")}-${(targetMonth + 1).toString().padStart(2, "0")}-${targetDay.toString().padStart(2, "0")}`;
   }
@@ -523,15 +576,20 @@ export class InterestService {
     const currencyRecord = (await this.ledger.listCurrencies(true)).find(
       (item) => item.code === account.currencyCode,
     );
-    if (!currencyRecord) throw new Error("Principal account currency is unavailable");
-    const lines = await this.ledger.listPostedJournalLinesForAccount(account.id);
+    if (!currencyRecord)
+      throw new Error("Principal account currency is unavailable");
+    const lines = await this.ledger.listPostedJournalLinesForAccount(
+      account.id,
+    );
     const balance = calculateAccountBalance(
       account,
       lines,
       new Currency(currencyRecord.code, currencyRecord.minorUnit),
     ).minorUnits;
     if (balance <= 0n) {
-      throw new Error("Interest principal account must have a positive posted Ledger balance");
+      throw new Error(
+        "Interest principal account must have a positive posted Ledger balance",
+      );
     }
     return balance;
   }

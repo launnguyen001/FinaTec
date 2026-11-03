@@ -101,7 +101,9 @@ export function countActualDays(startDate: string, endDate: string): number {
 /** HALF_UP for non-negative rational amounts. No floating-point arithmetic. */
 export function roundHalfUp(numerator: bigint, denominator: bigint): bigint {
   if (numerator < 0n || denominator <= 0n) {
-    throw new Error("HALF_UP accepts a non-negative numerator and positive denominator");
+    throw new Error(
+      "HALF_UP accepts a non-negative numerator and positive denominator",
+    );
   }
   const quotient = numerator / denominator;
   const remainder = numerator % denominator;
@@ -121,10 +123,7 @@ export function calculateSimpleInterest(
   if (input.principalMinor <= 0n) {
     throw new Error("Principal must be greater than zero");
   }
-  if (
-    input.annualRatePpm < 0n ||
-    input.annualRatePpm > MAX_ANNUAL_RATE_PPM
-  ) {
+  if (input.annualRatePpm < 0n || input.annualRatePpm > MAX_ANNUAL_RATE_PPM) {
     throw new Error("Annual APR must be between 0% and 1000%");
   }
 
@@ -147,10 +146,14 @@ export function addAccrualFractions(
   let numerator = 0n;
   for (const fraction of fractions) {
     if (fraction.numerator < 0n || fraction.denominator <= 0n) {
-      throw new Error("Accrual fractions must be non-negative with positive denominators");
+      throw new Error(
+        "Accrual fractions must be non-negative with positive denominators",
+      );
     }
     if (ACT_365_DENOMINATOR % fraction.denominator !== 0n) {
-      throw new Error("Accrual denominator is not compatible with ACT/365 Fixed");
+      throw new Error(
+        "Accrual denominator is not compatible with ACT/365 Fixed",
+      );
     }
     numerator +=
       fraction.numerator * (ACT_365_DENOMINATOR / fraction.denominator);

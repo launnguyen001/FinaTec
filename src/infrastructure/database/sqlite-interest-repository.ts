@@ -1,7 +1,13 @@
 import { and, asc, eq, gte } from "drizzle-orm";
 
-import { fromSqliteInteger, toSqliteSafeInteger } from "../../domain/ledger/money";
-import { validateJournalEntry, type PostingContext } from "../../domain/ledger/posting";
+import {
+  fromSqliteInteger,
+  toSqliteSafeInteger,
+} from "../../domain/ledger/money";
+import {
+  validateJournalEntry,
+  type PostingContext,
+} from "../../domain/ledger/posting";
 import type {
   InterestAccrual,
   InterestPlan,
@@ -34,7 +40,9 @@ function mapPlan(row: typeof interestPlans.$inferSelect): InterestPlan {
   };
 }
 
-function mapAccrual(row: typeof interestAccruals.$inferSelect): InterestAccrual {
+function mapAccrual(
+  row: typeof interestAccruals.$inferSelect,
+): InterestAccrual {
   return {
     ...row,
     principalMinor: fromSqliteInteger(row.principalMinor),
@@ -108,7 +116,9 @@ export class SqliteInterestRepository implements InterestRepository {
     return row ? mapAccrual(row) : null;
   }
 
-  async findAccrualByIdempotencyKey(key: string): Promise<InterestAccrual | null> {
+  async findAccrualByIdempotencyKey(
+    key: string,
+  ): Promise<InterestAccrual | null> {
     const row = await this.db
       .select()
       .from(interestAccruals)
@@ -122,7 +132,10 @@ export class SqliteInterestRepository implements InterestRepository {
       .select()
       .from(interestAccruals)
       .where(eq(interestAccruals.planId, planId))
-      .orderBy(asc(interestAccruals.periodStart), asc(interestAccruals.createdAt))
+      .orderBy(
+        asc(interestAccruals.periodStart),
+        asc(interestAccruals.createdAt),
+      )
       .all();
     return rows.map(mapAccrual);
   }
@@ -149,7 +162,10 @@ export class SqliteInterestRepository implements InterestRepository {
         and(
           eq(journalLines.accountId, plan.principalAccountId),
           eq(journalEntries.status, "POSTED"),
-          gte(journalEntries.occurredAt, `${this.nextDate(plan.startDate)}T00:00:00.000Z`),
+          gte(
+            journalEntries.occurredAt,
+            `${this.nextDate(plan.startDate)}T00:00:00.000Z`,
+          ),
         ),
       )
       .all();
@@ -176,7 +192,9 @@ export class SqliteInterestRepository implements InterestRepository {
         input.journalEntry.postedAt !== input.postedAt ||
         input.journalEntry.idempotencyKey !== accrualRow.idempotencyKey
       ) {
-        throw new Error("Interest posting identity or status does not match its accrual");
+        throw new Error(
+          "Interest posting identity or status does not match its accrual",
+        );
       }
 
       validateJournalEntry(
@@ -191,7 +209,9 @@ export class SqliteInterestRepository implements InterestRepository {
         .where(eq(journalEntries.idempotencyKey, accrualRow.idempotencyKey))
         .get();
       if (existing) {
-        throw new Error("Interest journal exists without a committed accrual transition");
+        throw new Error(
+          "Interest journal exists without a committed accrual transition",
+        );
       }
 
       const persistedLines = this.toPersistenceLines(input.journalLines);
@@ -215,7 +235,8 @@ export class SqliteInterestRepository implements InterestRepository {
         throw new Error("Interest Journal Entry could not be posted");
       }
 
-      const nextStatus = accrualRow.accrualKind === "PAYOUT" ? "PAID" : "POSTED";
+      const nextStatus =
+        accrualRow.accrualKind === "PAYOUT" ? "PAID" : "POSTED";
       const updated = tx
         .update(interestAccruals)
         .set({
@@ -280,7 +301,9 @@ export class SqliteInterestRepository implements InterestRepository {
         line.lineNumber <= 0 ||
         numbers.has(line.lineNumber)
       ) {
-        throw new Error("Journal line numbers must be unique positive integers");
+        throw new Error(
+          "Journal line numbers must be unique positive integers",
+        );
       }
       ids.add(line.id);
       numbers.add(line.lineNumber);
