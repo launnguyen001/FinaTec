@@ -16,7 +16,7 @@ TASK-05 phụ thuộc TASK-02 và TASK-04. TASK-04 không phụ thuộc việc h
 
 ## Tác động acceptance
 
-- TASK-04 criterion “tiền gửi có lãi ghi nhận theo kỳ, không ghi nhận lãi chưa đến hạn” được chuyển thành integration requirement của TASK-05. TASK-04 chỉ phải bảo đảm không coi lãi dự kiến/accrued chưa posted là số dư đã xác nhận.
+- Acceptance về accrual/capitalization/payout của tiền gửi có kỳ hạn thuộc TASK-05. TASK-04 chỉ cung cấp phân loại account INVESTMENT; số dư vẫn lấy từ Core Ledger và không được cộng thêm lần hai.
 - TASK-05 phải kiểm thử capitalization tăng principal đúng một lần; payout tăng đúng ACCOUNT; accrued chưa posted không làm thay đổi Ledger; catch-up idempotent.
 - Không tự chọn APR/APY, day-count, compounding frequency, kỳ tính hoặc rounding. Các convention phải được owner duyệt bằng ví dụ tham chiếu trước implementation.
 
@@ -30,7 +30,7 @@ TASK-05 phụ thuộc TASK-02 và TASK-04. TASK-04 không phụ thuộc việc h
 
 1. 15/15 Android SQLCipher acceptance giữ PASS trên đúng commit cuối của TASK-04.
 2. TypeScript, lint, format, unit tests và CI PASS trên PR head cuối.
-3. Asset metadata/contract không chứa hoặc tự tính interest accrual; accrued chưa posted không được cộng vào Ledger/confirmed asset value.
+3. TASK-04 không có interest calculator/accrual/journal posting riêng; stable-value balances không được mirror ngoài Core Ledger.
 4. Migration chain từ Core Finance đã merge tới migration mới nhất chạy fresh và upgrade; rollback atomic.
 5. Archive chỉ cho phép khi remaining quantity bằng 0; archive asset type chỉ sau khi mọi profile đã archived.
 6. iOS runtime ghi NOT VERIFIED; metals provider ghi DEFERRED; background scheduling ghi BEST-EFFORT, không giả định đã kiểm thử trên mọi OS.
