@@ -44,6 +44,29 @@ Phải chốt công thức và quy tắc làm tròn trước khi lập trình. K
 - Accrued, posted và paid là các trạng thái khác nhau; không được coi accrued là đã tăng Ledger balance trước khi posting.
 - Dữ liệu lãi phải truy vết được về plan, kỳ tính, nguồn principal/rate và Journal Entry.
 
+## 4.1. Kết quả audit contract hiện hữu
+
+### TASK-02 — Ledger / Accounting
+
+- `LedgerRepository` đã có `commitPostedEntry(PostingCommitInput)` với contract atomic cho Journal Entry và Journal Lines; repository enforce idempotency key, balancing, account currency và posted-history invariants.
+- `AccountingService.postEntry()` validate posting context rồi gọi `commitPostedEntry()`; nếu InterestAccrual được ghi sau lời gọi này bằng một repository command khác thì hai write không atomic. Không được dùng hai lệnh độc lập cho một accrual.
+- TASK-05 cần một atomic repository command duy nhất để persist InterestAccrual + Journal Entry + Journal Lines, cùng transaction SQLite; idempotency key phải unique theo plan + period + accrual kind. Có thể tái sử dụng domain posting validator/plan builder, nhưng không được bypass validation.
+- Balance là derived từ POSTED journal lines; không thêm principal/balance column vào Account. Mọi InterestPlan phải tham chiếu Account ASSET hoặc LIABILITY phù hợp và dùng native currency của Account.
+
+### TASK-04 — Asset / Account
+
+- TASK-04 đã merge. Cờ `isInvestment` chỉ áp dụng cho ASSET Account và Dashboard loại các account này khỏi available cash.
+- Term deposit dùng một ASSET Account riêng, có thể đánh dấu INVESTMENT; InterestPlan giữ điều khoản/kỳ hạn và tham chiếu accountId. Principal/currency lấy từ Ledger, không lưu số dư principal trùng lặp.
+- TASK-05 không cần thay đổi Asset schema, không phụ thuộc market-price provider và không ghi lãi vào Asset lot/cost basis.
+- Branch `task/05-interest-engine` đã được đồng bộ với `main`; `main` là baseline duy nhất kể từ merge Task04.
+
+### Hạch toán dự kiến — cần xác nhận theo use case
+
+- Lãi tài sản khi capitalization: Debit deposit ASSET / Credit interest INCOME.
+- Lãi tài sản khi payout: Debit receiving ASSET / Credit interest INCOME; không thay đổi principal deposit account.
+- Lãi nợ khi accrue: Debit interest EXPENSE / Credit LIABILITY; khi thanh toán: Debit LIABILITY / Credit funding ASSET.
+- Accrued chưa POSTED là record theo dõi, không làm thay đổi Ledger. Capitalization/payout phải commit cùng InterestAccrual state transition để không double-count.
+
 ## 5. Các quyết định cần khóa trước implementation
 
 1. APR/APY: semantics, conversion rules và có hỗ trợ cả hai hay chỉ một số convention.
@@ -58,6 +81,25 @@ Phải chốt công thức và quy tắc làm tròn trước khi lập trình. K
 10. Posting: tài khoản đối ứng, category và trạng thái khi accrue, post, capitalize hoặc payout.
 
 Không implement formula cho đến khi các quyết định liên quan được ghi thành bảng ví dụ tham chiếu và được owner duyệt.
+
+### 5.1. Đề xuất baseline MVP — CHỜ OWNER DUYỆT
+
+| Quyết định | Đề xuất | Lý do / giới hạn |
+|---|---|---|
+| Rate input | Hỗ trợ nominal APR trước; APY chỉ bổ sung sau khi có conversion tests | Tránh nhập nhằng APR/APY trong MVP |
+| Day-count | ACT/365 Fixed | Dễ giải thích, kiểm thử được; không giả định 30/360 |
+| Accrual | Daily accrual, giữ precision nội bộ | Tính bù theo ngày rõ ràng |
+| Posting | Monthly và at-maturity; không post daily | Giảm số Journal Entry, accrued tách khỏi posted |
+| Compounding | Simple interest mặc định; compound chỉ khi plan bật và chỉ sau capitalization | Không nhập lãi vào principal trước ngày được duyệt |
+| Period boundary | Calendar-day theo app timezone; timestamp lưu UTC; start inclusive/end exclusive | Tránh đếm trùng ngày ở ranh giới kỳ |
+| Rounding | Chỉ round khi posting về currency minor unit, HALF_UP; giữ fractional carry ở accrual chưa post | Tránh drift do round từng ngày |
+| Principal changes | Không tự suy luận; mọi nạp/rút principal phải có effective timestamp và chia kỳ tính tại thời điểm biến động | Không tính lãi trên principal sai |
+| Early withdrawal | Dừng accrual tại effective close date; penalty/forfeiture chỉ hỗ trợ khi owner định nghĩa riêng | Không tự đặt mức phạt |
+| Liability | Engine/calculator dùng chung; MVP triển khai asset-interest trước, liability posting sau khi TASK-06 chốt debt contract | Tránh trùng phạm vi với TASK-06 |
+| Catch-up | Tính từng kỳ còn thiếu theo plan version; giới hạn batch, unique plan-period key | Retry an toàn và có thể audit |
+
+Các đề xuất trên chưa phải business rules đã khóa. Cần owner duyệt hoặc chỉnh trước khi viết calculator/migration.
+
 
 ## 6. Thay đổi dự kiến
 
