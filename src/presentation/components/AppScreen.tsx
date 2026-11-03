@@ -360,6 +360,11 @@ export function AppScreen() {
         ) : null}
 
         {__DEV__ && Platform.OS !== "web" ? (
+          <Link href="/task04-asset-acceptance" style={styles.devLink}>
+            Task04 Asset Acceptance
+          </Link>
+        ) : null}
+        {__DEV__ && Platform.OS !== "web" ? (
           <Link href="/database-file-diagnostic" style={styles.devLink}>
             Chẩn đoán file SQLCipher (development)
           </Link>
