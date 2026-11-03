@@ -4,7 +4,6 @@ export type JournalStatus = "DRAFT" | "POSTED";
 export type JournalSide = "DEBIT" | "CREDIT";
 export type AccountSubtype = "CASH" | "BANK" | "EWALLET" | "SAVINGS" | "OTHER";
 export type TransactionKind = "INCOME" | "EXPENSE" | "TRANSFER" | "OPENING_BALANCE" | "ADJUSTMENT" | "REVERSAL" | "LEGACY";
-export type PostingPurpose = "STANDARD" | "ARCHIVED_ACCOUNT_SETTLEMENT" | "ARCHIVED_ACCOUNT_ADJUSTMENT" | "ARCHIVED_ACCOUNT_REVERSAL";
 
 export interface CurrencyRecord {
   code: string;
@@ -36,8 +35,6 @@ export interface JournalEntry {
   reversalOfId: string | null;
   transactionKind?: TransactionKind;
   categoryId?: string | null;
-  postingPurpose?: PostingPurpose;
-  auditReason?: string | null;
   createdAt: string;
   postedAt: string | null;
 }
