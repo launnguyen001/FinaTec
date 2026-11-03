@@ -46,7 +46,9 @@ async function expectFailure(
   throw new Error(`${label}: command unexpectedly succeeded`);
 }
 
-export async function runLiabilityAcceptanceDiagnostic(): Promise<LiabilityAcceptanceResult> {
+export async function runLiabilityAcceptanceDiagnostic(): Promise<
+  LiabilityAcceptanceResult
+> {
   const suffix = toHex(await Crypto.getRandomBytesAsync(6));
   const databaseName = `task06-liability-acceptance-${suffix}.db`;
   const secureStoreName = `ketso.task06.acceptance.${suffix}`;
