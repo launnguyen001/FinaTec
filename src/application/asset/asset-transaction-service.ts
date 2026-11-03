@@ -226,9 +226,7 @@ export class AssetTransactionService {
     return { created: result.created, lotId };
   }
 
-  async sell(
-    input: SellAssetInput,
-  ): Promise<{
+  async sell(input: SellAssetInput): Promise<{
     created: boolean;
     calculation: ReturnType<typeof calculateSale> | null;
   }> {
@@ -425,9 +423,7 @@ export class AssetTransactionService {
     return result;
   }
 
-  async mergeDca(
-    componentLotIds: string[],
-  ): Promise<{
+  async mergeDca(componentLotIds: string[]): Promise<{
     aggregateLotId: string;
     aggregate: Awaited<ReturnType<AssetRepository["mergeDca"]>>;
   }> {
