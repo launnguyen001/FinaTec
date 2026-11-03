@@ -72,7 +72,10 @@ export interface AssetRepository {
     transaction: AssetTransactionWrite;
     posting: PostingCommitInput;
     quantityPrecision: number;
-  }): Promise<{ created: boolean; calculation: import("./asset").SaleCalculation | null }>;
+  }): Promise<{
+    created: boolean;
+    calculation: import("./asset").SaleCalculation | null;
+  }>;
   mergeDca(input: {
     aggregateLotId: string;
     componentLotIds: string[];
