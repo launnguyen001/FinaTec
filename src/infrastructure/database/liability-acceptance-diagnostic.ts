@@ -180,8 +180,11 @@ export async function runLiabilityAcceptanceDiagnostic(): Promise<LiabilityAccep
       annualRatePpm: 120_000n,
       repaymentMethod: "EQUAL_PRINCIPAL",
       termMonths: 3,
-      startDate: "2026-08-01",
-      firstDueDate: "2026-09-01",
+      // Only the first installment is due at currentTime (2026-11-04).
+      // Keeping later installments in the future makes this a deterministic
+      // single-installment allocation assertion rather than a multi-overdue test.
+      startDate: "2026-10-01",
+      firstDueDate: "2026-11-01",
       timezoneId: "UTC",
     });
     const initialCash = calculateAccountBalance(
@@ -220,14 +223,18 @@ export async function runLiabilityAcceptanceDiagnostic(): Promise<LiabilityAccep
       count: number;
     }>("SELECT COUNT(*) AS count FROM journal_entries");
     check(
-      "Partial payment allocation and idempotency",
+      "Partial payment interest-first allocation",
       partial.interestPaidMinor === 1_000n &&
         partial.principalPaidMinor === 4_000n &&
         partialBalance.recordedPrincipalMinor === 96_000n &&
-        partialBalance.differenceMinor === 0n &&
-        retry.id === partial.id &&
+        partialBalance.differenceMinor === 0n,
+      `actual interest=${partial.interestPaidMinor}, principal=${partial.principalPaidMinor}, subledger principal=${partialBalance.recordedPrincipalMinor}, reconciliation difference=${partialBalance.differenceMinor}`,
+    );
+    check(
+      "Payment idempotent retry",
+      retry.id === partial.id &&
         journalCountAfterPayment?.count === journalCountAfterRetry?.count,
-      "interest was allocated before principal; Ledger and liability balances reconcile; retry did not duplicate the journal",
+      `original payment id=${partial.id}, retry payment id=${retry.id}, journals before retry=${journalCountAfterPayment?.count}, journals after retry=${journalCountAfterRetry?.count}`,
     );
 
     await service.reversePayment(partial.id, "Acceptance reversal");
