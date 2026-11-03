@@ -1,8 +1,5 @@
 export type RepaymentMethod =
-  | "DECLINING"
-  | "EQUAL_PRINCIPAL"
-  | "ANNUITY"
-  | "INTEREST_ONLY";
+  "DECLINING" | "EQUAL_PRINCIPAL" | "ANNUITY" | "INTEREST_ONLY";
 
 export interface RepaymentScheduleInput {
   principalMinor: bigint;
@@ -44,14 +41,20 @@ const MAX_TERM_MONTHS = 600;
 
 export function roundHalfUp(numerator: bigint, denominator: bigint): bigint {
   if (numerator < 0n || denominator <= 0n) {
-    throw new Error("HALF_UP requires a non-negative numerator and positive denominator");
+    throw new Error(
+      "HALF_UP requires a non-negative numerator and positive denominator",
+    );
   }
   const quotient = numerator / denominator;
   const remainder = numerator % denominator;
   return remainder * 2n >= denominator ? quotient + 1n : quotient;
 }
 
-function parseDate(value: string): { year: number; month: number; day: number } {
+function parseDate(value: string): {
+  year: number;
+  month: number;
+  day: number;
+} {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     throw new Error("Date must use YYYY-MM-DD format");
   }
@@ -89,7 +92,11 @@ export function addMonthsClamped(anchorDate: string, months: number): string {
   const absoluteMonth = anchor.year * 12 + (anchor.month - 1) + months;
   const year = Math.floor(absoluteMonth / 12);
   const month = (absoluteMonth % 12) + 1;
-  return dateToString(year, month, Math.min(anchor.day, daysInMonth(year, month)));
+  return dateToString(
+    year,
+    month,
+    Math.min(anchor.day, daysInMonth(year, month)),
+  );
 }
 
 export function countActualDays(startDate: string, endDate: string): number {
@@ -110,7 +117,11 @@ export function calculateAnnuityPayment(
   annualRatePpm: bigint,
   termMonths: number,
 ): bigint {
-  if (principalMinor <= 0n || !Number.isInteger(termMonths) || termMonths <= 0) {
+  if (
+    principalMinor <= 0n ||
+    !Number.isInteger(termMonths) ||
+    termMonths <= 0
+  ) {
     throw new Error("Principal and term must be positive");
   }
   if (annualRatePpm < 0n || annualRatePpm > MAX_ANNUAL_RATE_PPM) {
@@ -133,10 +144,7 @@ export function calculateRepaymentSchedule(
   input: RepaymentScheduleInput,
 ): RepaymentSchedule {
   if (input.principalMinor <= 0n) throw new Error("Principal must be positive");
-  if (
-    input.annualRatePpm < 0n ||
-    input.annualRatePpm > MAX_ANNUAL_RATE_PPM
-  ) {
+  if (input.annualRatePpm < 0n || input.annualRatePpm > MAX_ANNUAL_RATE_PPM) {
     throw new Error("APR must be between 0% and 1000%");
   }
   if (
@@ -155,21 +163,34 @@ export function calculateRepaymentSchedule(
   const declining = input.decliningPrincipalMinor;
   if (input.method === "DECLINING") {
     if (!declining || declining.length !== input.termMonths) {
-      throw new Error("DECLINING requires one principal amount for every installment");
+      throw new Error(
+        "DECLINING requires one principal amount for every installment",
+      );
     }
     if (declining.some((amount) => amount < 0n)) {
       throw new Error("Scheduled principal cannot be negative");
     }
-    if (declining.reduce((sum, amount) => sum + amount, 0n) !== input.principalMinor) {
-      throw new Error("DECLINING principal installments must sum exactly to the original principal");
+    if (
+      declining.reduce((sum, amount) => sum + amount, 0n) !==
+      input.principalMinor
+    ) {
+      throw new Error(
+        "DECLINING principal installments must sum exactly to the original principal",
+      );
     }
   } else if (declining !== undefined) {
-    throw new Error("Custom principal installments are only valid for DECLINING");
+    throw new Error(
+      "Custom principal installments are only valid for DECLINING",
+    );
   }
 
   const annuityPayment =
     input.method === "ANNUITY"
-      ? calculateAnnuityPayment(input.principalMinor, input.annualRatePpm, input.termMonths)
+      ? calculateAnnuityPayment(
+          input.principalMinor,
+          input.annualRatePpm,
+          input.termMonths,
+        )
       : null;
   const equalBase = input.principalMinor / BigInt(input.termMonths);
   const equalRemainder = input.principalMinor % BigInt(input.termMonths);
@@ -185,11 +206,18 @@ export function calculateRepaymentSchedule(
     const openingPrincipalMinor = balance;
     const interestNumerator =
       input.method === "DECLINING"
-        ? balance * input.annualRatePpm * BigInt(countActualDays(periodStart, dueDate))
+        ? balance *
+          input.annualRatePpm *
+          BigInt(countActualDays(periodStart, dueDate))
         : balance * input.annualRatePpm;
     const interestDenominator =
-      input.method === "DECLINING" ? RATE_SCALE * 365n : MONTHLY_RATE_DENOMINATOR;
-    const interestDueMinor = roundHalfUp(interestNumerator, interestDenominator);
+      input.method === "DECLINING"
+        ? RATE_SCALE * 365n
+        : MONTHLY_RATE_DENOMINATOR;
+    const interestDueMinor = roundHalfUp(
+      interestNumerator,
+      interestDenominator,
+    );
 
     let principalDueMinor: bigint;
     switch (input.method) {
@@ -206,7 +234,9 @@ export function calculateRepaymentSchedule(
             ? balance
             : annuityPayment! - interestDueMinor;
         if (principalDueMinor < 0n) {
-          throw new Error("Annuity payment is below the period interest; increase payment or reduce APR");
+          throw new Error(
+            "Annuity payment is below the period interest; increase payment or reduce APR",
+          );
         }
         if (principalDueMinor > balance) principalDueMinor = balance;
         break;
@@ -215,7 +245,9 @@ export function calculateRepaymentSchedule(
         break;
     }
     if (principalDueMinor > balance) {
-      throw new Error(`Principal due exceeds outstanding balance at installment ${index + 1}`);
+      throw new Error(
+        `Principal due exceeds outstanding balance at installment ${index + 1}`,
+      );
     }
     balance -= principalDueMinor;
     const totalDueMinor = principalDueMinor + interestDueMinor;
@@ -236,7 +268,9 @@ export function calculateRepaymentSchedule(
   }
 
   if (balance !== 0n || totalPrincipalMinor !== input.principalMinor) {
-    throw new Error("Repayment schedule does not fully amortize the original principal");
+    throw new Error(
+      "Repayment schedule does not fully amortize the original principal",
+    );
   }
   return {
     method: input.method,

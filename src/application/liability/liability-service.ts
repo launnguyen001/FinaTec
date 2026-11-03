@@ -1,6 +1,11 @@
 import { Currency } from "../../domain/ledger/currency";
 import { calculateAccountBalance } from "../../domain/ledger/posting";
-import type { Account, JournalEntry, JournalLine, LedgerRepository } from "../../domain/ledger/repository";
+import type {
+  Account,
+  JournalEntry,
+  JournalLine,
+  LedgerRepository,
+} from "../../domain/ledger/repository";
 import type {
   EarlyPaymentPolicy,
   Liability,
@@ -50,7 +55,8 @@ export interface LiabilityServiceOptions {
 
 function localDateAt(timestamp: string, timezoneId: string): string {
   const date = new Date(timestamp);
-  if (Number.isNaN(date.getTime())) throw new Error("Payment timestamp is invalid");
+  if (Number.isNaN(date.getTime()))
+    throw new Error("Payment timestamp is invalid");
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: timezoneId,
     year: "numeric",
@@ -66,8 +72,9 @@ function allocateEvenly(total: bigint, count: number): bigint[] {
   const divisor = BigInt(count);
   const base = total / divisor;
   const remainder = total % divisor;
-  return Array.from({ length: count }, (_, index) =>
-    base + (BigInt(index) < remainder ? 1n : 0n),
+  return Array.from(
+    { length: count },
+    (_, index) => base + (BigInt(index) < remainder ? 1n : 0n),
   );
 }
 
@@ -77,7 +84,8 @@ function installmentStatus(
   principalDue: bigint,
   interestDue: bigint,
 ): RepaymentStatus {
-  if (principalPaid === principalDue && interestPaid === interestDue) return "PAID";
+  if (principalPaid === principalDue && interestPaid === interestDue)
+    return "PAID";
   if (principalPaid > 0n || interestPaid > 0n) return "PARTIALLY_PAID";
   return "UPCOMING";
 }
@@ -96,36 +104,60 @@ export class LiabilityService {
   async create(input: CreateLiabilityInput): Promise<Liability> {
     const name = input.name.trim();
     if (!name) throw new Error("Liability name is required");
-    if (input.principalMinor <= 0n) throw new Error("Loan principal must be positive");
+    if (input.principalMinor <= 0n)
+      throw new Error("Loan principal must be positive");
     if (input.annualRatePpm < 0n || input.annualRatePpm > 10_000_000n) {
       throw new Error("Annual APR must be between 0% and 1000%");
     }
-    const [liabilityAccount, receivingAccount, interestAccount] = await Promise.all([
-      this.requireAccount(input.liabilityAccountId),
-      this.requireAccount(input.receivingAccountId),
-      this.requireAccount(input.interestExpenseAccountId),
-    ]);
-    if (liabilityAccount.type !== "LIABILITY") throw new Error("Loan account must have LIABILITY type");
-    if (receivingAccount.type !== "ASSET") throw new Error("Loan proceeds must be received by an ASSET account");
-    if (interestAccount.type !== "EXPENSE") throw new Error("Interest counterpart must have EXPENSE type");
+    const [liabilityAccount, receivingAccount, interestAccount] =
+      await Promise.all([
+        this.requireAccount(input.liabilityAccountId),
+        this.requireAccount(input.receivingAccountId),
+        this.requireAccount(input.interestExpenseAccountId),
+      ]);
+    if (liabilityAccount.type !== "LIABILITY")
+      throw new Error("Loan account must have LIABILITY type");
+    if (receivingAccount.type !== "ASSET")
+      throw new Error("Loan proceeds must be received by an ASSET account");
+    if (interestAccount.type !== "EXPENSE")
+      throw new Error("Interest counterpart must have EXPENSE type");
     const currencyCode = liabilityAccount.currencyCode;
-    const currencyRecord = (await this.ledger.listCurrencies(false)).find((item) => item.code === currencyCode);
-    if (!currencyRecord) throw new Error("Liability account currency is unavailable");
+    const currencyRecord = (await this.ledger.listCurrencies(false)).find(
+      (item) => item.code === currencyCode,
+    );
+    if (!currencyRecord)
+      throw new Error("Liability account currency is unavailable");
     const liabilityBalance = calculateAccountBalance(
       liabilityAccount,
       await this.ledger.listPostedJournalLinesForAccount(liabilityAccount.id),
       new Currency(currencyRecord.code, currencyRecord.minorUnit),
     ).minorUnits;
-    if (liabilityBalance !== 0n) throw new Error("A new liability must use an account with zero Ledger balance");
-    if ([receivingAccount, interestAccount].some((account) => account.currencyCode !== currencyCode)) {
-      throw new Error("Loan, receiving and interest accounts must use the same currency");
+    if (liabilityBalance !== 0n)
+      throw new Error(
+        "A new liability must use an account with zero Ledger balance",
+      );
+    if (
+      [receivingAccount, interestAccount].some(
+        (account) => account.currencyCode !== currencyCode,
+      )
+    ) {
+      throw new Error(
+        "Loan, receiving and interest accounts must use the same currency",
+      );
     }
     const baseCurrency = await this.ledger.getBaseCurrencyCode();
     if (baseCurrency !== currencyCode) {
-      throw new Error("Liability MVP posting currently requires accounts in the Ledger base currency");
+      throw new Error(
+        "Liability MVP posting currently requires accounts in the Ledger base currency",
+      );
     }
-    const timezoneId = input.timezoneId ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC";
-    try { new Intl.DateTimeFormat("en-US", { timeZone: timezoneId }); } catch {
+    const timezoneId =
+      input.timezoneId ??
+      Intl.DateTimeFormat().resolvedOptions().timeZone ??
+      "UTC";
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone: timezoneId });
+    } catch {
       throw new Error("Timezone must be a valid IANA timezone");
     }
     const timestamp = this.now();
@@ -144,7 +176,8 @@ export class LiabilityService {
       startDate: input.startDate,
       firstDueDate: input.firstDueDate,
       timezoneId,
-      earlyPaymentPolicy: input.earlyPaymentPolicy ?? "KEEP_MATURITY_REDUCE_INSTALLMENT",
+      earlyPaymentPolicy:
+        input.earlyPaymentPolicy ?? "KEEP_MATURITY_REDUCE_INSTALLMENT",
       status: "ACTIVE",
       createdAt: timestamp,
       updatedAt: timestamp,
@@ -177,10 +210,30 @@ export class LiabilityService {
       baseCurrency!,
     );
     const journalLines = [
-      this.createLine(journalEntry.id, 1, receivingAccount, "DEBIT", input.principalMinor, timestamp, "Loan proceeds received"),
-      this.createLine(journalEntry.id, 2, liabilityAccount, "CREDIT", input.principalMinor, timestamp, "Initial loan principal"),
+      this.createLine(
+        journalEntry.id,
+        1,
+        receivingAccount,
+        "DEBIT",
+        input.principalMinor,
+        timestamp,
+        "Loan proceeds received",
+      ),
+      this.createLine(
+        journalEntry.id,
+        2,
+        liabilityAccount,
+        "CREDIT",
+        input.principalMinor,
+        timestamp,
+        "Initial loan principal",
+      ),
     ];
-    await this.repository.createLiability({ liability, installments, journal: { journalEntry, journalLines } });
+    await this.repository.createLiability({
+      liability,
+      installments,
+      journal: { journalEntry, journalLines },
+    });
     return liability;
   }
 
@@ -199,47 +252,84 @@ export class LiabilityService {
   async syncStatuses(): Promise<void> {
     for (const liability of await this.repository.list()) {
       if (liability.status !== "ACTIVE") continue;
-      await this.repository.syncStatuses(liability.id, localDateAt(this.now(), liability.timezoneId));
+      await this.repository.syncStatuses(
+        liability.id,
+        localDateAt(this.now(), liability.timezoneId),
+      );
     }
   }
 
-  async recordPayment(input: RecordLiabilityPaymentInput): Promise<LiabilityPayment> {
+  async recordPayment(
+    input: RecordLiabilityPaymentInput,
+  ): Promise<LiabilityPayment> {
     const key = input.idempotencyKey.trim();
     if (!key) throw new Error("Payment idempotency key is required");
-    const existing = (await this.repository.listPayments(input.liabilityId)).find((item) => item.idempotencyKey === key);
+    const existing = (
+      await this.repository.listPayments(input.liabilityId)
+    ).find((item) => item.idempotencyKey === key);
     if (existing) return existing;
-    if (input.amountMinor <= 0n) throw new Error("Payment amount must be positive");
+    if (input.amountMinor <= 0n)
+      throw new Error("Payment amount must be positive");
     const feeMinor = input.feeMinor ?? 0n;
     if (feeMinor < 0n) throw new Error("Fee cannot be negative");
 
     const liability = await this.requireLiability(input.liabilityId);
-    if (liability.status !== "ACTIVE") throw new Error("Only an ACTIVE liability can be paid");
+    if (liability.status !== "ACTIVE")
+      throw new Error("Only an ACTIVE liability can be paid");
     const [source, feeAccount] = await Promise.all([
       this.requireAccount(input.sourceAccountId),
       input.feeMinor && input.feeMinor > 0n
         ? this.requireAccount(input.feeExpenseAccountId ?? "")
         : Promise.resolve(null),
     ]);
-    if (source.type !== "ASSET" || source.currencyCode !== liability.currencyCode) {
-      throw new Error("Payment source must be an ASSET account in the liability currency");
+    if (
+      source.type !== "ASSET" ||
+      source.currencyCode !== liability.currencyCode
+    ) {
+      throw new Error(
+        "Payment source must be an ASSET account in the liability currency",
+      );
     }
-    if (feeMinor > 0n && (!feeAccount || feeAccount.type !== "EXPENSE" || feeAccount.currencyCode !== liability.currencyCode)) {
-      throw new Error("A positive fee requires an EXPENSE account in the liability currency");
+    if (
+      feeMinor > 0n &&
+      (!feeAccount ||
+        feeAccount.type !== "EXPENSE" ||
+        feeAccount.currencyCode !== liability.currencyCode)
+    ) {
+      throw new Error(
+        "A positive fee requires an EXPENSE account in the liability currency",
+      );
     }
     const baseCurrency = await this.ledger.getBaseCurrencyCode();
     if (baseCurrency !== liability.currencyCode) {
-      throw new Error("Liability payments currently require the Ledger base currency");
+      throw new Error(
+        "Liability payments currently require the Ledger base currency",
+      );
     }
 
     const paidAt = input.paidAt ?? this.now();
     const localDate = localDateAt(paidAt, liability.timezoneId);
     await this.repository.syncStatuses(liability.id, localDate);
     const schedules = await this.repository.listInstallments(liability.id);
-    const due = schedules.filter((item) => item.dueDate <= localDate && item.status !== "PAID" && item.status !== "CANCELLED");
+    const due = schedules.filter(
+      (item) =>
+        item.dueDate <= localDate &&
+        item.status !== "PAID" &&
+        item.status !== "CANCELLED",
+    );
     if (input.scheduleId) {
       const selected = due.find((item) => item.id === input.scheduleId);
-      if (!selected) throw new Error("Selected installment is not due or does not belong to this liability");
-      due.sort((a, b) => a.id === selected.id ? -1 : b.id === selected.id ? 1 : a.sequence - b.sequence);
+      if (!selected)
+        throw new Error(
+          "Selected installment is not due or does not belong to this liability",
+        );
+      due.sort((a, b) =>
+        a.id === selected.id
+          ? -1
+          : b.id === selected.id
+            ? 1
+            : a.sequence - b.sequence,
+      );
     } else {
       due.sort((a, b) => a.sequence - b.sequence);
     }
@@ -253,7 +343,10 @@ export class LiabilityService {
       const interestLeft = item.interestDueMinor - item.interestPaidMinor;
       const allocated = remaining < interestLeft ? remaining : interestLeft;
       if (allocated > 0n) {
-        const next = { ...item, interestPaidMinor: item.interestPaidMinor + allocated };
+        const next = {
+          ...item,
+          interestPaidMinor: item.interestPaidMinor + allocated,
+        };
         updates.set(item.id, next);
         interestPaid += allocated;
         remaining -= allocated;
@@ -262,10 +355,14 @@ export class LiabilityService {
     for (const item of due) {
       if (remaining <= 0n) break;
       const current = updates.get(item.id) ?? item;
-      const principalLeft = current.principalDueMinor - current.principalPaidMinor;
+      const principalLeft =
+        current.principalDueMinor - current.principalPaidMinor;
       const allocated = remaining < principalLeft ? remaining : principalLeft;
       if (allocated > 0n) {
-        updates.set(item.id, { ...current, principalPaidMinor: current.principalPaidMinor + allocated });
+        updates.set(item.id, {
+          ...current,
+          principalPaidMinor: current.principalPaidMinor + allocated,
+        });
         principalPaid += allocated;
         remaining -= allocated;
       }
@@ -277,7 +374,8 @@ export class LiabilityService {
     const extraPrincipal = remaining;
     principalPaid += extraPrincipal;
     remaining = 0n;
-    if (principalPaid > outstanding) throw new Error("Principal payment exceeds outstanding balance");
+    if (principalPaid > outstanding)
+      throw new Error("Principal payment exceeds outstanding balance");
 
     const timestamp = this.now();
     const installmentUpdates: LiabilityInstallment[] = [];
@@ -286,15 +384,30 @@ export class LiabilityService {
       const interestNow = item.interestPaidMinor;
       installmentUpdates.push({
         ...item,
-        status: installmentStatus(principalNow, interestNow, item.principalDueMinor, item.interestDueMinor),
+        status: installmentStatus(
+          principalNow,
+          interestNow,
+          item.principalDueMinor,
+          item.interestDueMinor,
+        ),
         updatedAt: timestamp,
       });
     }
 
-    const future = schedules.filter((item) => item.dueDate > localDate && item.status !== "CANCELLED" && item.status !== "PAID");
+    const future = schedules.filter(
+      (item) =>
+        item.dueDate > localDate &&
+        item.status !== "CANCELLED" &&
+        item.status !== "PAID",
+    );
     const newInstallments: LiabilityInstallment[] = [];
     if (extraPrincipal > 0n && future.length > 0) {
-      for (const item of future) installmentUpdates.push({ ...item, status: "CANCELLED", updatedAt: timestamp });
+      for (const item of future)
+        installmentUpdates.push({
+          ...item,
+          status: "CANCELLED",
+          updatedAt: timestamp,
+        });
       const newBalance = outstanding - principalPaid;
       if (newBalance > 0n) {
         const nextDueDate = future[0]!.dueDate;
@@ -303,15 +416,20 @@ export class LiabilityService {
           const target = future[0]!.totalDueMinor;
           let selectedTerm = 1;
           for (let months = 1; months <= future.length; months += 1) {
-            const payment = calculateAnnuityPayment(newBalance, liability.annualRatePpm, months);
+            const payment = calculateAnnuityPayment(
+              newBalance,
+              liability.annualRatePpm,
+              months,
+            );
             if (payment >= target) selectedTerm = months;
             else break;
           }
           newTerm = selectedTerm;
         }
-        const declining = liability.repaymentMethod === "DECLINING"
-          ? allocateEvenly(newBalance, newTerm)
-          : undefined;
+        const declining =
+          liability.repaymentMethod === "DECLINING"
+            ? allocateEvenly(newBalance, newTerm)
+            : undefined;
         const recalculated = calculateRepaymentSchedule({
           principalMinor: newBalance,
           annualRatePpm: liability.annualRatePpm,
@@ -321,7 +439,8 @@ export class LiabilityService {
           firstDueDate: nextDueDate,
           decliningPrincipalMinor: declining,
         });
-        const nextSequence = Math.max(...schedules.map((item) => item.sequence), 0) + 1;
+        const nextSequence =
+          Math.max(...schedules.map((item) => item.sequence), 0) + 1;
         for (const item of recalculated.installments) {
           newInstallments.push({
             ...item,
@@ -341,16 +460,42 @@ export class LiabilityService {
 
     const paymentTotal = input.amountMinor + feeMinor;
     const paymentId = this.options.createId();
-    const journalEntry = this.createJournalEntry(key, `Loan payment: ${liability.name}`, paidAt, baseCurrency!);
+    const journalEntry = this.createJournalEntry(
+      key,
+      `Loan payment: ${liability.name}`,
+      paidAt,
+      baseCurrency!,
+    );
     const journalLines: JournalLine[] = [];
-    const add = (account: Account, side: "DEBIT" | "CREDIT", amount: bigint, memo: string) => {
-      if (amount > 0n) journalLines.push(this.createLine(journalEntry.id, journalLines.length + 1, account, side, amount, timestamp, memo));
+    const add = (
+      account: Account,
+      side: "DEBIT" | "CREDIT",
+      amount: bigint,
+      memo: string,
+    ) => {
+      if (amount > 0n)
+        journalLines.push(
+          this.createLine(
+            journalEntry.id,
+            journalLines.length + 1,
+            account,
+            side,
+            amount,
+            timestamp,
+            memo,
+          ),
+        );
     };
-    const liabilityAccount = await this.requireAccount(liability.liabilityAccountId);
-    const interestAccount = await this.requireAccount(liability.interestExpenseAccountId);
+    const liabilityAccount = await this.requireAccount(
+      liability.liabilityAccountId,
+    );
+    const interestAccount = await this.requireAccount(
+      liability.interestExpenseAccountId,
+    );
     add(liabilityAccount, "DEBIT", principalPaid, "Principal repayment");
     add(interestAccount, "DEBIT", interestPaid, "Interest expense");
-    if (feeMinor > 0n && feeAccount) add(feeAccount, "DEBIT", feeMinor, "Early repayment fee");
+    if (feeMinor > 0n && feeAccount)
+      add(feeAccount, "DEBIT", feeMinor, "Early repayment fee");
     add(source, "CREDIT", paymentTotal, "Payment source");
     const payment: LiabilityPayment = {
       id: paymentId,
@@ -378,15 +523,28 @@ export class LiabilityService {
 
   async archive(id: string): Promise<void> {
     const liability = await this.requireLiability(id);
-    if (liability.status !== "PAID_OFF" || liability.outstandingPrincipalMinor !== 0n) {
-      throw new Error("Liability can only be archived after principal is fully paid");
+    if (
+      liability.status !== "PAID_OFF" ||
+      liability.outstandingPrincipalMinor !== 0n
+    ) {
+      throw new Error(
+        "Liability can only be archived after principal is fully paid",
+      );
     }
     const detail = await this.getDetail(id);
-    if (detail.installments.some((item) => item.status !== "PAID" && item.status !== "CANCELLED")) {
-      throw new Error("Liability has unpaid installments and cannot be archived");
+    if (
+      detail.installments.some(
+        (item) => item.status !== "PAID" && item.status !== "CANCELLED",
+      )
+    ) {
+      throw new Error(
+        "Liability has unpaid installments and cannot be archived",
+      );
     }
     if (detail.reconciliation.differenceMinor !== 0n) {
-      throw new Error("Ledger reconciliation must be balanced before archiving");
+      throw new Error(
+        "Ledger reconciliation must be balanced before archiving",
+      );
     }
     await this.repository.archive(id, this.now());
   }
@@ -395,7 +553,12 @@ export class LiabilityService {
     return this.repository.reconcile(id);
   }
 
-  private createJournalEntry(idempotencyKey: string, description: string, occurredAt: string, baseCurrencyCode: string): JournalEntry {
+  private createJournalEntry(
+    idempotencyKey: string,
+    description: string,
+    occurredAt: string,
+    baseCurrencyCode: string,
+  ): JournalEntry {
     const timestamp = this.now();
     return {
       id: this.options.createId(),
@@ -440,7 +603,8 @@ export class LiabilityService {
 
   private async requireAccount(id: string): Promise<Account> {
     const account = await this.ledger.findAccountById(id);
-    if (!account || account.isArchived) throw new Error(`Active Ledger account does not exist: ${id}`);
+    if (!account || account.isArchived)
+      throw new Error(`Active Ledger account does not exist: ${id}`);
     return account;
   }
 

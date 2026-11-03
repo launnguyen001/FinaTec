@@ -53,7 +53,12 @@ export const ledgerMigrations = {
         tag: "0005_interest_engine",
         breakpoints: true,
       },
-      { idx: 6, when: liabilityManagementMigrationTime, tag: "0006_liability_management", breakpoints: true },
+      {
+        idx: 6,
+        when: liabilityManagementMigrationTime,
+        tag: "0006_liability_management",
+        breakpoints: true,
+      },
     ],
   },
   migrations: {

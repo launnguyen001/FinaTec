@@ -53,7 +53,10 @@ export async function createFinanceRuntime() {
     createId,
     ledger,
     assetRepository,
-    liabilities: new LiabilityService(liabilityRepository, ledger, { createId, now }),
+    liabilities: new LiabilityService(liabilityRepository, ledger, {
+      createId,
+      now,
+    }),
     interest: new InterestService(interestRepository, ledger, {
       createId,
       now,

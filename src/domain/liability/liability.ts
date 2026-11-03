@@ -1,9 +1,14 @@
 import type { JournalEntry, JournalLine } from "../ledger/repository";
-import type { RepaymentMethod, RepaymentInstallment } from "./repayment-schedule";
+import type {
+  RepaymentMethod,
+  RepaymentInstallment,
+} from "./repayment-schedule";
 
 export type LiabilityStatus = "ACTIVE" | "PAID_OFF" | "ARCHIVED";
-export type RepaymentStatus = "UPCOMING" | "DUE" | "PARTIALLY_PAID" | "PAID" | "OVERDUE" | "CANCELLED";
-export type EarlyPaymentPolicy = "KEEP_MATURITY_REDUCE_INSTALLMENT" | "KEEP_INSTALLMENT_SHORTEN_TERM";
+export type RepaymentStatus =
+  "UPCOMING" | "DUE" | "PARTIALLY_PAID" | "PAID" | "OVERDUE" | "CANCELLED";
+export type EarlyPaymentPolicy =
+  "KEEP_MATURITY_REDUCE_INSTALLMENT" | "KEEP_INSTALLMENT_SHORTEN_TERM";
 
 export interface Liability {
   id: string;
