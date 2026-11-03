@@ -399,7 +399,7 @@ export class LiabilityService {
         item.status !== "PAID",
     );
     const newInstallments: LiabilityInstallment[] = [];
-    if (extraPrincipal > 0n && future.length > 0) {
+    if ((extraPrincipal > 0n || outstanding - principalPaid === 0n) && future.length > 0) {
       for (const item of future)
         installmentUpdates.push({
           ...item,
