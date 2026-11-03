@@ -121,10 +121,16 @@ export function InterestScreen() {
       ),
     [accounts],
   );
-  const incomeAccounts = useMemo(
-    () => accounts.filter((account) => account.type === "INCOME"),
-    [accounts],
-  );
+  const incomeAccounts = useMemo(() => {
+    const currencyCode = accounts.find(
+      (account) => account.id === principalAccountId,
+    )?.currencyCode;
+    return accounts.filter(
+      (account) =>
+        account.type === "INCOME" &&
+        (!currencyCode || account.currencyCode === currencyCode),
+    );
+  }, [accounts, principalAccountId]);
   const payoutAccounts = useMemo(
     () =>
       accounts.filter(
