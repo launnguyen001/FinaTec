@@ -29,8 +29,6 @@ export interface JournalPostingSpec {
   reversalOfId: string | null;
   transactionKind?: import("./repository").TransactionKind;
   categoryId?: string | null;
-  postingPurpose?: import("./repository").PostingPurpose;
-  auditReason?: string | null;
   createdAt: string;
   postedAt: string | null;
   lines: readonly PostingLineSpec[];
@@ -102,8 +100,6 @@ export function buildJournalPosting(
     reversalOfId: spec.reversalOfId,
     transactionKind: spec.transactionKind ?? "LEGACY",
     categoryId: spec.categoryId ?? null,
-    postingPurpose: spec.postingPurpose ?? "STANDARD",
-    auditReason: spec.auditReason ?? null,
     createdAt: spec.createdAt,
     postedAt: spec.postedAt,
   };
