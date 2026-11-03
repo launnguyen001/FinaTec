@@ -22,6 +22,9 @@ CREATE TABLE interest_plans (
 CREATE INDEX interest_plans_principal_status_idx
   ON interest_plans(principal_account_id, status);
 --> statement-breakpoint
+CREATE UNIQUE INDEX interest_plans_one_active_per_principal
+  ON interest_plans(principal_account_id) WHERE status = 'ACTIVE';
+--> statement-breakpoint
 CREATE TABLE interest_accruals (
   id TEXT PRIMARY KEY NOT NULL,
   plan_id TEXT NOT NULL REFERENCES interest_plans(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
