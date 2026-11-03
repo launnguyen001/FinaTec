@@ -190,7 +190,8 @@ export class InterestService {
       throw new Error("Simple-interest plans cannot capitalize interest; use payout instead");
     }
 
-    const existing = (await this.repository.listAccruals(plan.id)).find(
+    const history = await this.repository.listAccruals(plan.id);
+    const existing = history.find(
       (item) =>
         item.periodStart === input.periodStart &&
         item.periodEnd === input.periodEnd &&
@@ -204,6 +205,18 @@ export class InterestService {
       denominator: existing.accruedDenominator,
       amountMinor: roundHalfUp(existing.accruedNumerator, existing.accruedDenominator),
     } };
+    if (history.some((item) => item.status === "ACCRUED")) {
+      throw new Error("An earlier accrual is still pending posting");
+    }
+    const settled = history
+      .filter((item) => item.status === "POSTED" || item.status === "PAID")
+      .sort((a, b) => a.periodEnd.localeCompare(b.periodEnd));
+    const expectedStart = settled.length > 0
+      ? settled[settled.length - 1]!.periodEnd
+      : plan.startDate;
+    if (input.periodStart !== expectedStart) {
+      throw new Error(`Accrual must continue from the last settled boundary: ${expectedStart}`);
+    }
 
     const principalMinor = await this.readPrincipalBalance(plan);
     const calculation = calculateSimpleInterest({
@@ -366,7 +379,7 @@ export class InterestService {
     const settled = existing
       .filter((item) => item.status === "POSTED" || item.status === "PAID")
       .sort((a, b) => a.periodEnd.localeCompare(b.periodEnd));
-    let periodStart = settled.at(-1)?.periodEnd ?? plan.startDate;
+    let periodStart = settled.length > 0 ? settled[settled.length - 1]!.periodEnd : plan.startDate;
     if (plan.maturityDate && periodStart >= plan.maturityDate) return completed;
 
     if (plan.postingFrequency === "AT_MATURITY") {
