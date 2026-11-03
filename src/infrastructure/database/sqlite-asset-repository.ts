@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { aggregateDcaLots, calculateSale, type AssetLot, type DcaAggregate } from "../../domain/asset/asset";
 import { toSqliteSafeInteger } from "../../domain/ledger/money";
 import { validateJournalEntry, type PostingContext } from "../../domain/ledger/posting";
-import type { JournalEntry, JournalLine, PostingCommitInput } from "../../domain/ledger/repository";
+import type { PostingCommitInput } from "../../domain/ledger/repository";
 import type { LedgerDatabase } from "./database";
 import {
   accounts,
