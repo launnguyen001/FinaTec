@@ -53,6 +53,31 @@ describe("ACT/365 Fixed nominal APR calculator", () => {
     expect(accumulated.numerator).toBe(500_000n);
   });
 
+  it("carries 365 exact daily fractions into one minor unit without daily rounding", () => {
+    const daily = calculateSimpleInterest({
+      principalMinor: 1n,
+      annualRatePpm: 1_000_000n,
+      startDate: "2026-01-01",
+      endDate: "2026-01-02",
+    });
+    const carried = addAccrualFractions(
+      Array.from({ length: 365 }, () => daily),
+    );
+    expect(daily.amountMinor).toBe(0n);
+    expect(carried.amountMinor).toBe(1n);
+    expect(carried.numerator).toBe(365_000_000n);
+  });
+
+  it("accepts the approved maximum nominal APR of 1000 percent", () => {
+    const result = calculateSimpleInterest({
+      principalMinor: 100_000n,
+      annualRatePpm: 10_000_000n,
+      startDate: "2026-01-01",
+      endDate: "2027-01-01",
+    });
+    expect(result.amountMinor).toBe(1_000_000n);
+  });
+
   it("rounds HALF_UP only at the posting boundary", () => {
     expect(roundHalfUp(1n, 2n)).toBe(1n);
     expect(roundHalfUp(2n, 3n)).toBe(1n);
