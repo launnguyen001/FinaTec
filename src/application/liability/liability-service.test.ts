@@ -81,6 +81,7 @@ function createHarness(
     listRateChanges: jest.fn().mockResolvedValue([]),
     findPaymentById: jest.fn().mockResolvedValue(null),
     findPaymentReversal: jest.fn().mockResolvedValue(null),
+    listPaymentReversals: jest.fn().mockResolvedValue([]),
     reversePayment: jest.fn().mockResolvedValue(undefined),
     addRateChange: jest.fn().mockResolvedValue(undefined),
     commitPayment: jest.fn(
