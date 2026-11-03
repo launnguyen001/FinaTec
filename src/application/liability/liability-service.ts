@@ -371,8 +371,11 @@ export class LiabilityService {
       await this.repository.listPayments(input.liabilityId)
     ).find((item) => item.idempotencyKey === key);
     if (existing) return existing;
-    if (input.replacesPaymentId && !(await this.repository.findPaymentReversal(input.replacesPaymentId))) {
-      throw new Error("A replacement payment must reference an already reversed payment");
+    if (input.replacesPaymentId) {
+      const replacedPayment = await this.repository.findPaymentById(input.replacesPaymentId);
+      if (!replacedPayment || replacedPayment.liabilityId !== input.liabilityId || !(await this.repository.findPaymentReversal(input.replacesPaymentId))) {
+        throw new Error("A replacement payment must reference a reversed payment on the same liability");
+      }
     }
     if (input.amountMinor <= 0n)
       throw new Error("Payment amount must be positive");
