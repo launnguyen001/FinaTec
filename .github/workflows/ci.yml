@@ -30,6 +30,10 @@ jobs:
         run: npm run typecheck
       - name: Lint
         run: npm run lint
+      - name: Temporary Prettier diagnostic
+        run: |
+          npx prettier --write src/application/liability/liability-service.test.ts src/infrastructure/database/sqlite-liability-repository.ts
+          git diff -- src/application/liability/liability-service.test.ts src/infrastructure/database/sqlite-liability-repository.ts
       - name: Format check
         run: npm run format:check
       - name: Unit tests
