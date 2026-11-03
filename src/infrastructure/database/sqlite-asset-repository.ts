@@ -789,8 +789,7 @@ export class SqliteAssetRepository implements AssetRepository {
       (total, row) => total + BigInt(row.feeAmountMinor),
       0n,
     );
-    const realizedPnlBeforeFeeMinor =
-      grossProceedsMinor - costBasisSoldMinor;
+    const realizedPnlBeforeFeeMinor = grossProceedsMinor - costBasisSoldMinor;
     return {
       assetId,
       currencyCode: facts.asset.quoteCurrency,
@@ -800,8 +799,7 @@ export class SqliteAssetRepository implements AssetRepository {
       saleFeeMinor,
       purchaseFeeMinor,
       realizedPnlBeforeFeeMinor,
-      realizedPnlAfterSaleFeeMinor:
-        realizedPnlBeforeFeeMinor - saleFeeMinor,
+      realizedPnlAfterSaleFeeMinor: realizedPnlBeforeFeeMinor - saleFeeMinor,
     };
   }
 

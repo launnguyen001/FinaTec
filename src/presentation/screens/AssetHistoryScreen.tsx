@@ -243,16 +243,24 @@ export function AssetHistoryScreen() {
             )}
           </Text>
           <Text style={styles.muted}>
-            Realized result after sale fees ·{" "}
-            {realized.transactionCount} lần bán
+            Realized result after sale fees · {realized.transactionCount} lần
+            bán
           </Text>
           <Text style={styles.muted}>
             Gross proceeds:{" "}
-            {money(realized.grossProceedsMinor, precision, realized.currencyCode)}
+            {money(
+              realized.grossProceedsMinor,
+              precision,
+              realized.currencyCode,
+            )}
           </Text>
           <Text style={styles.muted}>
             Cost basis disposed:{" "}
-            {money(realized.costBasisSoldMinor, precision, realized.currencyCode)}
+            {money(
+              realized.costBasisSoldMinor,
+              precision,
+              realized.currencyCode,
+            )}
           </Text>
           <Text style={styles.muted}>
             Sale fees:{" "}

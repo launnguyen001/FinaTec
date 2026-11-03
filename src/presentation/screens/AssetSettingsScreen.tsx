@@ -59,7 +59,8 @@ export function AssetSettingsScreen() {
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [backgroundStatus, setBackgroundStatus] = useState<string>("Chưa kiểm tra");
+  const [backgroundStatus, setBackgroundStatus] =
+    useState<string>("Chưa kiểm tra");
   const [backgroundBusy, setBackgroundBusy] = useState(false);
 
   const load = useCallback(async () => {
