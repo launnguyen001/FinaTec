@@ -69,6 +69,28 @@ describe("Task04 asset domain rules", () => {
     expect(result.realizedGainLossAfterFeeMinor).toBe(9_900n);
   });
 
+  it("allows a sale from a verified DCA component but rejects an unverified merged lot", () => {
+    const component = lot({ status: "MERGED", remainingQuantity: "0.5", remainingCostBasisMinor: 5_000n });
+    expect(() => calculateSale({
+      lot: component,
+      quantitySold: "0.25",
+      quantityPrecision: 8,
+      grossProceedsMinor: 2_000n,
+      feeMinor: 0n,
+    })).toThrow(/ACTIVE lot or a verified DCA component/);
+    const result = calculateSale({
+      lot: component,
+      isDcaComponent: true,
+      quantitySold: "0.25",
+      quantityPrecision: 8,
+      grossProceedsMinor: 2_000n,
+      feeMinor: 0n,
+    });
+    expect(result.remainingQuantity).toBe("0.25");
+    expect(result.costBasisSoldMinor).toBe(2_500n);
+    expect(result.remainingCostBasisMinor).toBe(2_500n);
+  });
+
   it("uses remaining cost basis when aggregating a partially sold lot into DCA", () => {
     const aggregate = aggregateDcaLots([
       lot({ remainingQuantity: "0.5", remainingCostBasisMinor: 5_000n }),
