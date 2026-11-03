@@ -2,7 +2,7 @@
 
 - Giai đoạn: 3 — MVP 2
 - Ưu tiên: P1
-- Trạng thái: IN PROGRESS — specification and cross-task audit
+- Trạng thái: ANALYSIS — cross-task contract audit complete; owner approval required for interest conventions before implementation
 - Phụ thuộc: TASK-02, TASK-04
 - Branch triển khai: `task/05-interest-engine`
 - Base: `main` tại `14db998`; branch đã được đồng bộ với toàn bộ baseline Task04 và closeout docs
@@ -156,6 +156,7 @@ Các đề xuất trên chưa phải business rules đã khóa. Cần owner duy�
 - 2026-11-04: Chốt ranh giới kiến trúc: term deposit dùng ASSET Account riêng làm nguồn principal; TASK-05 sở hữu InterestPlan và toàn bộ calculation/accrual/posting. TASK-04 không cần schema interest-specific và không được tự xây interest engine thứ hai.
 - Đã audit TASK-02 LedgerRepository/AccountingService: atomic commitPostedEntry, balance validation, native currency, idempotency và posted journal immutability là contract nền. TASK-05 phải mở rộng repository atomic command để commit accrual + Journal Entry cùng transaction, không gọi AccountingService rồi ghi accrual độc lập.
 - Đã audit TASK-04: Account ASSET và cờ INVESTMENT là nguồn phân loại sẵn có; term deposit sẽ dùng dedicated ASSET Account, InterestPlan giữ lịch/điều khoản và tham chiếu accountId; không duplicate principal.
-- Đang làm: chốt các business conventions APR/APY, day-count, posting frequency, compounding và rounding trước khi triển khai calculator.
+- Đã đề xuất baseline MVP tại mục 5.1: nominal APR, ACT/365 Fixed, daily accrual, monthly/at-maturity posting, simple interest mặc định, calendar-day boundaries, HALF_UP tại posting và fractional carry. Đề xuất đang CHỜ owner duyệt; chưa áp dụng như business rule.
+- Next: owner duyệt/chỉnh bảng convention và ví dụ tham chiếu; sau đó mới thiết kế schema/migration và pure calculator.
 - Chưa làm: chưa có công thức APR/APY, day-count, frequency và rounding được owner duyệt; chưa implement calculator/schema/UI.
-- Lưu ý branch: sau khi TASK-04 được merge vào main, phải đồng bộ/rebase TASK-05 trên main mới nhất trước khi mở PR merge; không force-push và không bỏ commit của TASK-04.
+- Branch sync: `task/05-interest-engine` hiện ahead 9 / behind 0 so với `main`; baseline Task04 đã được merge vào branch bằng merge commit `90a8617`, không force-push và không bỏ commit.
