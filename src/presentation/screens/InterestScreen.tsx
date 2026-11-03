@@ -106,9 +106,7 @@ export function InterestScreen() {
   const [periodEnd, setPeriodEnd] = useState(
     new Date().toISOString().slice(0, 10),
   );
-  const [kind, setKind] = useState<"CAPITALIZATION" | "PAYOUT">(
-    "CAPITALIZATION",
-  );
+  const [kind, setKind] = useState<"CAPITALIZATION" | "PAYOUT">("PAYOUT");
   const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
@@ -117,7 +115,10 @@ export function InterestScreen() {
   const principalAccounts = useMemo(
     () =>
       accounts.filter(
-        (account) => account.type === "ASSET" && account.isInvestment,
+        (account) =>
+          !account.isArchived &&
+          account.type === "ASSET" &&
+          account.isInvestment,
       ),
     [accounts],
   );
@@ -160,13 +161,20 @@ export function InterestScreen() {
     }
     if (!principalAccountId) {
       setPrincipalAccountId(
-        nextAccounts.find((item) => item.type === "ASSET" && item.isInvestment)
+        nextAccounts.find(
+          (item) =>
+            !item.isArchived &&
+            item.type === "ASSET" &&
+            item.isInvestment,
+        )
           ?.id ?? "",
       );
     }
     if (!incomeAccountId) {
       setIncomeAccountId(
-        nextAccounts.find((item) => item.type === "INCOME")?.id ?? "",
+        nextAccounts.find(
+          (item) => !item.isArchived && item.type === "INCOME",
+        )?.id ?? "",
       );
     }
   }, [runtime, principalAccountId, incomeAccountId, selectedPlanId]);
@@ -182,6 +190,11 @@ export function InterestScreen() {
       .filter((item) => item.status === "POSTED" || item.status === "PAID")
       .sort((a, b) => a.periodEnd.localeCompare(b.periodEnd));
     const selectedPlan = plans.find((item) => item.id === selectedPlanId);
+    if (selectedPlan) {
+      setKind(
+        selectedPlan.compounding === "SIMPLE" ? "PAYOUT" : "CAPITALIZATION",
+      );
+    }
     setPeriodStart(
       settled.length > 0
         ? settled[settled.length - 1]!.periodEnd
