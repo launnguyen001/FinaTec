@@ -1,4 +1,4 @@
-import { and, asc, eq, gte } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 
 import {
   fromSqliteInteger,
@@ -32,6 +32,41 @@ import {
 type InterestTransaction = Parameters<
   Parameters<LedgerDatabase["transaction"]>[0]
 >[0];
+
+function zonedStartOfDayUtc(dateOnly: string, timezoneId: string): number {
+  const [year, month, day] = dateOnly.split("-").map(Number);
+  const desiredLocalMidnightAsUtc = Date.UTC(year, month - 1, day);
+  let candidate = desiredLocalMidnightAsUtc;
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezoneId,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  });
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const values = new Map(
+      formatter
+        .formatToParts(new Date(candidate))
+        .map((part) => [part.type, part.value]),
+    );
+    const representedLocalTimeAsUtc = Date.UTC(
+      Number(values.get("year")),
+      Number(values.get("month")) - 1,
+      Number(values.get("day")),
+      Number(values.get("hour")),
+      Number(values.get("minute")),
+      Number(values.get("second")),
+    );
+    const difference = representedLocalTimeAsUtc - desiredLocalMidnightAsUtc;
+    if (difference === 0) break;
+    candidate -= difference;
+  }
+  return candidate;
+}
 
 function mapPlan(row: typeof interestPlans.$inferSelect): InterestPlan {
   return {
@@ -162,14 +197,15 @@ export class SqliteInterestRepository implements InterestRepository {
         and(
           eq(journalLines.accountId, plan.principalAccountId),
           eq(journalEntries.status, "POSTED"),
-          gte(
-            journalEntries.occurredAt,
-            `${plan.startDate}T00:00:00.000Z`,
-          ),
         ),
       )
       .all();
-    return movements.some((movement) => !ownIds.has(movement.id));
+    const cutoff = zonedStartOfDayUtc(plan.startDate, plan.timezoneId);
+    return movements.some((movement) => {
+      if (ownIds.has(movement.id)) return false;
+      const occurredAt = Date.parse(movement.occurredAt);
+      return Number.isNaN(occurredAt) || occurredAt >= cutoff;
+    });
   }
 
   async commitPostedAccrual(
