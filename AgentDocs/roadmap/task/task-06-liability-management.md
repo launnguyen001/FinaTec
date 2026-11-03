@@ -2,7 +2,7 @@
 
 - Giai đoạn: 4 — MVP 3: Khoản nợ, định kỳ và ngân sách
 - Ưu tiên: P1
-- Trạng thái: IN_PROGRESS — core implementation đang được hoàn thiện; chưa nghiệm thu/merge
+- Trạng thái: READY_FOR_CLI_ACCEPTANCE — implementation và CI đã pass; chờ acceptance trên Development Build
 - Phụ thuộc: TASK-02, TASK-03, TASK-05
 
 ## 1. Mục tiêu
@@ -92,5 +92,7 @@ Liability, RepaymentSchedule, LiabilityPayment (hoặc tên tương ứng theo n
 - UI đã có APR history/change, nhập gốc riêng từng kỳ DECLINING, tỷ giá tại origination/payment, đảo payment và liên kết payment thay thế.
 - SQLCipher acceptance diagnostic đã mở rộng để kiểm tra APR reset, reversal và replacement payment trên database cô lập.
 - CI đã xác nhận typecheck và lint PASS trên snapshot trước lần format hiện tại; format check và unit tests sẽ được xác nhận lại trên HEAD sau khi format.
-- Còn lại trước bàn giao CLI: xác nhận CI xanh trên HEAD, review migration/schema + luồng rollback, và chạy diagnostic trên Development Build. Chưa tuyên bố thiết bị pass, chưa merge PR #8.
+- Bàn giao CLI: chạy route `Task06 acceptance (DEV)` trên Development Build có SQLCipher. Diagnostic tạo database và SecureStore key ngẫu nhiên riêng, không đọc/ghi database tài chính production; phải trả đủ PASS cho migration 0007–0010, origination, partial allocation/idempotency, payment reversal/replacement, APR reset, early principal, full payoff, archive, fee posting, reconciliation và SQLCipher.
+- Giới hạn đã chủ động bảo vệ: với foreign-currency posting, nếu FX snapshot khiến các line sau HALF_UP không cân bằng base currency thì payment bị reject, không tự sinh journal mất cân bằng. Cần CLI xác nhận luồng FX trên thiết bị.
+- Chưa tuyên bố device acceptance; PR #8 vẫn Draft và chưa merge cho đến khi CLI trả báo cáo diagnostic và regression pass.
 
