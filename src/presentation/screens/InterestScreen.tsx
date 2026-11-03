@@ -222,6 +222,26 @@ export function InterestScreen() {
     }
   }
 
+  async function catchUp() {
+    if (!runtime || !selectedPlanId) return;
+    setBusy(true);
+    setFailure(null);
+    setMessage(null);
+    try {
+      const results = await runtime.interest.catchUp(selectedPlanId, periodEnd, kind);
+      setMessage(
+        results.length > 0
+          ? `Catch-up hoàn tất: ${results.length} kỳ đã được ghi nhận vào Ledger.`
+          : "Không có kỳ đến hạn có thể ghi nhận.",
+      );
+      await Promise.all([load(), loadAccruals()]);
+    } catch (cause) {
+      setFailure(cause instanceof Error ? cause.message : "Catch-up thất bại.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function post(accrualId: string) {
     if (!runtime) return;
     setBusy(true);
@@ -309,6 +329,7 @@ export function InterestScreen() {
           <View style={styles.wrap}>
             <Action label="Preview" disabled={busy} onPress={() => void previewPeriod()} />
             <Action label="Tạo accrual" disabled={busy} onPress={() => void accruePeriod()} />
+            <Action label="Catch-up đến ngày" disabled={busy} onPress={() => void catchUp()} />
           </View>
           {preview ? <Text selectable style={styles.muted}>{preview}</Text> : null}
           <Text style={styles.sectionTitle}>Lịch sử accrual</Text>
