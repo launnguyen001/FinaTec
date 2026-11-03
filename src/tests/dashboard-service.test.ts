@@ -49,6 +49,8 @@ describe("DashboardService", () => {
       makeAccount("salary", "INCOME"),
       makeAccount("food", "EXPENSE"),
       makeAccount("bank", "ASSET"),
+      { ...makeAccount("investment", "ASSET"), isInvestment: true },
+      makeAccount("investment-equity", "EQUITY"),
       {
         ...makeAccount("usd-wallet", "ASSET"),
         currencyCode: "USD",
@@ -100,6 +102,12 @@ describe("DashboardService", () => {
       accountId: "cash",
       offsetAccountId: "equity",
       amountMinor: 1_000_000n,
+    });
+    await accounting.createOpeningBalance({
+      idempotencyKey: "opening-investment",
+      accountId: "investment",
+      offsetAccountId: "investment-equity",
+      amountMinor: 3_000_000n,
     });
     await accounting.createOpeningBalance({
       idempotencyKey: "opening-usd",

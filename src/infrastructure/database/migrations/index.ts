@@ -1,8 +1,10 @@
 import { migration0000 } from "./0000_ledger_foundation";
 import { migration0001 } from "./0001_core_finance";
+import { migration0002 } from "./0002_asset_management";
 
 const migrationTime = 1_793_520_000_000;
 const coreFinanceMigrationTime = 1_793_700_000_000;
+const assetManagementMigrationTime = 1_793_800_000_000;
 
 export const ledgerMigrations = {
   journal: {
@@ -19,10 +21,17 @@ export const ledgerMigrations = {
         tag: "0001_core_finance",
         breakpoints: true,
       },
+      {
+        idx: 2,
+        when: assetManagementMigrationTime,
+        tag: "0002_asset_management",
+        breakpoints: true,
+      },
     ],
   },
   migrations: {
     m0000: migration0000,
     m0001: migration0001,
+    m0002: migration0002,
   },
 };

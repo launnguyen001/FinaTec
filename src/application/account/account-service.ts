@@ -26,12 +26,17 @@ export class AccountService {
     type: AccountType;
     subtype?: AccountSubtype | null;
     currencyCode: string;
+    isInvestment?: boolean;
   }): Promise<Account> {
     const name = input.name.trim();
     if (!name) throw new Error("Account name is required");
     if (name.length > 80)
       throw new Error("Account name must be at most 80 characters");
     const subtype = input.subtype ?? null;
+    const isInvestment = input.isInvestment ?? false;
+    if (isInvestment && input.type !== "ASSET") {
+      throw new Error("Only ASSET accounts can be marked as investment accounts");
+    }
     if (input.type === "ASSET" && !subtype)
       throw new Error("ASSET account subtype is required");
     if (input.type !== "ASSET" && subtype !== null)
@@ -46,6 +51,7 @@ export class AccountService {
       name,
       type: input.type,
       subtype,
+      isInvestment,
       currencyCode: input.currencyCode,
       createdAt: timestamp,
       updatedAt: timestamp,
