@@ -157,9 +157,10 @@ Category is not an Account. Account subtype does not create a second balance or 
 
 Dashboard available balances and income/expense totals are grouped by native currency. Schema v2 does not provide current market FX conversion or revaluation.
 
-Archived-account posting audit metadata:
-- `journal_entries.posting_purpose` records STANDARD or one of the narrowly scoped archived-account purposes.
-- `journal_entries.audit_reason` records why a settlement/adjustment/reversal touched an archived Account.
-- The SQLite repository validates purpose, transaction kind, archived Account type, destination Account state, line shape and exact reversal mirror before allowing a posting that touches an archived Account.
-- Ordinary income, expense, transfer, opening-balance and draft-posting paths continue to reject archived Accounts.
+Archived Account lifecycle enforcement:
+- An Account can transition ACTIVE → ARCHIVED only when its current native-currency Ledger balance is exactly zero, computed from POSTED journal lines.
+- A SQLite trigger rejects archival when the signed normal-side balance is non-zero.
+- New journal lines cannot reference an archived Account; a second trigger rejects posting a pre-existing draft if it references an Account archived after draft creation.
+- Restore changes only `accounts.is_archived`; it creates no Journal Entry and preserves all history.
+- No archived-account posting-purpose or audit-reason columns exist.
 - Category triggers also prevent an archived parent from being assigned, archiving a parent with active children, and changing a parent kind while its children would become inconsistent.
