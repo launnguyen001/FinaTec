@@ -63,6 +63,9 @@ export interface AssetRepository {
   findLotForSale(
     lotId: string,
   ): Promise<{ lot: AssetLotRecord; isDcaComponent: boolean } | null>;
+  findAssetTransactionByJournalEntryId(
+    journalEntryId: string,
+  ): Promise<{ transactionKind: "BUY" | "SELL"; lotId: string } | null>;
   commitPurchase(input: {
     lot: AssetLotWrite;
     transaction: AssetTransactionWrite;
