@@ -118,7 +118,7 @@ export function InterestScreen() {
   >("SIMPLE");
   const [periodStart, setPeriodStart] = useState("");
   const [periodEnd, setPeriodEnd] = useState(
-    new Date().toISOString().slice(0, 10),
+    getLocalDate(),
   );
   const [kind, setKind] = useState<"CAPITALIZATION" | "PAYOUT">("PAYOUT");
   const [preview, setPreview] = useState<string | null>(null);
