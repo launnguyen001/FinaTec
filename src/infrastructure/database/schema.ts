@@ -118,8 +118,6 @@ export const journalEntries = sqliteTable(
     idempotencyKey: text("idempotency_key"),
     transactionKind: text("transaction_kind", { enum: ["INCOME", "EXPENSE", "TRANSFER", "OPENING_BALANCE", "ADJUSTMENT", "REVERSAL", "LEGACY"] }).notNull().default("LEGACY"),
     categoryId: text("category_id").references((): AnySQLiteColumn => categories.id, { onDelete: "restrict", onUpdate: "restrict" }),
-    postingPurpose: text("posting_purpose", { enum: ["STANDARD", "ARCHIVED_ACCOUNT_SETTLEMENT", "ARCHIVED_ACCOUNT_ADJUSTMENT", "ARCHIVED_ACCOUNT_REVERSAL"] }).notNull().default("STANDARD"),
-    auditReason: text("audit_reason"),
     reversalOfId: text("reversal_of_id").references(
       (): AnySQLiteColumn => journalEntries.id,
       { onDelete: "restrict", onUpdate: "restrict" },
