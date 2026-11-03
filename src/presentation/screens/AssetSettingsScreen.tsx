@@ -113,8 +113,12 @@ export function AssetSettingsScreen() {
     setMessage(null);
     try {
       const outcomes = await runtime.assetPriceRefresh.refreshDueAssets(true);
-      const updated = outcomes.filter((item) => item.status === "UPDATED").length;
-      const skipped = outcomes.filter((item) => item.status === "SKIPPED").length;
+      const updated = outcomes.filter(
+        (item) => item.status === "UPDATED",
+      ).length;
+      const skipped = outcomes.filter(
+        (item) => item.status === "SKIPPED",
+      ).length;
       const failed = outcomes.filter((item) => item.status === "FAILED");
       if (outcomes.length === 0) {
         setMessage("Không có tài sản crypto đủ điều kiện refresh.");
@@ -124,11 +128,15 @@ export function AssetSettingsScreen() {
         );
       }
       if (failed.length > 0) {
-        setFailure(failed.map((item) => item.reason ?? item.assetId).join("; "));
+        setFailure(
+          failed.map((item) => item.reason ?? item.assetId).join("; "),
+        );
       }
     } catch (cause) {
       setFailure(
-        cause instanceof Error ? cause.message : "Không thể refresh giá tài sản.",
+        cause instanceof Error
+          ? cause.message
+          : "Không thể refresh giá tài sản.",
       );
     } finally {
       setRefreshBusy(false);
