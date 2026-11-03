@@ -2,7 +2,7 @@
 
 - Giai đoạn: 3 — MVP 2
 - Ưu tiên: P1
-- Trạng thái: IMPLEMENTATION IN PROGRESS — owner approved baseline MVP on 2026-11-04
+- Trạng thái: IMPLEMENTATION IN PROGRESS — domain, migration, atomic repository, application service and UI implemented; CI/device acceptance pending
 - Phụ thuộc: TASK-02, TASK-04
 - Branch triển khai: `task/05-interest-engine`
 - Base: `main` tại `14db998`; branch đã được đồng bộ với toàn bộ baseline Task04 và closeout docs
@@ -34,7 +34,7 @@ Không bao gồm cam kết lợi suất từ nhà cung cấp, tự động thao 
 
 ## 4. Bối cảnh và nguyên tắc
 
-Phải chốt công thức và quy tắc làm tròn trước khi lập trình. Không tự suy diễn APR/APY, day-count, compounding frequency, kỳ ghi nhận, xử lý ngày đáo hạn hoặc rounding mode từ tên trường hay ví dụ đơn lẻ.
+Owner approved the MVP conventions in section 5.1 on 2026-11-04. Only the listed conventions are implemented; APY conversion, alternative day-count conventions and penalty rules remain unsupported until separately approved.
 
 - Cùng đầu vào và cùng phiên bản quy tắc phải cho kết quả xác định.
 - Chỉ làm tròn tại thời điểm ghi nhận đã được duyệt.
@@ -67,7 +67,7 @@ Phải chốt công thức và quy tắc làm tròn trước khi lập trình. K
 - Lãi nợ khi accrue: Debit interest EXPENSE / Credit LIABILITY; khi thanh toán: Debit LIABILITY / Credit funding ASSET.
 - Accrued chưa POSTED là record theo dõi, không làm thay đổi Ledger. Capitalization/payout phải commit cùng InterestAccrual state transition để không double-count.
 
-## 5. Các quyết định cần khóa trước implementation
+## 5. Decision log and approved MVP conventions
 
 1. APR/APY: semantics, conversion rules và có hỗ trợ cả hai hay chỉ một số convention.
 2. Day-count: danh sách convention được hỗ trợ (ví dụ ACT/365, ACT/360, 30/360) và quy tắc năm nhuận.
@@ -80,7 +80,7 @@ Phải chốt công thức và quy tắc làm tròn trước khi lập trình. K
 9. Catch-up: tính các kỳ bị bỏ lỡ, xử lý kỳ trùng/thiếu và giới hạn batch.
 10. Posting: tài khoản đối ứng, category và trạng thái khi accrue, post, capitalize hoặc payout.
 
-Không implement formula cho đến khi các quyết định liên quan được ghi thành bảng ví dụ tham chiếu và được owner duyệt.
+Implementation may proceed only within the owner-approved baseline below. New conventions require a new decision and reference vectors.
 
 ### 5.1. Baseline MVP — OWNER APPROVED (2026-11-04)
 
@@ -157,7 +157,11 @@ Các quy tắc trên đã được owner duyệt ngày 2026-11-04 và là busine
 - Đã audit TASK-02 LedgerRepository/AccountingService: atomic commitPostedEntry, balance validation, native currency, idempotency và posted journal immutability là contract nền. TASK-05 phải mở rộng repository atomic command để commit accrual + Journal Entry cùng transaction, không gọi AccountingService rồi ghi accrual độc lập.
 - Đã audit TASK-04: Account ASSET và cờ INVESTMENT là nguồn phân loại sẵn có; term deposit sẽ dùng dedicated ASSET Account, InterestPlan giữ lịch/điều khoản và tham chiếu accountId; không duplicate principal.
 - 2026-11-04: Owner APPROVED baseline MVP tại mục 5.1. Implementation bắt đầu bằng pure ACT/365 Fixed calculator dùng BigInt rational arithmetic và reference-vector tests.
-- Đã implement pure calculator: nominal APR (ppm), ACT/365 Fixed, start-inclusive/end-exclusive, HALF_UP và exact fractional carry; domain unit tests đã thêm.
-- Đang làm: schema/migration, repository atomic commit và application lifecycle.
-- Chưa làm: UI, catch-up scheduler, SQLCipher device acceptance và Ledger reconciliation acceptance.
+- Đã implement pure calculator: nominal APR (ppm), ACT/365 Fixed, start-inclusive/end-exclusive, HALF_UP và exact BigInt rational arithmetic; reference-vector unit tests đã thêm.
+- Đã implement migration `0005_interest_engine`, Drizzle schema, InterestPlan/InterestAccrual persistence, immutable plan terms và accrual history constraints.
+- Đã implement SQLite atomic commit: Journal Entry + Journal Lines + accrual state trong một transaction; duplicate Journal Line failure phải rollback cả transaction.
+- Đã implement InterestService: funded INVESTMENT ASSET validation, APR preview, accrued record, capitalization/payout, monthly/at-maturity catch-up, fractional carry across sub-minor periods và idempotent posting.
+- Đã implement foreground catch-up khi app khởi chạy/resume; UI route `/interest`; development SQLCipher acceptance route `/task05-interest-acceptance`.
+- MVP limitation: posting chỉ hỗ trợ account cùng Ledger base currency; liability interest, APY, early-withdrawal penalty và external principal changes sau ngày bắt đầu chưa hỗ trợ. Catch-up từ chối principal movement ngoài InterestPlan để không tính sai lịch sử.
+- CI đã PASS trên baseline trước các bổ sung acceptance gần nhất; phải chạy lại CI trên latest head. SQLCipher device acceptance và Ledger reconciliation acceptance vẫn PENDING.
 - Branch sync: `task/05-interest-engine` hiện ahead 9 / behind 0 so với `main`; baseline Task04 đã được merge vào branch bằng merge commit `90a8617`, không force-push và không bỏ commit.
