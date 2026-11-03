@@ -157,7 +157,7 @@ export class LiabilityService {
     if (!baseCurrencyRecord) throw new Error("Ledger base currency is unavailable");
     const fxRateNumerator = currencyCode === baseCurrencyCode ? "1" : input.fxRateNumerator;
     const fxRateDenominator = currencyCode === baseCurrencyCode ? "1" : input.fxRateDenominator;
-    if (!fxRateNumerator || !fxRateDenominator || !/^[1-9]\\d*$/.test(fxRateNumerator) || !/^[1-9]\\d*$/.test(fxRateDenominator)) {
+    if (!fxRateNumerator || !fxRateDenominator || !/^[1-9]\d*$/.test(fxRateNumerator) || !/^[1-9]\d*$/.test(fxRateDenominator)) {
       throw new Error("A positive rational FX snapshot is required for a non-base-currency liability");
     }
     const fxRate = new FxRate(
@@ -408,7 +408,7 @@ export class LiabilityService {
     if (!nativeCurrencyRecord || !baseCurrencyRecord) throw new Error("Payment currency metadata is unavailable");
     const fxRateNumerator = liability.currencyCode === baseCurrencyCode ? "1" : input.fxRateNumerator;
     const fxRateDenominator = liability.currencyCode === baseCurrencyCode ? "1" : input.fxRateDenominator;
-    if (!fxRateNumerator || !fxRateDenominator || !/^[1-9]\\d*$/.test(fxRateNumerator) || !/^[1-9]\\d*$/.test(fxRateDenominator)) {
+    if (!fxRateNumerator || !fxRateDenominator || !/^[1-9]\d*$/.test(fxRateNumerator) || !/^[1-9]\d*$/.test(fxRateDenominator)) {
       throw new Error("A positive rational FX snapshot is required for a non-base-currency payment");
     }
     const fxRate = new FxRate(
@@ -609,6 +609,9 @@ export class LiabilityService {
             amount,
             timestamp,
             memo,
+            fxRateNumerator,
+            fxRateDenominator,
+            baseAmount(amount),
           ),
         );
     };
