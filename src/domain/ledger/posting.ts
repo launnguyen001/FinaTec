@@ -17,7 +17,6 @@ export interface PostingCurrency {
 export interface PostingContext {
   accounts: ReadonlyMap<string, Account>;
   currencies: ReadonlyMap<string, PostingCurrency>;
-  allowedArchivedAccountIds?: ReadonlySet<string>;
 }
 
 export type NormalBalance = "DEBIT" | "CREDIT";
@@ -107,7 +106,7 @@ export function validateJournalEntry(
     if (!account) {
       throw new Error(`Account does not exist: ${line.accountId}`);
     }
-    if (account.isArchived && !context.allowedArchivedAccountIds?.has(account.id)) {
+    if (account.isArchived) {
       throw new Error(
         `Archived account cannot receive a new posting: ${line.accountId}`,
       );
