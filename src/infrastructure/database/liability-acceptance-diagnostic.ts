@@ -435,7 +435,10 @@ export async function runLiabilityAcceptanceDiagnostic(): Promise<LiabilityAccep
     const cause =
       error instanceof Error
         ? Object.getOwnPropertyNames(error)
-            .map((key) => `${key}=${String((error as Error & Record<string, unknown>)[key])}`)
+            .map(
+              (key) =>
+                `${key}=${String((error as Error & Record<string, unknown>)[key])}`,
+            )
             .join("; ")
         : String(error);
     let foreignKeyState = "unavailable";
