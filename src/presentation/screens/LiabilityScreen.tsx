@@ -15,7 +15,10 @@ import type {
   LiabilityInstallment,
   LiabilityPayment,
 } from "../../domain/liability/liability";
-import type { RepaymentMethod } from "../../domain/liability/repayment-schedule";
+import {
+  addMonthsClamped,
+  type RepaymentMethod,
+} from "../../domain/liability/repayment-schedule";
 import { formatBigIntVi } from "../../shared/formatting/format-bigint";
 import { colors, spacing } from "../../shared/theme/tokens";
 import { ScreenBackLink } from "../components/ScreenBackLink";
@@ -47,7 +50,7 @@ function parseFxRateRatio(value: string): {
   denominator: string;
 } {
   const normalized = value.trim().replace(",", ".");
-  if (!/^(?:0|[1-9]\\d*)(?:\\.\\d{1,8})?$/.test(normalized)) {
+  if (!/^(?:0|[1-9]\d*)(?:\.\d{1,8})?$/.test(normalized)) {
     throw new Error("Tỷ giá phải là số thập phân dương, tối đa 8 chữ số");
   }
   const [whole, fraction = ""] = normalized.split(".");
@@ -307,15 +310,11 @@ export function LiabilityScreen() {
       }
       const rate = parseAprPpm(apr);
       const fx = parseFxRateRatio(originationFxRate);
-      const [year, month, day] = startDate.split("-").map(Number);
-      const nextDate = new Date(Date.UTC(year!, month! - 1, day! + 1))
-        .toISOString()
-        .slice(0, 10);
-      const dueDate = firstDueDate || nextDate;
+      const dueDate = firstDueDate || addMonthsClamped(startDate, 1);
       const principalParts =
         method === "DECLINING"
           ? decliningPrincipalInput
-              .split(/[;\\n]+/)
+              .split(/[;\n]+/)
               .map((part) => part.trim())
               .filter(Boolean)
               .map((part) => parseMinorUnits(part, selectedCurrency.minorUnit))
