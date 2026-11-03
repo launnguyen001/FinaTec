@@ -179,6 +179,9 @@ export function AppScreen() {
           <Link href="/accounts" style={styles.navigationLink}>
             Tài khoản
           </Link>
+          <Link href="/assets" style={styles.navigationLink}>
+            Tài sản
+          </Link>
           <Link href="/categories" style={styles.navigationLink}>
             Danh mục
           </Link>
