@@ -196,7 +196,10 @@ export function AccountsScreen() {
               key={value}
               label={value}
               selected={type === value}
-              onPress={() => setType(value)}
+              onPress={() => {
+                setType(value);
+                if (value !== "ASSET") setIsInvestment(false);
+              }}
             />
           ))}
         </View>
