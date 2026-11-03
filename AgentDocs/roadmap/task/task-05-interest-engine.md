@@ -2,7 +2,7 @@
 
 - Giai đoạn: 3 — MVP 2
 - Ưu tiên: P1
-- Trạng thái: IMPLEMENTATION IN PROGRESS — domain, migration, atomic repository, application service and UI implemented; CI/device acceptance pending
+- Trạng thái: IMPLEMENTATION COMPLETE — GitHub CI PASS; awaiting Android SQLCipher/device acceptance
 - Phụ thuộc: TASK-02, TASK-04
 - Branch triển khai: `task/05-interest-engine`
 - Base: `main` tại `14db998`; branch đã được đồng bộ với toàn bộ baseline Task04 và closeout docs
