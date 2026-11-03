@@ -26,6 +26,7 @@ export interface LiabilityRepository {
   addRateChange(change: LiabilityRateChange, installments: LiabilityInstallment[]): Promise<void>;
   reversePayment(input: { paymentId: string; reversal: LiabilityJournalCommit; record: LiabilityPaymentReversal }): Promise<void>;
   findPaymentReversal(paymentId: string): Promise<LiabilityPaymentReversal | null>;
+  listPaymentReversals(liabilityId: string): Promise<LiabilityPaymentReversal[]>;
   commitPayment(input: LiabilityPaymentCommit): Promise<LiabilityPayment>;
   syncStatuses(liabilityId: string, localDate: string): Promise<void>;
   archive(id: string, archivedAt: string): Promise<void>;
