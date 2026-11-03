@@ -507,6 +507,136 @@ export const assetDailyValuations = sqliteTable("asset_daily_valuations", {
   closedAt: text("closed_at"),
   createdAt: text("created_at").notNull(),
 });
+export const interestPlans = sqliteTable(
+  "interest_plans",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    principalAccountId: text("principal_account_id")
+      .notNull()
+      .references(() => accounts.id, {
+        onDelete: "restrict",
+        onUpdate: "restrict",
+      }),
+    interestIncomeAccountId: text("interest_income_account_id")
+      .notNull()
+      .references(() => accounts.id, {
+        onDelete: "restrict",
+        onUpdate: "restrict",
+      }),
+    payoutAccountId: text("payout_account_id").references(() => accounts.id, {
+      onDelete: "restrict",
+      onUpdate: "restrict",
+    }),
+    annualRatePpm: integer("annual_rate_ppm").notNull(),
+    rateConvention: text("rate_convention", { enum: ["NOMINAL_APR"] })
+      .notNull()
+      .default("NOMINAL_APR"),
+    dayCount: text("day_count", { enum: ["ACT_365_FIXED"] })
+      .notNull()
+      .default("ACT_365_FIXED"),
+    compounding: text("compounding", {
+      enum: ["SIMPLE", "AFTER_CAPITALIZATION"],
+    }).notNull(),
+    postingFrequency: text("posting_frequency", {
+      enum: ["MONTHLY", "AT_MATURITY"],
+    }).notNull(),
+    startDate: text("start_date").notNull(),
+    maturityDate: text("maturity_date"),
+    timezoneId: text("timezone_id").notNull(),
+    status: text("status", { enum: ["ACTIVE", "PAUSED", "CLOSED"] })
+      .notNull()
+      .default("ACTIVE"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [
+    index("interest_plans_principal_status_idx").on(
+      table.principalAccountId,
+      table.status,
+    ),
+    uniqueIndex("interest_plans_one_active_per_principal")
+      .on(table.principalAccountId)
+      .where(sql`${table.status} = 'ACTIVE'`),
+    check("interest_plans_name_nonempty", sql`length(trim(${table.name})) > 0`),
+    check(
+      "interest_plans_rate_range",
+      sql`${table.annualRatePpm} BETWEEN 0 AND 10000000`,
+    ),
+    check(
+      "interest_plans_maturity_after_start",
+      sql`${table.maturityDate} IS NULL OR ${table.maturityDate} > ${table.startDate}`,
+    ),
+  ],
+);
+
+export const interestAccruals = sqliteTable(
+  "interest_accruals",
+  {
+    id: text("id").primaryKey(),
+    planId: text("plan_id")
+      .notNull()
+      .references(() => interestPlans.id, {
+        onDelete: "restrict",
+        onUpdate: "restrict",
+      }),
+    periodStart: text("period_start").notNull(),
+    periodEnd: text("period_end").notNull(),
+    principalMinor: integer("principal_minor").notNull(),
+    accruedNumerator: text("accrued_numerator").notNull(),
+    accruedDenominator: text("accrued_denominator").notNull(),
+    amountMinor: integer("amount_minor").notNull(),
+    status: text("status", { enum: ["ACCRUED", "POSTED", "PAID"] })
+      .notNull()
+      .default("ACCRUED"),
+    accrualKind: text("accrual_kind", {
+      enum: ["CAPITALIZATION", "PAYOUT"],
+    }).notNull(),
+    journalEntryId: text("journal_entry_id")
+      .unique()
+      .references(() => journalEntries.id, {
+        onDelete: "restrict",
+        onUpdate: "restrict",
+      }),
+    idempotencyKey: text("idempotency_key").notNull().unique(),
+    createdAt: text("created_at").notNull(),
+    postedAt: text("posted_at"),
+    paidAt: text("paid_at"),
+  },
+  (table) => [
+    uniqueIndex("interest_accruals_plan_period_kind_unique").on(
+      table.planId,
+      table.periodStart,
+      table.periodEnd,
+      table.accrualKind,
+    ),
+    index("interest_accruals_plan_period_idx").on(
+      table.planId,
+      table.periodEnd,
+    ),
+    check(
+      "interest_accruals_period_check",
+      sql`${table.periodEnd} > ${table.periodStart}`,
+    ),
+    check(
+      "interest_accruals_principal_range",
+      sql`${table.principalMinor} > 0 AND ${table.principalMinor} <= 9007199254740991`,
+    ),
+    check(
+      "interest_accruals_fraction_positive",
+      sql`length(${table.accruedNumerator}) > 0 AND ${table.accruedNumerator} NOT GLOB '*[^0-9]*' AND length(${table.accruedDenominator}) > 0 AND ${table.accruedDenominator} NOT GLOB '*[^0-9]*' AND ${table.accruedDenominator} <> '0'`,
+    ),
+    check(
+      "interest_accruals_amount_range",
+      sql`${table.amountMinor} >= 0 AND ${table.amountMinor} <= 9007199254740991`,
+    ),
+    check(
+      "interest_accruals_journal_state",
+      sql`(${table.status} = 'ACCRUED' AND ${table.journalEntryId} IS NULL AND ${table.postedAt} IS NULL AND ${table.paidAt} IS NULL) OR (${table.status} = 'POSTED' AND ${table.accrualKind} = 'CAPITALIZATION' AND ${table.journalEntryId} IS NOT NULL AND ${table.postedAt} IS NOT NULL AND ${table.paidAt} IS NULL) OR (${table.status} = 'PAID' AND ${table.accrualKind} = 'PAYOUT' AND ${table.journalEntryId} IS NOT NULL AND ${table.postedAt} IS NOT NULL AND ${table.paidAt} IS NOT NULL)`,
+    ),
+  ],
+);
+
 export const ledgerSchema = {
   currencies,
   ledgerSettings,
@@ -523,4 +653,6 @@ export const ledgerSchema = {
   assetTransactions,
   assetPriceQuotes,
   assetDailyValuations,
+  interestPlans,
+  interestAccruals,
 };

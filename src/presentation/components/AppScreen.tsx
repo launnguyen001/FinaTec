@@ -190,6 +190,17 @@ export function AppScreen() {
           <Link href="/asset-settings" style={styles.navigationLink}>
             Cài đặt tài sản
           </Link>
+          <Link href="/interest" style={styles.navigationLink}>
+            Lãi suất & tiền gửi
+          </Link>
+          {__DEV__ ? (
+            <Link
+              href="/task05-interest-acceptance"
+              style={styles.navigationLink}
+            >
+              Task05 acceptance (DEV)
+            </Link>
+          ) : null}
           <Link href="/categories" style={styles.navigationLink}>
             Danh mục
           </Link>
