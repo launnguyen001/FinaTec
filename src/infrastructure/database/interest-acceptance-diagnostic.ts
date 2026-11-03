@@ -9,7 +9,11 @@ import { AccountingService } from "../../application/ledger/accounting-service";
 import { InterestService } from "../../application/interest/interest-service";
 import { Currency } from "../../domain/ledger/currency";
 import { calculateAccountBalance } from "../../domain/ledger/posting";
-import type { Account, JournalEntry, JournalLine } from "../../domain/ledger/repository";
+import type {
+  Account,
+  JournalEntry,
+  JournalLine,
+} from "../../domain/ledger/repository";
 import { SqliteInterestRepository } from "./sqlite-interest-repository";
 import { SqliteLedgerRepository } from "./sqlite-ledger-repository";
 import { ledgerMigrations } from "./migrations";
@@ -23,7 +27,9 @@ export interface InterestAcceptanceResult {
 }
 
 function toHex(bytes: Uint8Array): string {
-  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join(
+    "",
+  );
 }
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -51,7 +57,9 @@ export async function runInterestAcceptanceDiagnostic(): Promise<InterestAccepta
   const secureStoreName = `ketso.task05.acceptance.${suffix}`;
   const directory = SQLite.defaultDatabaseDirectory;
   assert(directory, "SQLite database directory is unavailable");
-  const fileUri = directory.startsWith("file://") ? directory : `file://${directory}`;
+  const fileUri = directory.startsWith("file://")
+    ? directory
+    : `file://${directory}`;
   const file = new FileSystem.File(fileUri, databaseName);
   assert(!file.exists, "Refusing to open a pre-existing diagnostic database");
 
@@ -71,13 +79,21 @@ export async function runInterestAcceptanceDiagnostic(): Promise<InterestAccepta
   try {
     await SecureStore.setItemAsync(secureStoreName, key);
     const restoredKey = await SecureStore.getItemAsync(secureStoreName);
-    assert(restoredKey === key, "Diagnostic SQLCipher key could not be restored");
+    assert(
+      restoredKey === key,
+      "Diagnostic SQLCipher key could not be restored",
+    );
 
-    client = await SQLite.openDatabaseAsync(databaseName, { useNewConnection: true });
+    client = await SQLite.openDatabaseAsync(databaseName, {
+      useNewConnection: true,
+    });
     const cipher = await client.getFirstAsync<{ cipher_version: string }>(
       "PRAGMA cipher_version",
     );
-    assert(cipher?.cipher_version, "SQLCipher is unavailable in this Development Build");
+    assert(
+      cipher?.cipher_version,
+      "SQLCipher is unavailable in this Development Build",
+    );
     cipherVersion = cipher.cipher_version;
     await client.execAsync(`PRAGMA key = "x'${restoredKey}'"`);
     await client.execAsync("PRAGMA foreign_keys = ON");
@@ -179,8 +195,14 @@ export async function runInterestAcceptanceDiagnostic(): Promise<InterestAccepta
     });
     assert(accrued.accrual, "Expected an accrued interest record");
     const principalCurrency = new Currency("USDT", 6);
-    const beforeLines = await ledger.listPostedJournalLinesForAccount(principal.id);
-    const beforeBalance = calculateAccountBalance(principal, beforeLines, principalCurrency);
+    const beforeLines = await ledger.listPostedJournalLinesForAccount(
+      principal.id,
+    );
+    const beforeBalance = calculateAccountBalance(
+      principal,
+      beforeLines,
+      principalCurrency,
+    );
     check(
       "Accrued does not change Ledger balance",
       accrued.accrual.status === "ACCRUED" &&
@@ -192,8 +214,13 @@ export async function runInterestAcceptanceDiagnostic(): Promise<InterestAccepta
     const beforeCount = await client.getFirstAsync<{ count: number }>(
       "SELECT COUNT(*) AS count FROM journal_entries",
     );
-    const duplicateLineId = beforeLines.find((line) => line.accountId === principal.id)?.id;
-    assert(duplicateLineId, "Opening-balance principal journal line was not found");
+    const duplicateLineId = beforeLines.find(
+      (line) => line.accountId === principal.id,
+    )?.id;
+    assert(
+      duplicateLineId,
+      "Opening-balance principal journal line was not found",
+    );
     const rollbackEntryId = `task05-${suffix}-rollback-entry`;
     const rollbackEntry: JournalEntry = {
       id: rollbackEntryId,
@@ -266,7 +293,8 @@ export async function runInterestAcceptanceDiagnostic(): Promise<InterestAccepta
     );
 
     const capitalized = await interest.postAccrual(accrued.accrual.id);
-    const afterCapitalizationLines = await ledger.listPostedJournalLinesForAccount(principal.id);
+    const afterCapitalizationLines =
+      await ledger.listPostedJournalLinesForAccount(principal.id);
     const afterCapitalizationBalance = calculateAccountBalance(
       principal,
       afterCapitalizationLines,
@@ -276,9 +304,9 @@ export async function runInterestAcceptanceDiagnostic(): Promise<InterestAccepta
       "SELECT COUNT(*) AS count FROM journal_entries",
     );
     await interest.postAccrual(accrued.accrual.id);
-    const journalCountAfterRetry = await client.getFirstAsync<{ count: number }>(
-      "SELECT COUNT(*) AS count FROM journal_entries",
-    );
+    const journalCountAfterRetry = await client.getFirstAsync<{
+      count: number;
+    }>("SELECT COUNT(*) AS count FROM journal_entries");
     check(
       "Atomic capitalization and idempotent retry",
       capitalized.status === "POSTED" &&
@@ -337,7 +365,8 @@ export async function runInterestAcceptanceDiagnostic(): Promise<InterestAccepta
       databaseName,
       cipherVersion,
       checks,
-      cleanup: "Diagnostic database and temporary SecureStore key are removed in finally.",
+      cleanup:
+        "Diagnostic database and temporary SecureStore key are removed in finally.",
     };
   } finally {
     if (client) {
