@@ -439,6 +439,44 @@ export class SqliteAssetRepository implements AssetRepository {
     });
   }
 
+  async listLots(assetId: string) {
+    const facts = await this.findAssetForTransaction(assetId);
+    if (!facts) throw new Error("Asset does not exist");
+    const rows = await this.db.select().from(assetLots)
+      .where(eq(assetLots.assetId, assetId)).all();
+    const activeAggregateIds = new Set(
+      rows.filter((row) => row.status === "ACTIVE").map((row) => row.id),
+    );
+    const componentIds = new Set(
+      (await this.db.select().from(assetDcaComponents).all()).map(
+        (component) => component.componentLotId,
+      ),
+    );
+    return rows
+      .filter((row) => {
+        const hasQuantity =
+          normalizeDecimal(row.remainingQuantity, facts.assetType.quantityPrecision) !== "0";
+        if (!hasQuantity) return false;
+        if (row.status === "ACTIVE" && row.mergedIntoId === null) return true;
+        return row.status === "MERGED" &&
+          row.mergedIntoId !== null &&
+          activeAggregateIds.has(row.mergedIntoId) &&
+          componentIds.has(row.id);
+      })
+      .map((row) => ({
+        id: row.id,
+        assetId: row.assetId,
+        currencyCode: row.currencyCode,
+        quantity: row.quantity,
+        remainingQuantity: row.remainingQuantity,
+        costBasisMinor: BigInt(row.costBasisMinor),
+        remainingCostBasisMinor: BigInt(row.remainingCostBasisMinor),
+        acquiredAt: row.acquiredAt,
+        status: row.status,
+        mergedIntoId: row.mergedIntoId,
+      }));
+  }
+
   async getCurrentQuantity(assetId: string): Promise<string> {
     const facts = await this.findAssetForTransaction(assetId);
     if (!facts) throw new Error("Asset does not exist");
