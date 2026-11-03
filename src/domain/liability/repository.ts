@@ -3,6 +3,8 @@ import type {
   LiabilityInstallment,
   LiabilityPayment,
   LiabilityRateChange,
+  LiabilityPaymentReversal,
+  LiabilityJournalCommit,
   LiabilityJournalCommit,
   LiabilityPaymentCommit,
 } from "./liability";
@@ -21,6 +23,8 @@ export interface LiabilityRepository {
   listPayments(liabilityId: string): Promise<LiabilityPayment[]>;
   listRateChanges(liabilityId: string): Promise<LiabilityRateChange[]>;
   addRateChange(change: LiabilityRateChange, installments: LiabilityInstallment[]): Promise<void>;
+  reversePayment(input: { paymentId: string; reversal: LiabilityJournalCommit; record: LiabilityPaymentReversal }): Promise<void>;
+  findPaymentReversal(paymentId: string): Promise<LiabilityPaymentReversal | null>;
   commitPayment(input: LiabilityPaymentCommit): Promise<LiabilityPayment>;
   syncStatuses(liabilityId: string, localDate: string): Promise<void>;
   archive(id: string, archivedAt: string): Promise<void>;
