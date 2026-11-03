@@ -1,5 +1,6 @@
 import * as Crypto from "expo-crypto";
 import { AccountService } from "../application/account/account-service";
+import { AssetTransactionService } from "../application/asset/asset-transaction-service";
 import { CategoryService } from "../application/category/category-service";
 import { DashboardService } from "../application/finance/dashboard-service";
 import { FinanceTransactionService } from "../application/finance/finance-transaction-service";
@@ -26,6 +27,7 @@ export async function createFinanceRuntime() {
     createId,
     ledger,
     assetRepository,
+    assetTransactions: new AssetTransactionService(assetRepository, ledger, categoryRepository, { now }),
     accounts: new AccountService(accountRepository, ledger, { createId, now }),
     categories: new CategoryService(categoryRepository, { createId, now }),
     transactions: new FinanceTransactionService(
