@@ -54,6 +54,23 @@ describe("CategoryService", () => {
     await expect(service.reparent(parent.id, child.id)).rejects.toThrow(/cycle/);
   });
 
+  it("updates category name and parent through one validated metadata operation", async () => {
+    const firstParent = await service.create({ name: "Food", kind: "EXPENSE" });
+    const secondParent = await service.create({ name: "Living", kind: "EXPENSE" });
+    const child = await service.create({ name: "Lunch", kind: "EXPENSE", parentId: firstParent.id });
+
+    const updated = await service.updateMetadata(child.id, {
+      name: "Dining",
+      parentId: secondParent.id,
+    });
+    expect(updated).toMatchObject({ name: "Dining", parentId: secondParent.id });
+
+    await expect(service.updateMetadata(secondParent.id, {
+      name: "Living",
+      parentId: child.id,
+    })).rejects.toThrow(/cycle/);
+  });
+
   it("archives without deleting historical category identity", async () => {
     const category = await service.create({ name: "Rent", kind: "EXPENSE" });
     await service.archive(category.id);
