@@ -65,6 +65,7 @@ export class InMemoryLedgerRepository implements LedgerRepository {
     if (input.lines.length === 0) {
       throw new Error("A draft journal entry must contain at least one line");
     }
+    this.assertNoArchivedAccounts(input.lines);
     this.assertIdempotencyUnused(input.entry);
     this.entries.set(input.entry.id, input.entry);
     this.linesByEntry.set(input.entry.id, [...input.lines]);
@@ -128,39 +129,19 @@ export class InMemoryLedgerRepository implements LedgerRepository {
         "A journal entry must contain at least two lines before posting",
       );
     }
+    this.assertNoArchivedAccounts(lines);
     const posted: JournalEntry = { ...entry, status: "POSTED", postedAt };
     this.entries.set(entry.id, posted);
     return { entry: posted, lines, created: true };
   }
 
-  private assertArchivedPosting(input: PostingCommitInput): void {
-    const archivedIds = new Set(input.lines.filter((line) => this.accounts.get(line.accountId)?.isArchived).map((line) => line.accountId));
-    const purpose = input.entry.postingPurpose ?? "STANDARD";
-    if (archivedIds.size === 0) {
-      if (purpose !== "STANDARD" || input.entry.auditReason) throw new Error("Archived-account audit metadata is only valid when a posting touches an archived account");
-      return;
+  private assertNoArchivedAccounts(lines: readonly JournalLine[]): void {
+    const archivedLine = lines.find((line) => this.accounts.get(line.accountId)?.isArchived);
+    if (archivedLine) {
+      throw new Error(`Archived account cannot receive a new posting: ${archivedLine.accountId}`);
     }
-    if ((input.entry.auditReason?.trim().length ?? 0) < 8) throw new Error("Archived-account posting requires an audit reason of at least 8 characters");
-    if (purpose === "ARCHIVED_ACCOUNT_SETTLEMENT" || purpose === "ARCHIVED_ACCOUNT_ADJUSTMENT") {
-      if (input.entry.transactionKind !== "ADJUSTMENT" || input.entry.reversalOfId !== null || archivedIds.size !== 1 || input.lines.length !== 2) throw new Error("Archived-account settlement command is invalid");
-      const source = input.lines.find((line) => archivedIds.has(line.accountId));
-      const destination = input.lines.find((line) => !archivedIds.has(line.accountId));
-      if (!source || !destination || this.accounts.get(source.accountId)?.type !== "ASSET" || this.accounts.get(destination.accountId)?.type !== "ASSET" || this.accounts.get(destination.accountId)?.isArchived || source.side !== "CREDIT" || destination.side !== "DEBIT" || source.amountMinor !== destination.amountMinor || source.currencyCode !== destination.currencyCode) throw new Error("Archived-account settlement lines are invalid");
-      return;
-    }
-    if (purpose === "ARCHIVED_ACCOUNT_REVERSAL" && input.entry.transactionKind === "REVERSAL" && input.entry.reversalOfId) {
-      const original = this.entries.get(input.entry.reversalOfId);
-      const originalLines = this.linesByEntry.get(input.entry.reversalOfId) ?? [];
-      if (!original || original.status !== "POSTED" || originalLines.length !== input.lines.length || original.baseCurrencyCode !== input.entry.baseCurrencyCode || (original.categoryId ?? null) !== (input.entry.categoryId ?? null)) throw new Error("Archived-account reversal source is invalid");
-      for (let index = 0; index < originalLines.length; index += 1) {
-        const source = originalLines[index]!;
-        const reversal = input.lines[index]!;
-        if (source.accountId !== reversal.accountId || source.amountMinor !== reversal.amountMinor || source.baseAmountMinor !== reversal.baseAmountMinor || source.currencyCode !== reversal.currencyCode || source.side === reversal.side || source.fxRateNumerator !== reversal.fxRateNumerator || source.fxRateDenominator !== reversal.fxRateDenominator) throw new Error("Archived-account reversal must mirror the original lines");
-      }
-      return;
-    }
-    throw new Error("Archived accounts require a dedicated settlement or reversal purpose");
   }
+
   async commitPostedEntry(input: PostingCommitInput): Promise<PostingResult> {
     this.commitCount += 1;
     if (this.failNextCommit) {
@@ -175,7 +156,7 @@ export class InMemoryLedgerRepository implements LedgerRepository {
       throw new Error("A posted journal entry must contain at least two lines");
     }
 
-    this.assertArchivedPosting(input);
+    this.assertNoArchivedAccounts(input.lines);
     this.assertIdempotencyUnused(input.entry);
     if (input.entry.reversalOfId !== null) {
       const reversal = await this.findReversalOfEntry(input.entry.reversalOfId);
