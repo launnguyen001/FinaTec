@@ -7,11 +7,11 @@ import {
   Text,
   TextInput,
   View,
+  Platform,
 } from "react-native";
 import * as SecureStore from "expo-secure-store";
 import * as BackgroundTask from "expo-background-task";
 import * as TaskManager from "expo-task-manager";
-import { Platform } from "react-native";
 import type { AssetSettingsRecord } from "../../domain/asset/repository";
 import { ScreenBackLink } from "../components/ScreenBackLink";
 import { useFinanceRuntime } from "../providers/FinanceRuntimeProvider";

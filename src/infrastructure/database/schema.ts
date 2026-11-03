@@ -23,7 +23,7 @@ export const currencies = sqliteTable(
   (table) => [
     check(
       "currencies_code_format",
-      sql`length(${table.code}) = 3 AND ${table.code} = upper(${table.code})`,
+      sql`length(${table.code}) BETWEEN 3 AND 4 AND ${table.code} = upper(${table.code})`,
     ),
     check(
       "currencies_minor_unit_range",

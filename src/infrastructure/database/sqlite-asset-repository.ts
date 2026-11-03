@@ -683,6 +683,7 @@ export class SqliteAssetRepository implements AssetRepository {
             calculation.remainingCostBasisMinor,
           ),
           status: nextStatus,
+          mergedIntoId: nextStatus === "CLOSED" ? null : lot.mergedIntoId,
         })
         .where(
           and(
@@ -891,7 +892,7 @@ export class SqliteAssetRepository implements AssetRepository {
       ) {
         throw new Error("Quote asset or quote currency is invalid");
       }
-      if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(input.valuationDate)) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(input.valuationDate)) {
         throw new Error("Valuation date must use YYYY-MM-DD");
       }
       if (

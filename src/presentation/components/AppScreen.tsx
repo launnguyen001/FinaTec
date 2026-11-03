@@ -16,6 +16,7 @@ import type { TransactionHistoryItem } from "../../application/finance/transacti
 import type { Account, CurrencyRecord } from "../../domain/ledger/repository";
 import { useFinanceRuntime } from "../providers/FinanceRuntimeProvider";
 import { colors, spacing, typography } from "../../shared/theme/tokens";
+import { formatBigIntVi } from "../../shared/formatting/format-bigint";
 
 function formatMoney(
   amountMinor: bigint,
@@ -30,9 +31,7 @@ function formatMoney(
     precision > 0
       ? `,${(absolute % scale).toString().padStart(precision, "0")}`
       : "";
-  const formattedMajor = new Intl.NumberFormat("vi-VN", {
-    maximumFractionDigits: 0,
-  }).format(major);
+  const formattedMajor = formatBigIntVi(major);
   return `${amountMinor < 0n ? "−" : ""}${formattedMajor}${fraction} ${code}`.trim();
 }
 

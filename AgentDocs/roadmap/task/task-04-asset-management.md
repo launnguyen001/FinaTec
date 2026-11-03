@@ -276,3 +276,11 @@ Không lưu trùng số dư ACCOUNT của TASK-03 trong bảng asset. Bảo đ�
 - TASK-05 là task chuyên trách Interest Engine, nhưng TASK-05 hiện phụ thuộc TASK-04; công thức APR/APY, day-count, kỳ tính và quy tắc làm tròn vẫn chưa được chốt trong TASK-05.
 - Vì vậy không triển khai một interest engine thứ hai trong Asset Management và không tự suy diễn công thức lãi. Hiện TASK-04 chưa đáp ứng tiêu chí nghiệm thu số 3.
 - Cần owner quyết định một trong hai hướng: (A) chuyển tiêu chí accrual sang TASK-05 và chỉ yêu cầu TASK-04 lưu metadata/contract cho khoản tiền gửi có lãi; hoặc (B) chốt công thức tối thiểu và interface INTEREST_PLAN/INTEREST_ACCRUAL để TASK-04 tích hợp engine dùng chung.
+
+## 16. Kiểm chứng acceptance trên Android (2026-11-04)
+
+- Đã build và cài development build mới trên Android arm64; build cũ thiếu native module `ExpoTaskManager` nên không thể chạy bundle hiện tại.
+- CLI acceptance trên database SQLCipher cô lập đã PASS 15 kiểm tra: Core Finance → Task04 migration upgrade; settings migration/persistence; rollback nguyên tử; nhiều lot; partial-sale cost basis; DCA không tạo Ledger entry; realized/unrealized P&L; same-day snapshot upsert và rollover; archive guard/lifecycle; atomic refresh claim và refresh-state persistence. Diagnostic báo SQLCipher 4.17.0 và xác nhận file/key cô lập được cleanup.
+- Acceptance phát hiện và đã sửa các lỗi: schema/domain chỉ cho currency 3 ký tự trong khi crypto dùng USDT; regex snapshot date bị escape sai; đóng DCA component không xóa `merged_into_id`; Hermes không nhận `bigint` trực tiếp trong `Intl.NumberFormat`. Migration `0004_usdt_currency_code` mở rộng currency code lên 4 ký tự và bảo toàn các foreign key hiện có.
+- `npx expo lint` và `npx tsc --noEmit` PASS sau các sửa đổi.
+- TASK-04 vẫn chưa DONE: tiêu chí interest accrual đang chờ quyết định owner tại mục 15; chưa chốt ngân sách/provider kim loại; chưa xác nhận kiểm thử iOS và background behavior theo từng OS.

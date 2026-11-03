@@ -15,6 +15,7 @@ import type { DailyValuation } from "../../domain/asset/asset";
 import { ScreenBackLink } from "../components/ScreenBackLink";
 import { useFinanceRuntime } from "../providers/FinanceRuntimeProvider";
 import { colors, spacing, typography } from "../../shared/theme/tokens";
+import { formatBigIntVi } from "../../shared/formatting/format-bigint";
 
 type Performance = {
   quantity: string;
@@ -38,11 +39,7 @@ function money(amount: bigint, precision: number, currency: string): string {
       ? "," + (absolute % scale).toString().padStart(precision, "0")
       : "";
   return (
-    (amount < 0n ? "−" : "") +
-    new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }).format(whole) +
-    fraction +
-    " " +
-    currency
+    (amount < 0n ? "−" : "") + formatBigIntVi(whole) + fraction + " " + currency
   );
 }
 

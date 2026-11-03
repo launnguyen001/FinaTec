@@ -14,6 +14,7 @@ import type { Account, CurrencyRecord } from "../../domain/ledger/repository";
 import { useFinanceRuntime } from "../providers/FinanceRuntimeProvider";
 import { ScreenBackLink } from "../components/ScreenBackLink";
 import { colors, spacing, typography } from "../../shared/theme/tokens";
+import { formatBigIntVi } from "../../shared/formatting/format-bigint";
 
 function flatten(nodes: (Category & { children: Category[] })[]): Category[] {
   return nodes.flatMap((node) => [
@@ -36,7 +37,7 @@ function formatLineAmount(
     precision > 0
       ? `,${(line.amountMinor % scale).toString().padStart(precision, "0")}`
       : "";
-  return `${new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }).format(major)}${fraction} ${line.currencyCode}`;
+  return `${formatBigIntVi(major)}${fraction} ${line.currencyCode}`;
 }
 
 export function HistoryScreen() {
