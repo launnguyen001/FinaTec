@@ -34,10 +34,21 @@ describe("AccountService", () => {
     const service = new AccountService(repository, ledger, { createId: () => "account-id", now: () => timestamp });
     const cash = await service.create({ name: "Cash", type: "ASSET", subtype: "CASH", currencyCode: "VND" });
     ledger.accounts.set(cash.id, cash);
+    ledger.entries.set("zero-balance-entry", {
+      id: "zero-balance-entry", occurredAt: timestamp, description: "Balanced seed", status: "POSTED",
+      baseCurrencyCode: "VND", idempotencyKey: "zero-seed", reversalOfId: null,
+      transactionKind: "ADJUSTMENT", categoryId: null, createdAt: timestamp, postedAt: timestamp,
+    });
+    ledger.linesByEntry.set("zero-balance-entry", [
+      { id: "zero-debit", entryId: "zero-balance-entry", lineNumber: 1, accountId: cash.id, currencyCode: "VND", side: "DEBIT", amountMinor: 100n, fxRateNumerator: "1", fxRateDenominator: "1", baseAmountMinor: 100n, memo: null, createdAt: timestamp },
+      { id: "zero-credit", entryId: "zero-balance-entry", lineNumber: 2, accountId: cash.id, currencyCode: "VND", side: "CREDIT", amountMinor: 100n, fxRateNumerator: "1", fxRateDenominator: "1", baseAmountMinor: 100n, memo: null, createdAt: timestamp },
+    ]);
     await service.archive(cash.id);
     expect(await repository.findById(cash.id)).toMatchObject({ isArchived: true });
     await service.restoreAccount(cash.id);
     expect(await repository.findById(cash.id)).toMatchObject({ isArchived: false });
+    expect(ledger.entries.size).toBe(1);
+    expect((await ledger.listPostedJournalLinesForAccount(cash.id))).toHaveLength(2);
     await expect(service.rename(cash.id, "New cash")).resolves.toMatchObject({ name: "New cash" });
   });
 
