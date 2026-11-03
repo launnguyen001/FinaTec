@@ -63,9 +63,12 @@ export class SqliteAssetRepository {
       }
       if (
         transaction.assetId !== lot.assetId ||
+        transaction.currencyCode !== lot.currencyCode ||
         transaction.lotId !== lot.id ||
         transaction.journalEntryId !== posting.entry.id ||
         transaction.costBasisMinor !== BigInt(lot.costBasisMinor) ||
+        transaction.grossAmountMinor !== BigInt(lot.costBasisMinor) ||
+        transaction.netCashAmountMinor !== transaction.grossAmountMinor + transaction.feeAmountMinor ||
         BigInt(lot.remainingCostBasisMinor) !== BigInt(lot.costBasisMinor) ||
         lot.quantity !== lot.remainingQuantity ||
         lot.status !== "ACTIVE" ||
@@ -74,6 +77,7 @@ export class SqliteAssetRepository {
         throw new Error("Purchase lot and transaction facts are inconsistent");
       }
 
+      this.validateAssetAccounts(tx, transaction);
       if (!this.insertPostedJournal(tx, posting)) return { created: false };
       tx.insert(assetLots).values(lot).run();
       this.insertAssetTransaction(tx, transaction);
@@ -94,12 +98,13 @@ export class SqliteAssetRepository {
       if (transaction.journalEntryId !== posting.entry.id) {
         throw new Error("Sale transaction must reference its posted Journal Entry");
       }
+      this.validateAssetAccounts(tx, transaction);
       if (this.hasExistingAssetPosting(tx, posting)) {
         return { created: false, calculation: null };
       }
 
       const lot = tx.select().from(assetLots).where(eq(assetLots.id, transaction.lotId)).get();
-      if (!lot || lot.assetId !== transaction.assetId) {
+      if (!lot || lot.assetId !== transaction.assetId || lot.currencyCode !== transaction.currencyCode) {
         throw new Error("Selected asset lot does not exist for this asset");
       }
 
@@ -270,6 +275,17 @@ export class SqliteAssetRepository {
       .get();
     if (!row) throw new Error("Asset type does not exist for DCA source lots");
     return row.quantityPrecision;
+  }
+
+  private validateAssetAccounts(tx: LedgerTransaction, transaction: AssetTransactionWrite): void {
+    const cash = tx.select().from(accounts).where(eq(accounts.id, transaction.cashAccountId)).get();
+    const investment = tx.select().from(accounts).where(eq(accounts.id, transaction.investmentAccountId)).get();
+    if (!cash || cash.type !== "ASSET" || cash.currencyCode !== transaction.currencyCode) {
+      throw new Error("Asset transaction cash account must be an ASSET account in the transaction currency");
+    }
+    if (!investment || investment.type !== "ASSET" || !investment.isInvestment || investment.currencyCode !== transaction.currencyCode) {
+      throw new Error("Asset transaction requires an INVESTMENT ASSET account in the transaction currency");
+    }
   }
 
   private insertAssetTransaction(tx: LedgerTransaction, transaction: AssetTransactionWrite): void {
