@@ -15,7 +15,6 @@ import type {
 } from "../../domain/liability/liability";
 import type { LiabilityRepository } from "../../domain/liability/repository";
 import {
-  calculateAnnuityPayment,
   calculateRepaymentSchedule,
   type RepaymentMethod,
 } from "../../domain/liability/repayment-schedule";
@@ -379,7 +378,7 @@ export class LiabilityService {
 
     const timestamp = this.now();
     const installmentUpdates: LiabilityInstallment[] = [];
-    for (const [id, item] of updates) {
+    for (const item of updates.values()) {
       const principalNow = item.principalPaidMinor;
       const interestNow = item.interestPaidMinor;
       installmentUpdates.push({
@@ -416,13 +415,23 @@ export class LiabilityService {
           const target = future[0]!.totalDueMinor;
           let selectedTerm = 1;
           for (let months = 1; months <= future.length; months += 1) {
-            const payment = calculateAnnuityPayment(
-              newBalance,
-              liability.annualRatePpm,
-              months,
-            );
-            if (payment >= target) selectedTerm = months;
-            else break;
+            const candidatePrincipal = liability.repaymentMethod === "DECLINING"
+              ? allocateEvenly(newBalance, months)
+              : undefined;
+            const candidate = calculateRepaymentSchedule({
+              principalMinor: newBalance,
+              annualRatePpm: liability.annualRatePpm,
+              termMonths: months,
+              method: liability.repaymentMethod,
+              startDate: localDate,
+              firstDueDate: nextDueDate,
+              decliningPrincipalMinor: candidatePrincipal,
+            });
+            if (candidate.installments[0]!.totalDueMinor >= target) {
+              selectedTerm = months;
+            } else {
+              break;
+            }
           }
           newTerm = selectedTerm;
         }
