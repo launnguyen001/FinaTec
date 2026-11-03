@@ -94,6 +94,9 @@ export class SqliteAssetRepository {
       if (transaction.journalEntryId !== posting.entry.id) {
         throw new Error("Sale transaction must reference its posted Journal Entry");
       }
+      if (this.hasExistingAssetPosting(tx, posting)) {
+        return { created: false, calculation: null };
+      }
 
       const lot = tx.select().from(assetLots).where(eq(assetLots.id, transaction.lotId)).get();
       if (!lot || lot.assetId !== transaction.assetId) {
@@ -279,30 +282,30 @@ export class SqliteAssetRepository {
     }).run();
   }
 
+  private hasExistingAssetPosting(tx: LedgerTransaction, posting: PostingCommitInput): boolean {
+    const key = posting.entry.idempotencyKey;
+    if (!key) throw new Error("Asset posting requires an idempotency key");
+    const existing = tx.select().from(journalEntries)
+      .where(eq(journalEntries.idempotencyKey, key)).get();
+    if (!existing) return false;
+    if (existing.id !== posting.entry.id) {
+      throw new Error("Asset posting idempotency key is already used");
+    }
+    const transaction = tx.select({ id: assetTransactions.id })
+      .from(assetTransactions)
+      .where(eq(assetTransactions.journalEntryId, existing.id)).get();
+    if (!transaction) {
+      throw new Error("Idempotency key belongs to a Journal Entry without an asset transaction");
+    }
+    return true;
+  }
+
   private insertPostedJournal(tx: LedgerTransaction, posting: PostingCommitInput): boolean {
     const { entry, lines } = posting;
     if (entry.status !== "POSTED" || entry.postedAt === null || !entry.idempotencyKey?.trim()) {
       throw new Error("Asset posting requires a POSTED entry and idempotency key");
     }
-    const existing = tx
-      .select()
-      .from(journalEntries)
-      .where(eq(journalEntries.idempotencyKey, entry.idempotencyKey))
-      .get();
-    if (existing) {
-      if (existing.id !== entry.id) {
-        throw new Error("Asset posting idempotency key is already used");
-      }
-      const transaction = tx
-        .select({ id: assetTransactions.id })
-        .from(assetTransactions)
-        .where(eq(assetTransactions.journalEntryId, existing.id))
-        .get();
-      if (!transaction) {
-        throw new Error("Idempotency key belongs to a Journal Entry without an asset transaction");
-      }
-      return false;
-    }
+    if (this.hasExistingAssetPosting(tx, posting)) return false;
 
     const accountRows = tx.select().from(accounts).all();
     const currencyRows = tx.select().from(currencies).all();
