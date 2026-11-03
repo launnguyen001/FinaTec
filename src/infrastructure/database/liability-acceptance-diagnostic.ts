@@ -433,30 +433,27 @@ export async function runLiabilityAcceptanceDiagnostic() {
     };
   } catch (error) {
     const cause =
-      error instanceof Error
-        ? Object.getOwnPropertyNames(error)
-            .map(
-              (key) =>
-                `${key}=${String((error as Error & Record<string, unknown>)[key])}`,
-            )
-            .join("; ")
-        : String(error);
+      error instanceof Error ? error.stack ?? error.message : String(error);
     let foreignKeyState = "unavailable";
     if (client) {
       try {
-        const violations = await client.getAllAsync(
-          "PRAGMA foreign_key_check",
+        foreignKeyState = JSON.stringify(
+          await client.getAllAsync("PRAGMA foreign_key_check"),
         );
-        foreignKeyState = JSON.stringify(violations);
       } catch (inspectionError) {
-        foreignKeyState = `inspection failed: ${String(inspectionError)}`;
+        foreignKeyState = String(inspectionError);
       }
     }
     const completed = checks
-      .map((item) => `${item.passed ? "PASS" : "FAIL"} ${item.name}`)
-      .join(" | ") || "none";
+      .map(({ name, passed }) => `${passed ? "PASS" : "FAIL"} ${name}`)
+      .join(" | ");
     throw new Error(
-      `Task06 diagnostic failed during "${stage}". Completed checks: ${completed}. PRAGMA foreign_key_check: ${foreignKeyState}. Cause: ${cause}`,
+      [
+        `Task06 diagnostic failed during "${stage}".`,
+        `Completed checks: ${completed || "none"}.`,
+        `PRAGMA foreign_key_check: ${foreignKeyState}.`,
+        `Cause: ${cause}`,
+      ].join(" "),
     );
   } finally {
     if (client) {
