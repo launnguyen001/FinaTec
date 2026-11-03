@@ -115,7 +115,6 @@ export class AssetTransactionService {
       input.fxRateDenominator,
     );
 
-    const entryId = "asset:buy:" + key;
     const lineSpecs: PostingLineSpec[] = [
       {
         accountId: investment.id,
@@ -275,7 +274,6 @@ export class AssetTransactionService {
       input.fxRateNumerator,
       input.fxRateDenominator,
     );
-    const entryId = "asset:sell:" + key;
     const lineSpecs: PostingLineSpec[] = [
       {
         accountId: cash.id,
