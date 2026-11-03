@@ -18,7 +18,7 @@ Tính toán và ghi nhận lãi phát sinh cho tài sản hoặc khoản nợ c�
 - Tính lãi đơn và lãi kép.
 - Lịch phát sinh lãi và vòng đời accrued/posted/paid.
 - Nhập lãi vào gốc hoặc thanh toán về tài khoản chỉ định.
-- Ghi nhận phần thưởng staking dưới dạng số lượng khi được đặc tả cho phép.
+- Staking reward quantity records: DEFERRED; requires a separate token/chain reward-source contract and is outside the approved MVP.
 - Xử lý bù các kỳ bị bỏ lỡ theo cách idempotent.
 
 Không bao gồm cam kết lợi suất từ nhà cung cấp, tự động thao tác on-chain hoặc sản phẩm chưa được hỗ trợ.
@@ -64,7 +64,7 @@ Owner approved the MVP conventions in section 5.1 on 2026-11-04. Only the listed
 
 - Lãi tài sản khi capitalization: Debit deposit ASSET / Credit interest INCOME.
 - Lãi tài sản khi payout: Debit receiving ASSET / Credit interest INCOME; không thay đổi principal deposit account.
-- Lãi nợ khi accrue: Debit interest EXPENSE / Credit LIABILITY; khi thanh toán: Debit LIABILITY / Credit funding ASSET.
+- Liability interest accounting is documented as a future mapping only; implementation is DEFERRED to the debt contract in TASK-06.
 - Accrued chưa POSTED là record theo dõi, không làm thay đổi Ledger. Capitalization/payout phải commit cùng InterestAccrual state transition để không double-count.
 
 ## 5. Decision log and approved MVP conventions
@@ -171,8 +171,8 @@ Rates are represented as parts per million: 5.5% = 55,000 ppm; 100% = 1,000,000 
 - Đã implement pure calculator: nominal APR (ppm), ACT/365 Fixed, start-inclusive/end-exclusive, HALF_UP và exact BigInt rational arithmetic; reference-vector unit tests đã thêm.
 - Đã implement migration `0005_interest_engine`, Drizzle schema, InterestPlan/InterestAccrual persistence, immutable plan terms và accrual history constraints.
 - Đã implement SQLite atomic commit: Journal Entry + Journal Lines + accrual state trong một transaction; duplicate Journal Line failure phải rollback cả transaction.
-- Đã implement InterestService: funded INVESTMENT ASSET validation, APR preview, accrued record, capitalization/payout, monthly/at-maturity catch-up, fractional carry across sub-minor periods và idempotent posting.
-- Đã implement foreground catch-up khi app khởi chạy/resume; UI route `/interest`; development SQLCipher acceptance route `/task05-interest-acceptance`.
-- MVP limitation: posting chỉ hỗ trợ account cùng Ledger base currency; liability interest, APY, early-withdrawal penalty và external principal changes sau ngày bắt đầu chưa hỗ trợ. Catch-up từ chối principal movement ngoài InterestPlan để không tính sai lịch sử.
+- Đã implement InterestService: funded INVESTMENT ASSET validation, timezone-aware principal movement guard, APR preview, accrued record, capitalization/payout, monthly/at-maturity catch-up, fractional carry across sub-minor periods, idempotent accrual/posting và plan pause/resume/close lifecycle.
+- Đã implement foreground catch-up khi app khởi chạy/resume; UI route `/interest` (create/list/preview/accrue/post/catch-up/pause/resume/close); development SQLCipher acceptance route `/task05-interest-acceptance`.
+- MVP limitation: posting chỉ hỗ trợ account cùng Ledger base currency; liability interest (TASK-06), staking rewards, APY, early-withdrawal penalty và variable-principal schedules chưa hỗ trợ. Principal phải được funding trước ngày bắt đầu theo timezone của plan; mọi external movement từ ngày bắt đầu trở đi khiến preview/accrual/catch-up bị từ chối để không tính sai lịch sử.
 - CI đã PASS trên baseline trước các bổ sung acceptance gần nhất; phải chạy lại CI trên latest head. SQLCipher device acceptance và Ledger reconciliation acceptance vẫn PENDING.
 - Branch sync: `task/05-interest-engine` hiện ahead 9 / behind 0 so với `main`; baseline Task04 đã được merge vào branch bằng merge commit `90a8617`, không force-push và không bỏ commit.
