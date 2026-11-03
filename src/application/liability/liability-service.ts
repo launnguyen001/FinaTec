@@ -1,4 +1,6 @@
 import { Currency } from "../../domain/ledger/currency";
+import { FxRate } from "../../domain/ledger/fx-rate";
+import { Money } from "../../domain/ledger/money";
 import { calculateAccountBalance } from "../../domain/ledger/posting";
 import type {
   Account,
@@ -34,6 +36,8 @@ export interface CreateLiabilityInput {
   timezoneId?: string;
   earlyPaymentPolicy?: EarlyPaymentPolicy;
   decliningPrincipalMinor?: readonly bigint[];
+  fxRateNumerator?: string;
+  fxRateDenominator?: string;
 }
 
 export interface RecordLiabilityPaymentInput {
@@ -46,6 +50,8 @@ export interface RecordLiabilityPaymentInput {
   paidAt?: string;
   idempotencyKey: string;
   note?: string | null;
+  fxRateNumerator?: string;
+  fxRateDenominator?: string;
 }
 
 export interface LiabilityServiceOptions {
@@ -145,12 +151,22 @@ export class LiabilityService {
         "Loan, receiving and interest accounts must use the same currency",
       );
     }
-    const baseCurrency = await this.ledger.getBaseCurrencyCode();
-    if (baseCurrency !== currencyCode) {
-      throw new Error(
-        "Liability MVP posting currently requires accounts in the Ledger base currency",
-      );
+    const baseCurrencyCode = await this.ledger.getBaseCurrencyCode();
+    if (!baseCurrencyCode) throw new Error("Ledger base currency is not configured");
+    const baseCurrencyRecord = (await this.ledger.listCurrencies(false)).find((item) => item.code === baseCurrencyCode);
+    if (!baseCurrencyRecord) throw new Error("Ledger base currency is unavailable");
+    const fxRateNumerator = currencyCode === baseCurrencyCode ? "1" : input.fxRateNumerator;
+    const fxRateDenominator = currencyCode === baseCurrencyCode ? "1" : input.fxRateDenominator;
+    if (!fxRateNumerator || !fxRateDenominator || !/^[1-9]\\d*$/.test(fxRateNumerator) || !/^[1-9]\\d*$/.test(fxRateDenominator)) {
+      throw new Error("A positive rational FX snapshot is required for a non-base-currency liability");
     }
+    const fxRate = new FxRate(
+      BigInt(fxRateNumerator),
+      BigInt(fxRateDenominator),
+      new Currency(currencyCode, currencyRecord.minorUnit),
+      new Currency(baseCurrencyCode, baseCurrencyRecord.minorUnit),
+    );
+    const basePrincipalMinor = fxRate.convertToBase(new Money(input.principalMinor, new Currency(currencyCode, currencyRecord.minorUnit))).minorUnits;
     const timezoneId =
       input.timezoneId ??
       Intl.DateTimeFormat().resolvedOptions().timeZone ??
@@ -168,6 +184,8 @@ export class LiabilityService {
       liabilityAccountId: liabilityAccount.id,
       interestExpenseAccountId: interestAccount.id,
       currencyCode,
+      fxRateNumerator,
+      fxRateDenominator,
       originalPrincipalMinor: input.principalMinor,
       outstandingPrincipalMinor: input.principalMinor,
       annualRatePpm: input.annualRatePpm,
@@ -207,7 +225,7 @@ export class LiabilityService {
       `liability:origination:${id}`,
       `Loan received: ${name}`,
       timestamp,
-      baseCurrency!,
+      baseCurrencyCode,
     );
     const journalLines = [
       this.createLine(
@@ -218,6 +236,9 @@ export class LiabilityService {
         input.principalMinor,
         timestamp,
         "Loan proceeds received",
+        fxRateNumerator,
+        fxRateDenominator,
+        basePrincipalMinor,
       ),
       this.createLine(
         journalEntry.id,
@@ -227,6 +248,9 @@ export class LiabilityService {
         input.principalMinor,
         timestamp,
         "Initial loan principal",
+        fxRateNumerator,
+        fxRateDenominator,
+        basePrincipalMinor,
       ),
     ];
     await this.repository.createLiability({
@@ -375,12 +399,25 @@ export class LiabilityService {
         "A positive fee requires an EXPENSE account in the liability currency",
       );
     }
-    const baseCurrency = await this.ledger.getBaseCurrencyCode();
-    if (baseCurrency !== liability.currencyCode) {
-      throw new Error(
-        "Liability payments currently require the Ledger base currency",
-      );
+    const baseCurrencyCode = await this.ledger.getBaseCurrencyCode();
+    if (!baseCurrencyCode) throw new Error("Ledger base currency is not configured");
+    const [nativeCurrencyRecord, baseCurrencyRecord] = await Promise.all([
+      this.ledger.listCurrencies(false).then((items) => items.find((item) => item.code === liability.currencyCode)),
+      this.ledger.listCurrencies(false).then((items) => items.find((item) => item.code === baseCurrencyCode)),
+    ]);
+    if (!nativeCurrencyRecord || !baseCurrencyRecord) throw new Error("Payment currency metadata is unavailable");
+    const fxRateNumerator = liability.currencyCode === baseCurrencyCode ? "1" : input.fxRateNumerator;
+    const fxRateDenominator = liability.currencyCode === baseCurrencyCode ? "1" : input.fxRateDenominator;
+    if (!fxRateNumerator || !fxRateDenominator || !/^[1-9]\\d*$/.test(fxRateNumerator) || !/^[1-9]\\d*$/.test(fxRateDenominator)) {
+      throw new Error("A positive rational FX snapshot is required for a non-base-currency payment");
     }
+    const fxRate = new FxRate(
+      BigInt(fxRateNumerator),
+      BigInt(fxRateDenominator),
+      new Currency(liability.currencyCode, nativeCurrencyRecord.minorUnit),
+      new Currency(baseCurrencyCode, baseCurrencyRecord.minorUnit),
+    );
+    const baseAmount = (amount: bigint) => fxRate.convertToBase(new Money(amount, new Currency(liability.currencyCode, nativeCurrencyRecord.minorUnit))).minorUnits;
 
     const paidAt = input.paidAt ?? this.now();
     const localDate = localDateAt(paidAt, liability.timezoneId);
@@ -553,7 +590,7 @@ export class LiabilityService {
       key,
       `Loan payment: ${liability.name}`,
       paidAt,
-      baseCurrency!,
+      baseCurrencyCode,
     );
     const journalLines: JournalLine[] = [];
     const add = (
@@ -592,6 +629,8 @@ export class LiabilityService {
       scheduleId: input.scheduleId ?? null,
       sourceAccountId: source.id,
       journalEntryId: journalEntry.id,
+      fxRateNumerator,
+      fxRateDenominator,
       idempotencyKey: key,
       paidAt,
       principalPaidMinor: principalPaid,
@@ -673,6 +712,9 @@ export class LiabilityService {
     amountMinor: bigint,
     createdAt: string,
     memo: string,
+    fxRateNumerator = "1",
+    fxRateDenominator = "1",
+    baseAmountMinor = amountMinor,
   ): JournalLine {
     return {
       id: this.options.createId(),
@@ -682,9 +724,9 @@ export class LiabilityService {
       currencyCode: account.currencyCode,
       side,
       amountMinor,
-      fxRateNumerator: "1",
-      fxRateDenominator: "1",
-      baseAmountMinor: amountMinor,
+      fxRateNumerator,
+      fxRateDenominator,
+      baseAmountMinor,
       memo,
       createdAt,
     };
