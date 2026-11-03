@@ -2,7 +2,7 @@
 
 - Giai đoạn: 4 — MVP 3: Khoản nợ, định kỳ và ngân sách
 - Ưu tiên: P1
-- Trạng thái: IMPLEMENTATION_IN_PROGRESS — CI format check đang fail; chưa bàn giao CLI acceptance
+- Trạng thái: IMPLEMENTATION_IN_PROGRESS — đã sửa formatter và các lỗi UI/idempotency phát hiện khi rà soát; chờ CI toàn phần và CLI acceptance
 - Phụ thuộc: TASK-02, TASK-03, TASK-05
 
 ## 1. Mục tiêu
@@ -90,8 +90,10 @@ Liability, RepaymentSchedule, LiabilityPayment (hoặc tên tương ứng theo n
 - Đã bổ sung migration 0008 FX snapshots cho khoản vay và payment. Khoản nợ có thể dùng currency khác Ledger base currency khi cung cấp tỷ giá rational numerator/denominator; các line lưu FX snapshot và base amount. Payment bị từ chối nếu làm phát sinh lệch rounding ở base currency thay vì tự tạo bút toán mất cân bằng.
 - Đã bổ sung migration 0009 allocation audit, schedule-change audit, payment reversal records và liên kết `replacesPaymentId`. Reversal tạo Journal Entry REVERSAL mới, kiểm tra đảo chính xác mọi line gốc, khôi phục counter/schedule trong cùng transaction; không sửa/xóa payment hay journal POSTED. Chỉ cho đảo theo thứ tự ngược thời gian để tránh phá vỡ các phân bổ sau đó.
 - UI đã có APR history/change, nhập gốc riêng từng kỳ DECLINING, tỷ giá tại origination/payment, đảo payment và liên kết payment thay thế.
+- Rà soát sau triển khai: đã sửa regex tỷ giá bị escape thừa (trước đó từ chối cả giá trị `1`), tách danh sách gốc DECLINING đúng theo newline/semicolon và mặc định kỳ đầu sau một tháng bằng `addMonthsClamped`.
+- Đã siết idempotency: retry cùng key nhưng khác số tiền, phí, nguồn, kỳ, liên kết thay thế, note hoặc FX snapshot bị từ chối; bổ sung unit test cho payload amount khác và parser FX/DECLINING.
 - SQLCipher acceptance diagnostic đã mở rộng để kiểm tra APR reset, reversal và replacement payment trên database cô lập.
-- CI trên HEAD 86b538c: npm ci, typecheck và lint PASS; format check FAIL do ba khác biệt Prettier trong acceptance diagnostic; unit tests bị SKIP. Đang sửa đúng formatter diff và sẽ chạy lại toàn bộ pipeline.
+- CI trên HEAD 86b538c: npm ci, typecheck và lint PASS; format check FAIL do ba khác biệt Prettier trong acceptance diagnostic; unit tests bị SKIP. Đã áp dụng đúng diff Prettier và gỡ bước debug tạm; pipeline phải được xác nhận lại trên HEAD mới nhất.
 - Bàn giao CLI: chạy route `Task06 acceptance (DEV)` trên Development Build có SQLCipher. Diagnostic tạo database và SecureStore key ngẫu nhiên riêng, không đọc/ghi database tài chính production; phải trả đủ PASS cho migration 0007–0010, origination, partial allocation/idempotency, payment reversal/replacement, APR reset, early principal, full payoff, archive, fee posting, reconciliation và SQLCipher.
 - Giới hạn đã chủ động bảo vệ: với foreign-currency posting, nếu FX snapshot khiến các line sau HALF_UP không cân bằng base currency thì payment bị reject, không tự sinh journal mất cân bằng. Cần CLI xác nhận luồng FX trên thiết bị.
 - Chưa tuyên bố device acceptance; PR #8 vẫn Draft và chưa merge cho đến khi CLI trả báo cáo diagnostic và regression pass.
