@@ -10,6 +10,7 @@ export interface AssetLot {
   quantity: string;
   remainingQuantity: string;
   costBasisMinor: bigint;
+  remainingCostBasisMinor: bigint;
   acquiredAt: string;
   status: AssetLotStatus;
 }
@@ -160,7 +161,10 @@ export function aggregateDcaLots(lots: readonly AssetLot[], quantityPrecision: n
     const quantity = decimalParts(lot.remainingQuantity, quantityPrecision).units;
     if (quantity <= 0n) throw new Error("DCA source lot must have positive remaining quantity");
     totalQuantity += quantity;
-    totalCost += lot.costBasisMinor;
+    if (lot.remainingCostBasisMinor < 0n || lot.remainingCostBasisMinor > lot.costBasisMinor) {
+      throw new Error("Remaining lot cost basis must be between zero and original cost basis");
+    }
+    totalCost += lot.remainingCostBasisMinor;
   }
   if (totalQuantity <= 0n) throw new Error("DCA aggregate quantity must be positive");
   const weightedAverage = (totalCost * (10n ** BigInt(quantityPrecision))) / totalQuantity;
@@ -185,14 +189,17 @@ export function calculateSale(params: {
   if (lot.status !== "ACTIVE") throw new Error("Only an ACTIVE lot can be sold");
   if (grossProceedsMinor < 0n || feeMinor < 0n) throw new Error("Sale proceeds and fee cannot be negative");
   const remaining = decimalParts(lot.remainingQuantity, quantityPrecision).units;
+  if (lot.remainingCostBasisMinor < 0n || lot.remainingCostBasisMinor > lot.costBasisMinor) {
+    throw new Error("Remaining lot cost basis must be between zero and original cost basis");
+  }
   const sold = decimalParts(quantitySold, quantityPrecision).units;
   if (sold <= 0n) throw new Error("Sale quantity must be positive");
   if (sold > remaining) throw new Error("Sale quantity exceeds the selected lot's remaining quantity");
   if (feeMinor > grossProceedsMinor) throw new Error("Sale fee cannot exceed gross proceeds");
   const costSold = sold === remaining
-    ? lot.costBasisMinor
-    : (lot.costBasisMinor * sold + remaining / 2n) / remaining;
-  const remainingCost = lot.costBasisMinor - costSold;
+    ? lot.remainingCostBasisMinor
+    : (lot.remainingCostBasisMinor * sold + remaining / 2n) / remaining;
+  const remainingCost = lot.remainingCostBasisMinor - costSold;
   const net = grossProceedsMinor - feeMinor;
   const realizedBeforeFee = grossProceedsMinor - costSold;
   return {
