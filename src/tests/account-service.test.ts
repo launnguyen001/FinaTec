@@ -36,7 +36,7 @@ describe("AccountService", () => {
     ledger.accounts.set(cash.id, cash);
     await service.archive(cash.id);
     expect(await repository.findById(cash.id)).toMatchObject({ isArchived: true });
-    await service.restore(cash.id);
+    await service.restoreAccount(cash.id);
     expect(await repository.findById(cash.id)).toMatchObject({ isArchived: false });
     await expect(service.rename(cash.id, "New cash")).resolves.toMatchObject({ name: "New cash" });
   });
