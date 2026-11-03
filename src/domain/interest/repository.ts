@@ -29,6 +29,7 @@ export interface InterestRepository {
   findAccrualById(id: string): Promise<InterestAccrual | null>;
   findAccrualByIdempotencyKey(key: string): Promise<InterestAccrual | null>;
   listAccruals(planId: string): Promise<InterestAccrual[]>;
+  hasExternalPrincipalMovements(plan: InterestPlan): Promise<boolean>;
   /** Persists the posted Journal Entry and accrual state in one SQLite transaction. */
   commitPostedAccrual(input: InterestPostingCommit): Promise<InterestAccrual>;
 }
