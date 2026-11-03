@@ -257,6 +257,9 @@ export function LiabilityScreen() {
         throw new Error("Tài khoản nợ chưa có loại tiền hợp lệ");
       const amount = parseMinorUnits(principal, selectedCurrency.minorUnit);
       const months = Number(term);
+      if (!Number.isInteger(months) || months < 1 || months > 600) {
+        throw new Error("Số kỳ phải là số nguyên từ 1 đến 600");
+      }
       const rate = parseAprPpm(apr);
       const [year, month, day] = startDate.split("-").map(Number);
       const nextDate = new Date(Date.UTC(year!, month! - 1, day! + 1))
