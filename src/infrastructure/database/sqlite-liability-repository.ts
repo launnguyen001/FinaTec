@@ -190,7 +190,7 @@ export class SqliteLiabilityRepository implements LiabilityRepository {
       const interestLeft = fromSqliteInteger(row.interestDueMinor) - fromSqliteInteger(row.interestPaidMinor);
       const paid = principalLeft === 0n && interestLeft === 0n;
       const partial = fromSqliteInteger(row.principalPaidMinor) > 0n || fromSqliteInteger(row.interestPaidMinor) > 0n;
-      const status = paid ? "PAID" : row.dueDate < localDate ? "OVERDUE" : row.dueDate === localDate ? "DUE" : partial ? "PARTIALLY_PAID" : "UPCOMING";
+      const status = paid ? "PAID" : row.dueDate < localDate ? "OVERDUE" : partial ? "PARTIALLY_PAID" : row.dueDate === localDate ? "DUE" : "UPCOMING";
       if (status !== row.status) {
         await this.db.update(liabilityInstallments).set({ status, updatedAt: new Date().toISOString() })
           .where(eq(liabilityInstallments.id, row.id)).run();
