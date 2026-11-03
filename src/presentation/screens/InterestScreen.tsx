@@ -12,7 +12,7 @@ import type { Account } from "../../domain/ledger/repository";
 import type { InterestAccrual, InterestPlan } from "../../domain/interest/interest";
 import { ScreenBackLink } from "../components/ScreenBackLink";
 import { useFinanceRuntime } from "../providers/FinanceRuntimeProvider";
-import { colors, spacing, typography } from "../../shared/theme/tokens";
+import { colors, spacing } from "../../shared/theme/tokens";
 
 function Action({
   label,
@@ -322,24 +322,24 @@ export function InterestScreen() {
 
 const styles = StyleSheet.create({
   content: { padding: spacing.lg, gap: spacing.md, backgroundColor: colors.background },
-  eyebrow: { ...typography.eyebrow, color: colors.muted },
-  title: { ...typography.title, color: colors.text },
-  subtitle: { ...typography.body, color: colors.muted },
+  eyebrow: { fontSize: 12, fontWeight: "700", letterSpacing: 1, color: colors.mutedText },
+  title: { fontSize: 28, fontWeight: "700", color: colors.text },
+  subtitle: { fontSize: 16, lineHeight: 23, color: colors.mutedText },
   card: { backgroundColor: colors.surface, borderRadius: 16, padding: spacing.md, gap: spacing.sm },
-  sectionTitle: { ...typography.heading, color: colors.text },
-  label: { ...typography.label, color: colors.text, marginTop: spacing.xs },
+  sectionTitle: { fontSize: 18, fontWeight: "700", color: colors.text },
+  label: { fontSize: 14, fontWeight: "600", color: colors.text, marginTop: spacing.xs },
   input: { borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: spacing.sm, color: colors.text, backgroundColor: colors.background },
   fieldGroup: { gap: spacing.xs },
   wrap: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs },
   action: { borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
-  actionSelected: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
-  actionText: { ...typography.caption, color: colors.text },
+  actionSelected: { borderColor: colors.primary, backgroundColor: "#EAF5EF" },
+  actionText: { fontSize: 12, color: colors.text },
   actionTextSelected: { color: colors.primary, fontWeight: "700" },
   disabled: { opacity: 0.45 },
-  muted: { ...typography.caption, color: colors.muted },
-  error: { ...typography.body, color: colors.danger },
-  success: { ...typography.body, color: colors.success },
+  muted: { fontSize: 12, color: colors.mutedText },
+  error: { fontSize: 14, color: "#B42318" },
+  success: { fontSize: 14, color: colors.primary },
   accrualRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.sm },
   flex: { flex: 1 },
-  itemTitle: { ...typography.body, color: colors.text, fontWeight: "600" },
+  itemTitle: { fontSize: 14, color: colors.text, fontWeight: "600" },
 });
