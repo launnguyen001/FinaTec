@@ -7,6 +7,15 @@ import { colors, spacing, typography } from "../../shared/theme/tokens";
 
 const kinds: CategoryKind[] = ["EXPENSE", "INCOME"];
 
+function isDescendant(candidateId: string, ancestorId: string, items: Category[]): boolean {
+  let current = items.find((item) => item.id === candidateId);
+  while (current?.parentId) {
+    if (current.parentId === ancestorId) return true;
+    current = items.find((item) => item.id === current?.parentId);
+  }
+  return false;
+}
+
 export function CategoriesScreen() {
   const { runtime, loading, error } = useFinanceRuntime();
   const [tree, setTree] = useState<Array<Category & { children: Category[] }>>([]);
@@ -14,6 +23,7 @@ export function CategoriesScreen() {
   const [name, setName] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
+  const [editingParentId, setEditingParentId] = useState<string | null>(null);
   const [kind, setKind] = useState<CategoryKind>("EXPENSE");
   const [parentId, setParentId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -40,7 +50,7 @@ export function CategoriesScreen() {
   async function saveRename(id: string) {
     if (!runtime || busy) return;
     setBusy(true); setFailure(null); setMessage(null);
-    try { await runtime.categories.rename(id, editingName); setEditingId(null); setEditingName(""); setMessage("Đã đổi tên danh mục."); await refresh(); }
+    try { await runtime.categories.updateMetadata(id, { name: editingName, parentId: editingParentId }); setEditingId(null); setEditingName(""); setEditingParentId(null); setMessage("Đã cập nhật danh mục."); await refresh(); }
     catch (cause) { setFailure(cause instanceof Error ? cause.message : "Không thể đổi tên danh mục."); }
     finally { setBusy(false); }
   }
@@ -54,7 +64,7 @@ export function CategoriesScreen() {
 
   function renderNodes(nodes: Array<Category & { children: Category[] }>, depth = 0): ReactNode {
     return nodes.map((item) => <View key={item.id}>
-      <View style={[styles.categoryRow, { paddingLeft: spacing.md + depth * spacing.lg }]}><View style={styles.categoryBody}>{editingId === item.id ? <TextInput accessibilityLabel={`Tên mới cho ${item.name}`} value={editingName} onChangeText={setEditingName} style={styles.input} maxLength={80} /> : <><Text style={styles.categoryName}>{item.name}</Text><Text style={styles.categoryMeta}>{item.kind}{item.isArchived ? " · Đã archive" : ""}</Text></>}</View>{!item.isArchived ? <>{editingId === item.id ? <Pressable accessibilityRole="button" disabled={busy || !editingName.trim()} onPress={() => void saveRename(item.id)} style={styles.archiveButton}><Text style={styles.archiveText}>Lưu</Text></Pressable> : <Pressable accessibilityRole="button" onPress={() => { setEditingId(item.id); setEditingName(item.name); }} style={styles.archiveButton}><Text style={styles.archiveText}>Sửa</Text></Pressable>}<Pressable accessibilityRole="button" accessibilityLabel={`Archive ${item.name}`} disabled={busy} onPress={() => void archiveCategory(item.id)} style={styles.archiveButton}><Text style={styles.archiveText}>Archive</Text></Pressable></> : null}</View>
+      <View style={[styles.categoryRow, { paddingLeft: spacing.md + depth * spacing.lg }]}><View style={styles.categoryBody}>{editingId === item.id ? <View style={styles.categoryEdit}><TextInput accessibilityLabel={`Tên mới cho ${item.name}`} value={editingName} onChangeText={setEditingName} style={styles.input} maxLength={80} /><Text style={styles.label}>Danh mục cha</Text><View style={styles.options}><Option label="Không có" selected={editingParentId === null} onPress={() => setEditingParentId(null)} />{flat.filter((candidate) => candidate.kind === item.kind && !candidate.isArchived && candidate.id !== item.id && !isDescendant(candidate.id, item.id, flat)).map((candidate) => <Option key={candidate.id} label={candidate.name} selected={editingParentId === candidate.id} onPress={() => setEditingParentId(candidate.id)} />)}</View></View> : <><Text style={styles.categoryName}>{item.name}</Text><Text style={styles.categoryMeta}>{item.kind}{item.isArchived ? " · Đã archive" : ""}</Text></>}</View>{!item.isArchived ? <>{editingId === item.id ? <Pressable accessibilityRole="button" disabled={busy || !editingName.trim()} onPress={() => void saveRename(item.id)} style={styles.archiveButton}><Text style={styles.archiveText}>Lưu</Text></Pressable> : <Pressable accessibilityRole="button" onPress={() => { setEditingId(item.id); setEditingName(item.name); setEditingParentId(item.parentId); }} style={styles.archiveButton}><Text style={styles.archiveText}>Sửa</Text></Pressable>}<Pressable accessibilityRole="button" accessibilityLabel={`Archive ${item.name}`} disabled={busy} onPress={() => void archiveCategory(item.id)} style={styles.archiveButton}><Text style={styles.archiveText}>Archive</Text></Pressable></> : null}</View>
       {item.children.length > 0 ? renderNodes(item.children as Array<Category & { children: Category[] }>, depth + 1) : null}
     </View>);
   }
@@ -105,6 +115,7 @@ const styles = StyleSheet.create({
   sectionTitle: { marginTop: spacing.md, color: colors.text, fontSize: typography.subtitle, fontWeight: "700" },
   categoryRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border },
   categoryBody: { flex: 1 },
+  categoryEdit: { flex: 1, gap: spacing.xs },
   categoryName: { color: colors.text, fontSize: typography.body, fontWeight: "700" },
   categoryMeta: { marginTop: 3, color: colors.mutedText, fontSize: typography.caption },
   archiveButton: { paddingVertical: spacing.sm, paddingHorizontal: spacing.md, borderRadius: 10, backgroundColor: "#FFF2F2" },
