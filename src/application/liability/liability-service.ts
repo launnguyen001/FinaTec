@@ -293,7 +293,7 @@ export class LiabilityService {
 
     const future = schedules.filter((item) => item.dueDate > localDate && item.status !== "CANCELLED" && item.status !== "PAID");
     const newInstallments: LiabilityInstallment[] = [];
-    if (principalPaid > 0n && future.length > 0) {
+    if (extraPrincipal > 0n && future.length > 0) {
       for (const item of future) installmentUpdates.push({ ...item, status: "CANCELLED", updatedAt: timestamp });
       const newBalance = outstanding - principalPaid;
       if (newBalance > 0n) {
