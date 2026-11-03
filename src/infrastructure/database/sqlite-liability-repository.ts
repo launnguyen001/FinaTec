@@ -165,7 +165,11 @@ export class SqliteLiabilityRepository implements LiabilityRepository {
         if (changed.changes !== 1) throw new Error(`Installment disappeared during payment: ${item.id}`);
       }
 
-      if (input.newInstallments.length > 0) {\n        tx.insert(liabilityInstallments).values(input.newInstallments.map((item) => this.installmentRow(item, input.payment.createdAt))).run();\n      }\n\n      const paidOff = input.outstandingPrincipalMinor === 0n;
+      if (input.newInstallments.length > 0) {
+        tx.insert(liabilityInstallments).values(input.newInstallments.map((item) => this.installmentRow(item, input.payment.createdAt))).run();
+      }
+
+      const paidOff = input.outstandingPrincipalMinor === 0n;
       const changedLiability = tx.update(liabilities).set({
         outstandingPrincipalMinor: toSqliteSafeInteger(input.outstandingPrincipalMinor),
         status: paidOff ? "PAID_OFF" : "ACTIVE",
