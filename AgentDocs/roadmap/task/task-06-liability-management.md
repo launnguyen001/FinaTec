@@ -2,7 +2,7 @@
 
 - Giai đoạn: 4 — MVP 3: Khoản nợ, định kỳ và ngân sách
 - Ưu tiên: P1
-- Trạng thái: IMPLEMENTATION_REVIEW_IN_PROGRESS — CI PASS trên HEAD 671b731; còn rà soát reconciliation schedule/payment và CLI acceptance
+- Trạng thái: IMPLEMENTATION_REVIEW_IN_PROGRESS — đã mở rộng reconciliation Ledger/schedule/payment history; cần CI và CLI acceptance trên HEAD mới
 - Phụ thuộc: TASK-02, TASK-03, TASK-05
 
 ## 1. Mục tiêu
@@ -94,7 +94,7 @@ Liability, RepaymentSchedule, LiabilityPayment (hoặc tên tương ứng theo n
 - Đã siết idempotency: retry cùng key nhưng khác số tiền, phí, nguồn, kỳ, liên kết thay thế, note hoặc FX snapshot bị từ chối; bổ sung unit test cho payload amount khác và parser FX/DECLINING.
 - SQLCipher acceptance diagnostic đã mở rộng để kiểm tra APR reset, reversal và replacement payment trên database cô lập.
 - CI PASS trên HEAD `671b731d4d88f6b6f59da763949733e8b03f649e`: npm ci, typecheck, lint, format:check và unit tests đều PASS.
-- Rà soát còn phát hiện khoảng trống so với kế hoạch kiểm thử: `reconcile()` hiện đối chiếu posted LIABILITY balance với outstanding principal, nhưng chưa đối chiếu độc lập principal còn lại trên lịch và principal suy ra từ payment history sau reversal. Cần đóng khoảng trống này trước khi tuyên bố Task06 hoàn tất.
+- Đã mở rộng `reconcile()` để đối chiếu độc lập: (1) posted LIABILITY balance với outstanding principal, (2) tổng principal còn lại trên các installment không CANCELLED với outstanding principal, (3) original principal trừ tổng principal payment chưa bị reversal với outstanding principal. Reversal được loại khỏi payment history; payment thay thế vẫn được tính. Archive yêu cầu cả ba chênh lệch bằng 0. Cần CI và CLI xác nhận trên commit mới.
 - CLI từng gặp `FOREIGN KEY constraint failed` trên SHA cũ; chưa có báo cáo acceptance mới trên HEAD hiện tại. Chỉ bàn giao CLI sau khi chốt reconciliation và CI mới nhất PASS.
 - Bàn giao CLI: chạy route `Task06 acceptance (DEV)` trên Development Build có SQLCipher. Diagnostic tạo database và SecureStore key ngẫu nhiên riêng, không đọc/ghi database tài chính production; phải trả đủ PASS cho migration 0007–0010, origination, partial allocation/idempotency, payment reversal/replacement, APR reset, early principal, full payoff, archive, fee posting, reconciliation và SQLCipher.
 - Giới hạn đã chủ động bảo vệ: với foreign-currency posting, nếu FX snapshot khiến các line sau HALF_UP không cân bằng base currency thì payment bị reject, không tự sinh journal mất cân bằng. Cần CLI xác nhận luồng FX trên thiết bị.
