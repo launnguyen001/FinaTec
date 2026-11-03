@@ -782,6 +782,7 @@ export const liabilityPayments = sqliteTable(
     fxRateNumerator: text("fx_rate_numerator").notNull().default("1"),
     fxRateDenominator: text("fx_rate_denominator").notNull().default("1"),
     replacesPaymentId: text("replaces_payment_id"),
+    postingOrder: integer("posting_order").notNull().default(0),
     paidAt: text("paid_at").notNull(),
     principalPaidMinor: integer("principal_paid_minor").notNull(),
     interestPaidMinor: integer("interest_paid_minor").notNull(),
