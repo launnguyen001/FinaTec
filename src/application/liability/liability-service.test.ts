@@ -92,7 +92,11 @@ function createHarness(
     reconcile: jest.fn().mockResolvedValue({
       ledgerPrincipalMinor: liability.outstandingPrincipalMinor,
       recordedPrincipalMinor: liability.outstandingPrincipalMinor,
+      schedulePrincipalMinor: liability.outstandingPrincipalMinor,
+      paymentDerivedPrincipalMinor: liability.outstandingPrincipalMinor,
       differenceMinor: 0n,
+      scheduleDifferenceMinor: 0n,
+      paymentDifferenceMinor: 0n,
     }),
   } as unknown as jest.Mocked<LiabilityRepository>;
   const ledger = {
