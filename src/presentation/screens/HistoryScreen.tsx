@@ -37,7 +37,6 @@ export function HistoryScreen() {
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const [reversalTargetId, setReversalTargetId] = useState<string | null>(null);
-  const [reversalReason, setReversalReason] = useState("");
 
   const loadOptions = useCallback(async () => {
     if (!runtime) return;
@@ -67,11 +66,10 @@ export function HistoryScreen() {
 
   async function reverseEntry(entryId: string) {
     if (!runtime || busy) return;
-    if (reversalReason.trim().length < 8) { setFailure("Lý do điều chỉnh phải có ít nhất 8 ký tự."); return; }
     setBusy(true); setFailure(null);
     try {
-      await runtime.transactions.reversePostedEntry({ idempotencyKey: runtime.createId(), originalEntryId: entryId, reason: reversalReason.trim() });
-      setReversalTargetId(null); setReversalReason("");
+      await runtime.transactions.reversePostedEntry({ idempotencyKey: runtime.createId(), originalEntryId: entryId });
+      setReversalTargetId(null);
       await applyFilters();
     } catch (cause) { setFailure(cause instanceof Error ? cause.message : "Không thể đảo giao dịch."); }
     finally { setBusy(false); }
@@ -103,8 +101,8 @@ export function HistoryScreen() {
         <Text style={styles.meta}>{item.entry.occurredAt} · {item.categoryName ?? "Chưa phân loại"}</Text>
         <Text style={styles.meta}>{item.lines.map((line) => line.accountName).join(" · ")}</Text>
         {item.entry.reversalOfId ? <Text style={styles.reversal}>Đảo giao dịch {item.entry.reversalOfId}</Text> : null}
-        {item.entry.transactionKind !== "REVERSAL" && !items.some((candidate) => candidate.entry.reversalOfId === item.entry.id) ? <Pressable accessibilityRole="button" onPress={() => { setReversalTargetId(reversalTargetId === item.entry.id ? null : item.entry.id); setReversalReason(""); }} style={styles.reverseLink}><Text style={styles.reverseLinkText}>Đảo giao dịch</Text></Pressable> : null}
-        {reversalTargetId === item.entry.id ? <View style={styles.reversalForm}><TextInput accessibilityLabel="Lý do đảo giao dịch" value={reversalReason} onChangeText={setReversalReason} placeholder="Lý do điều chỉnh (tối thiểu 8 ký tự)" style={styles.input} maxLength={240} /><Pressable accessibilityRole="button" disabled={busy || reversalReason.trim().length < 8} onPress={() => void reverseEntry(item.entry.id)} style={[styles.reverseButton, (busy || reversalReason.trim().length < 8) && styles.disabled]}><Text style={styles.reverseButtonText}>{busy ? "Đang đảo…" : "Xác nhận đảo"}</Text></Pressable></View> : null}
+        {item.entry.transactionKind !== "REVERSAL" && !items.some((candidate) => candidate.entry.reversalOfId === item.entry.id) ? <Pressable accessibilityRole="button" onPress={() => { setReversalTargetId(reversalTargetId === item.entry.id ? null : item.entry.id); }} style={styles.reverseLink}><Text style={styles.reverseLinkText}>Đảo giao dịch</Text></Pressable> : null}
+        {reversalTargetId === item.entry.id ? <View style={styles.reversalForm}><Text style={styles.meta}>Giao dịch gốc sẽ được giữ nguyên; hệ thống tạo bút toán đảo liên kết.</Text><Pressable accessibilityRole="button" disabled={busy} onPress={() => void reverseEntry(item.entry.id)} style={[styles.reverseButton, busy && styles.disabled]}><Text style={styles.reverseButtonText}>{busy ? "Đang đảo…" : "Xác nhận đảo"}</Text></Pressable></View> : null}
       </View>
       <View style={styles.amountBlock}><Text style={styles.amount}>{formatLineAmount(item, currencies)}</Text><Text style={styles.kind}>{item.entry.transactionKind ?? "LEGACY"}</Text></View>
     </View>)}
