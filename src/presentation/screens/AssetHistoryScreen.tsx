@@ -204,7 +204,7 @@ export function AssetHistoryScreen() {
             <Text style={styles.muted}>
               Valuation gần nhất:{" "}
               {money(
-                BigInt(Math.round(Number(latest.totalValue) * 10 ** precision)),
+                performance.calculation?.currentValueMinor ?? 0n,
                 precision,
                 latest.currencyCode,
               )}{" "}

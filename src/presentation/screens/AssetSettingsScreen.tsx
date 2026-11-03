@@ -63,7 +63,7 @@ export function AssetSettingsScreen() {
       SecureStore.getItemAsync(COINGECKO_KEY),
     ]);
     setMode(settings.timezoneMode);
-    setTimezoneId(settings.timezoneId);
+    setTimezoneId(settings.effectiveTimeZone);
     setEffectiveTimeZone(settings.effectiveTimeZone);
     setCryptoMinutes(String(settings.cryptoRefreshMinutes));
     setMetalMinutes(String(settings.metalRefreshMinutes));

@@ -47,6 +47,9 @@ export class AssetPriceRefreshService {
         "No approved market-price provider is configured for this asset class",
       );
     }
+    if (facts.asset.quoteCurrency !== "USDT") {
+      throw new Error("Crypto market quotes must be normalized to USDT");
+    }
     if (!facts.asset.providerSymbol?.trim()) {
       throw new Error(
         "Provider symbol is required before refreshing this asset",
@@ -182,6 +185,13 @@ export class AssetPriceRefreshService {
     });
     return Promise.all(
       eligible.map(async (asset): Promise<AssetRefreshOutcome> => {
+        if (!asset.providerSymbol?.trim()) {
+          return {
+            assetId: asset.id,
+            status: "SKIPPED",
+            reason: "Provider symbol is not configured",
+          };
+        }
         try {
           return await this.refreshAsset(asset.id, manual);
         } catch (cause) {

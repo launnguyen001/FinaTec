@@ -250,3 +250,15 @@ Không lưu trùng số dư ACCOUNT của TASK-03 trong bảng asset. Bảo đ�
 - Tiếp theo: hoàn thiện Settings/timezone/provider configuration, provider refresh scheduler và metals provider; bổ sung history/chart; sau đó chạy migration/integration/device acceptance; chạy `npx tsc --noEmit`, `npx expo lint`, `npm run format:check`, `npm test` và kiểm tra migration trên DB mới/nâng cấp.
 - Kiểm chứng: GitHub Actions CI PASS trên commit hiện tại: `npm run typecheck`, `npm run lint`, `npm run format:check`, `npm test` (10 suites, 66 tests passed). Chưa có integration test cho SQLite asset repository và chưa chạy migration upgrade/device acceptance từ CLI; không đánh dấu Task04 DONE cho đến khi các tiêu chí nghiệm thu pass.
 
+
+
+## 14. Bổ sung sau nghiệm thu vòng đầu (2026-11-03)
+
+- Đã bổ sung truy vấn daily valuation history và computation Unrealized P&L dựa trên latest saved valuation trừ remaining cost basis của các lot còn quantity; không dùng original cost basis sau partial sale.
+- Đã bổ sung Settings UI cho timezone, refresh intervals và crypto provider preference; CoinGecko Demo API key được lưu bằng SecureStore, không lưu trong SQLite.
+- Đã bổ sung foreground refresh scheduler: refresh khi runtime khởi tạo, khi app resume và kiểm tra chu kỳ khi app đang active. Đây là best-effort foreground scheduling; chưa cam kết OS background execution khi app bị suspend/terminated.
+- Đã bổ sung provider refresh state, cooldown manual 30 giây, exponential backoff, Retry-After và stale marking dựa trên last known quote.
+- Đã bổ sung archive policy: chỉ archive asset khi remaining quantity bằng 0; chỉ archive asset type sau khi mọi asset profile thuộc type đã archived.
+- Crypto quote currency được khóa ở USDT theo quy ước đã duyệt; CoinPaprika/CoinGecko USD quote được gắn conversion basis USDT/USD parity.
+- Metals provider evaluation: MetalCharts có endpoint batch `/v1/prices` trả nhiều metal trong một request; Free cho 200 request/tháng, 10 request/phút, commercial use được phép nhưng public display cần attribution link; Starter được công bố ở mức USD 9/tháng và 10.000 request/tháng. Với chu kỳ mặc định 60 phút, một batch request mỗi giờ tương đương khoảng 720 request/tháng, vượt free quota; nếu gọi riêng từng asset thì còn cao hơn. Vì vậy chưa tích hợp MetalCharts vào refresh mặc định cho đến khi chốt ngân sách hoặc thay đổi cadence. Corgano có API miễn phí cho gold và attribution nhưng không đáp ứng danh mục nhiều kim loại. Nguồn đánh giá: https://metalcharts.org/metals-api ; https://goldprice.corgano.com/gold-price-api
+- Còn phải kiểm chứng: SQLite repository integration/atomic rollback, migration upgrade trên DB có dữ liệu, thiết bị thật, background behavior theo OS, provider API trên thiết bị và archive flow.

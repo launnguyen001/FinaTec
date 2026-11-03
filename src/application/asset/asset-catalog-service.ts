@@ -35,6 +35,10 @@ export class AssetCatalogService {
     ) {
       throw new Error("Asset precision must be an integer between 0 and 12");
     }
+    const quoteCurrency = input.quoteCurrency.trim().toUpperCase();
+    if (input.assetClass === "CRYPTO" && quoteCurrency !== "USDT") {
+      throw new Error("Crypto asset types must use USDT as their quote currency");
+    }
     const now = this.options.now();
     return this.assets.createAssetType({
       id: this.options.createId(),
@@ -44,7 +48,7 @@ export class AssetCatalogService {
       unitCode,
       quantityPrecision: input.quantityPrecision,
       pricePrecision: input.pricePrecision,
-      quoteCurrency: input.quoteCurrency.trim().toUpperCase(),
+      quoteCurrency,
       createdAt: now,
       updatedAt: now,
     });
