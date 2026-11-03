@@ -1,4 +1,3 @@
-import { calculateAccountBalance } from "../../domain/ledger/posting";
 import type { Account, JournalEntry, JournalLine } from "../../domain/ledger/repository";
 import type {
   EarlyPaymentPolicy,
