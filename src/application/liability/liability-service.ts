@@ -272,11 +272,12 @@ export class LiabilityService {
     const liability = await this.requireLiability(id);
     const installments = await this.repository.listInstallments(id);
     const payments = await this.repository.listPayments(id);
-    const [reconciliation, rateChanges] = await Promise.all([
+    const [reconciliation, rateChanges, reversals] = await Promise.all([
       this.repository.reconcile(id),
       this.repository.listRateChanges(id),
+      this.repository.listPaymentReversals(id),
     ]);
-    return { liability, installments, payments, rateChanges, reconciliation };
+    return { liability, installments, payments, rateChanges, reversals, reconciliation };
   }
 
   async syncStatuses(): Promise<void> {
