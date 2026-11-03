@@ -70,6 +70,106 @@ type LedgerTransaction = Parameters<
 export class SqliteAssetRepository implements AssetRepository {
   constructor(private readonly db: LedgerDatabase) {}
 
+  async createAssetType(input: {
+    id: string;
+    name: string;
+    assetClass: "CRYPTO" | "METAL" | "STOCK" | "OTHER";
+    valuationModel: "STABLE_VALUE" | "MARKET_VALUED";
+    unitCode: string;
+    quantityPrecision: number;
+    pricePrecision: number;
+    quoteCurrency: string;
+    createdAt: string;
+    updatedAt: string;
+  }) {
+    const currency = await this.db.select().from(currencies)
+      .where(eq(currencies.code, input.quoteCurrency)).get();
+    if (!currency?.isActive) throw new Error("Asset quote currency is missing or inactive");
+    if (!input.name.trim() || !input.unitCode.trim()) {
+      throw new Error("Asset type name and unit code are required");
+    }
+    if (!Number.isInteger(input.quantityPrecision) || input.quantityPrecision < 0 || input.quantityPrecision > 12 ||
+        !Number.isInteger(input.pricePrecision) || input.pricePrecision < 0 || input.pricePrecision > 12) {
+      throw new Error("Asset precision must be an integer between 0 and 12");
+    }
+    await this.db.insert(assetTypes).values({
+      ...input,
+      name: input.name.trim(),
+      unitCode: input.unitCode.trim().toUpperCase(),
+    }).run();
+    return { ...input, name: input.name.trim(), unitCode: input.unitCode.trim().toUpperCase(), isArchived: false };
+  }
+
+  async createAsset(input: {
+    id: string;
+    assetTypeId: string;
+    name: string;
+    symbol: string;
+    providerSymbol: string | null;
+    quoteCurrency: string;
+    createdAt: string;
+    updatedAt: string;
+  }) {
+    const assetType = await this.db.select().from(assetTypes)
+      .where(eq(assetTypes.id, input.assetTypeId)).get();
+    if (!assetType || assetType.isArchived) throw new Error("Asset type does not exist or is archived");
+    if (assetType.quoteCurrency !== input.quoteCurrency) {
+      throw new Error("Asset quote currency must match its asset type");
+    }
+    if (!input.name.trim() || !input.symbol.trim()) {
+      throw new Error("Asset name and symbol are required");
+    }
+    await this.db.insert(assets).values({
+      ...input,
+      name: input.name.trim(),
+      symbol: input.symbol.trim().toUpperCase(),
+      providerSymbol: input.providerSymbol?.trim() || null,
+    }).run();
+    return {
+      id: input.id,
+      assetTypeId: input.assetTypeId,
+      name: input.name.trim(),
+      symbol: input.symbol.trim().toUpperCase(),
+      providerSymbol: input.providerSymbol?.trim() || null,
+      quoteCurrency: input.quoteCurrency,
+      isArchived: false,
+    };
+  }
+
+  async listAssetTypes(includeArchived = false) {
+    const rows = includeArchived
+      ? await this.db.select().from(assetTypes).all()
+      : await this.db.select().from(assetTypes)
+          .where(eq(assetTypes.isArchived, false)).all();
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      assetClass: row.assetClass,
+      valuationModel: row.valuationModel,
+      unitCode: row.unitCode,
+      quantityPrecision: row.quantityPrecision,
+      pricePrecision: row.pricePrecision,
+      quoteCurrency: row.quoteCurrency,
+      isArchived: row.isArchived,
+    }));
+  }
+
+  async listAssets(includeArchived = false) {
+    const rows = includeArchived
+      ? await this.db.select().from(assets).all()
+      : await this.db.select().from(assets)
+          .where(eq(assets.isArchived, false)).all();
+    return rows.map((row) => ({
+      id: row.id,
+      assetTypeId: row.assetTypeId,
+      name: row.name,
+      symbol: row.symbol,
+      providerSymbol: row.providerSymbol,
+      quoteCurrency: row.quoteCurrency,
+      isArchived: row.isArchived,
+    }));
+  }
+
   async findAssetForTransaction(assetId: string) {
     const asset = await this.db
       .select()
@@ -87,12 +187,18 @@ export class SqliteAssetRepository implements AssetRepository {
       asset: {
         id: asset.id,
         assetTypeId: asset.assetTypeId,
+        name: asset.name,
+        symbol: asset.symbol,
+        providerSymbol: asset.providerSymbol,
         quoteCurrency: asset.quoteCurrency,
         isArchived: asset.isArchived,
       },
       assetType: {
         id: assetType.id,
+        name: assetType.name,
+        assetClass: assetType.assetClass,
         valuationModel: assetType.valuationModel,
+        unitCode: assetType.unitCode,
         quantityPrecision: assetType.quantityPrecision,
         pricePrecision: assetType.pricePrecision,
         quoteCurrency: assetType.quoteCurrency,
