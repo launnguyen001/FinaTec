@@ -900,9 +900,13 @@ export class LiabilityService {
         "Liability has unpaid installments and cannot be archived",
       );
     }
-    if (detail.reconciliation.differenceMinor !== 0n) {
+    if (
+      detail.reconciliation.differenceMinor !== 0n ||
+      detail.reconciliation.scheduleDifferenceMinor !== 0n ||
+      detail.reconciliation.paymentDifferenceMinor !== 0n
+    ) {
       throw new Error(
-        "Ledger reconciliation must be balanced before archiving",
+        "Ledger, schedule and payment history must reconcile before archiving",
       );
     }
     await this.repository.archive(id, this.now());
