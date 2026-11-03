@@ -33,6 +33,20 @@ export class SqliteAccountRepository implements AccountRepository {
   }
 
   async archive(id: string, updatedAt: string): Promise<void> {
-    await this.db.update(accounts).set({ isArchived: true, updatedAt }).where(eq(accounts.id, id)).run();
+    // The database trigger independently verifies a zero Ledger balance in
+    // the same SQLite write transaction as this state transition.
+    const result = await this.db.update(accounts)
+      .set({ isArchived: true, updatedAt })
+      .where(eq(accounts.id, id))
+      .run();
+    if (result.changes !== 1) throw new Error(`Account could not be archived: ${id}`);
+  }
+
+  async restore(id: string, updatedAt: string): Promise<void> {
+    const result = await this.db.update(accounts)
+      .set({ isArchived: false, updatedAt })
+      .where(eq(accounts.id, id))
+      .run();
+    if (result.changes !== 1) throw new Error(`Account could not be restored: ${id}`);
   }
 }
