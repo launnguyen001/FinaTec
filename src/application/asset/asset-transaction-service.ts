@@ -1,6 +1,6 @@
 import { calculatePurchase, calculateSale, multiplyDecimalToMinor, assertTransactionFee } from "../../domain/asset/asset";
 import type { AssetRepository } from "../../domain/asset/repository";
-import type { Account, CurrencyRecord, LedgerRepository } from "../../domain/ledger/repository";
+import type { Account, LedgerRepository } from "../../domain/ledger/repository";
 import { buildJournalPosting, resolveFxSnapshot, type PostingLineSpec } from "../../domain/ledger/posting-plan";
 import type { PostingContext } from "../../domain/ledger/posting";
 import type { CategoryRepository } from "../../domain/category/repository";
