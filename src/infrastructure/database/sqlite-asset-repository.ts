@@ -333,6 +333,31 @@ export class SqliteAssetRepository implements AssetRepository {
     });
   }
 
+  async getCurrentQuantity(assetId: string): Promise<string> {
+    const facts = await this.findAssetForTransaction(assetId);
+    if (!facts) throw new Error("Asset does not exist");
+    const rows = await this.db.select().from(assetLots)
+      .where(eq(assetLots.assetId, assetId)).all();
+    const activeAggregateIds = new Set(
+      rows.filter((row) => row.status === "ACTIVE").map((row) => row.id),
+    );
+    const componentIds = new Set(
+      (await this.db.select().from(assetDcaComponents).all()).map(
+        (component) => component.componentLotId,
+      ),
+    );
+    const quantities = rows
+      .filter((row) => {
+        if (row.status === "ACTIVE" && row.mergedIntoId === null) return true;
+        return row.status === "MERGED" &&
+          row.mergedIntoId !== null &&
+          activeAggregateIds.has(row.mergedIntoId) &&
+          componentIds.has(row.id);
+      })
+      .map((row) => row.remainingQuantity);
+    return sumDecimalQuantities(quantities, facts.assetType.quantityPrecision);
+  }
+
   async recordQuoteAndSnapshot(input: {
     quoteId: string;
     snapshotId: string;
