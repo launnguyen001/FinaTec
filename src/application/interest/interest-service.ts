@@ -82,6 +82,9 @@ export class InterestService {
     if (payout && payout.type !== "ASSET") {
       throw new Error("Payout destination must be an ASSET account");
     }
+    if (payout && payout.id === principal.id) {
+      throw new Error("Payout destination must differ from the principal account");
+    }
     if (
       principal.currencyCode !== income.currencyCode ||
       (payout && payout.currencyCode !== principal.currencyCode)
@@ -218,6 +221,9 @@ export class InterestService {
       throw new Error(`Accrual must continue from the last settled boundary: ${expectedStart}`);
     }
 
+    if (await this.repository.hasExternalPrincipalMovements(plan)) {
+      throw new Error("Principal changed outside this InterestPlan after its start date; variable-principal accrual is not supported in this MVP");
+    }
     const principalMinor = await this.readPrincipalBalance(plan);
     const calculation = calculateSimpleInterest({
       principalMinor,
@@ -361,6 +367,9 @@ export class InterestService {
   ): Promise<InterestAccrual[]> {
     const plan = await this.requirePlan(planId);
     if (plan.status !== "ACTIVE") return [];
+    if (await this.repository.hasExternalPrincipalMovements(plan)) {
+      throw new Error("Principal changed outside this InterestPlan after its start date; variable-principal catch-up is not supported in this MVP");
+    }
     if (kind === "CAPITALIZATION" && plan.compounding !== "AFTER_CAPITALIZATION") {
       throw new Error("Simple-interest plans cannot capitalize interest");
     }
