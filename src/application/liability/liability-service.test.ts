@@ -3,6 +3,7 @@ import type {
   Liability,
   LiabilityInstallment,
   LiabilityPayment,
+  LiabilityRateChange,
 } from "../../domain/liability/liability";
 import type {
   Account,
@@ -78,6 +79,8 @@ function createHarness(
     list: jest.fn().mockResolvedValue([liability]),
     listInstallments: jest.fn().mockResolvedValue(installments),
     listPayments: jest.fn().mockResolvedValue([]),
+    listRateChanges: jest.fn().mockResolvedValue([]),
+    addRateChange: jest.fn().mockResolvedValue(undefined),
     commitPayment: jest.fn(
       async (input: { payment: LiabilityPayment }) => input.payment,
     ),
@@ -111,6 +114,8 @@ function baseLiability(overrides: Partial<Liability> = {}): Liability {
     liabilityAccountId: "loan",
     interestExpenseAccountId: "interest-expense",
     currencyCode: "VND",
+    fxRateNumerator: "1",
+    fxRateDenominator: "1",
     originalPrincipalMinor: 100_000n,
     outstandingPrincipalMinor: 100_000n,
     annualRatePpm: 120_000n,
@@ -155,6 +160,24 @@ function installment(
 }
 
 describe("LiabilityService", () => {
+  it("records an APR change and recalculates only future installments", async () => {
+    const current = baseLiability();
+    const schedule = [
+      installment(1, "2026-12-01", 33_334n, 1_000n),
+      installment(2, "2027-01-01", 33_333n, 667n),
+      installment(3, "2027-02-01", 33_333n, 333n),
+    ];
+    const { service, repository } = createHarness(current, schedule);
+    const change = await service.changeApr(current.id, 240_000n, "Rate reset");
+    expect(change.annualRatePpm).toBe(240_000n);
+    expect(change.effectiveDate).toBe("2026-11-01");
+    const saved = (repository.addRateChange as jest.Mock).mock.calls[0]!;
+    expect(saved[0].annualRatePpm).toBe(240_000n);
+    expect(saved[1]).toHaveLength(3);
+    expect(saved[1].every((item: LiabilityInstallment) => item.annualRatePpm === 240_000n)).toBe(true);
+    expect(saved[1].reduce((sum: bigint, item: LiabilityInstallment) => sum + item.principalDueMinor, 0n)).toBe(100_000n);
+  });
+
   it("originates a loan with a balanced ASSET debit and LIABILITY credit", async () => {
     const { service, repository } = createHarness(baseLiability());
     const created = await service.create({
