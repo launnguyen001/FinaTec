@@ -9,7 +9,10 @@ import type { PostingCommitInput } from "../ledger/repository";
 
 export interface AssetTypeRecord {
   id: string;
+  name: string;
+  assetClass: "CRYPTO" | "METAL" | "STOCK" | "OTHER";
   valuationModel: AssetValuationModel;
+  unitCode: string;
   quantityPrecision: number;
   pricePrecision: number;
   quoteCurrency: string;
@@ -19,6 +22,9 @@ export interface AssetTypeRecord {
 export interface AssetRecord {
   id: string;
   assetTypeId: string;
+  name: string;
+  symbol: string;
+  providerSymbol: string | null;
   quoteCurrency: string;
   isArchived: boolean;
 }
@@ -63,6 +69,30 @@ export interface AssetLotWrite {
 }
 
 export interface AssetRepository {
+  createAssetType(input: {
+    id: string;
+    name: string;
+    assetClass: "CRYPTO" | "METAL" | "STOCK" | "OTHER";
+    valuationModel: AssetValuationModel;
+    unitCode: string;
+    quantityPrecision: number;
+    pricePrecision: number;
+    quoteCurrency: string;
+    createdAt: string;
+    updatedAt: string;
+  }): Promise<AssetTypeRecord>;
+  createAsset(input: {
+    id: string;
+    assetTypeId: string;
+    name: string;
+    symbol: string;
+    providerSymbol: string | null;
+    quoteCurrency: string;
+    createdAt: string;
+    updatedAt: string;
+  }): Promise<AssetRecord>;
+  listAssetTypes(includeArchived?: boolean): Promise<AssetTypeRecord[]>;
+  listAssets(includeArchived?: boolean): Promise<AssetRecord[]>;
   findAssetForTransaction(
     assetId: string,
   ): Promise<{ asset: AssetRecord; assetType: AssetTypeRecord } | null>;
