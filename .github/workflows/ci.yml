@@ -30,6 +30,10 @@ jobs:
         run: npm run typecheck
       - name: Lint
         run: npm run lint
+      - name: Diagnose Task06 unit-test formatter diff
+        run: |
+          npx prettier src/application/liability/liability-service.test.ts > /tmp/task06-test.formatted.ts
+          diff -u src/application/liability/liability-service.test.ts /tmp/task06-test.formatted.ts || true
       - name: Format check
         run: npm run format:check
       - name: Unit tests
