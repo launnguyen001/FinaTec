@@ -91,5 +91,5 @@ Liability, RepaymentSchedule, LiabilityPayment (hoặc tên tương ứng theo n
 - Đã bổ sung migration 0009 allocation audit, schedule-change audit, payment reversal records và liên kết `replacesPaymentId`. Reversal tạo Journal Entry REVERSAL mới, kiểm tra đảo chính xác mọi line gốc, khôi phục counter/schedule trong cùng transaction; không sửa/xóa payment hay journal POSTED. Chỉ cho đảo theo thứ tự ngược thời gian để tránh phá vỡ các phân bổ sau đó.
 - UI đã có APR history/change, nhập gốc riêng từng kỳ DECLINING, tỷ giá tại origination/payment, đảo payment và liên kết payment thay thế.
 - SQLCipher acceptance diagnostic đã mở rộng để kiểm tra APR reset, reversal và replacement payment trên database cô lập.
-- CI trước các thay đổi mới nhất đã phát hiện lỗi typecheck trong fixture/import và đã sửa; CI trên HEAD mới nhất đang chạy, chưa xác nhận PASS.
+- CI đã xác nhận typecheck và lint PASS trên snapshot trước lần format hiện tại; format check và unit tests sẽ được xác nhận lại trên HEAD sau khi format.
 - Còn lại trước bàn giao CLI: xác nhận CI xanh trên HEAD, review migration/schema + luồng rollback, và chạy diagnostic trên Development Build. Chưa tuyên bố thiết bị pass, chưa merge PR #8.
