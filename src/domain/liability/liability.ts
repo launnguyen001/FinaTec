@@ -16,6 +16,8 @@ export interface Liability {
   liabilityAccountId: string;
   interestExpenseAccountId: string;
   currencyCode: string;
+  fxRateNumerator: string;
+  fxRateDenominator: string;
   originalPrincipalMinor: bigint;
   outstandingPrincipalMinor: bigint;
   annualRatePpm: bigint;
@@ -48,6 +50,8 @@ export interface LiabilityPayment {
   scheduleId: string | null;
   sourceAccountId: string;
   journalEntryId: string;
+  fxRateNumerator: string;
+  fxRateDenominator: string;
   idempotencyKey: string;
   paidAt: string;
   principalPaidMinor: bigint;
