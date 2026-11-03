@@ -8,7 +8,7 @@ import { migrate } from "drizzle-orm/expo-sqlite/migrator";
 import { LiabilityService } from "../../application/liability/liability-service";
 import { Currency } from "../../domain/ledger/currency";
 import { calculateAccountBalance } from "../../domain/ledger/posting";
-import type { Account, CurrencyRecord } from "../../domain/ledger/repository";
+import type { Account } from "../../domain/ledger/repository";
 import { ledgerMigrations } from "./migrations";
 import { ledgerSchema } from "./schema";
 import { SqliteLedgerRepository } from "./sqlite-ledger-repository";
@@ -122,14 +122,6 @@ export async function runLiabilityAcceptanceDiagnostic(): Promise<LiabilityAccep
     );
 
     const ledger = new SqliteLedgerRepository(db);
-    const currency: CurrencyRecord = {
-      code: "VND",
-      name: "Vietnamese dong",
-      minorUnit: 0,
-      isActive: true,
-      createdAt: legacyAt,
-    };
-    await ledger.createCurrency(currency);
     await ledger.setBaseCurrencyCode("VND", legacyAt);
 
     const makeAccount = (name: string, type: Account["type"]): Account => ({
