@@ -127,7 +127,16 @@ export class SqliteLiabilityRepository implements LiabilityRepository {
     return this.db.transaction((tx) => {
       const existing = tx.select().from(liabilityPayments)
         .where(eq(liabilityPayments.idempotencyKey, input.payment.idempotencyKey)).get();
-      if (existing) return mapPayment(existing);
+      if (existing) {
+        if (existing.liabilityId !== input.payment.liabilityId ||
+            existing.sourceAccountId !== input.payment.sourceAccountId ||
+            fromSqliteInteger(existing.principalPaidMinor) !== input.payment.principalPaidMinor ||
+            fromSqliteInteger(existing.interestPaidMinor) !== input.payment.interestPaidMinor ||
+            fromSqliteInteger(existing.feePaidMinor) !== input.payment.feePaidMinor) {
+          throw new Error("Payment idempotency key was reused with a different payload");
+        }
+        return mapPayment(existing);
+      }
 
       const liabilityRow = tx.select().from(liabilities)
         .where(eq(liabilities.id, input.payment.liabilityId)).get();
@@ -140,6 +149,11 @@ export class SqliteLiabilityRepository implements LiabilityRepository {
       }
       if (fromSqliteInteger(liabilityRow.outstandingPrincipalMinor) - input.payment.principalPaidMinor !== input.outstandingPrincipalMinor) {
         throw new Error("Payment principal does not reconcile to the new liability balance");
+      }
+      if (input.journalEntry.id !== input.payment.journalEntryId ||
+          input.journalEntry.idempotencyKey !== input.payment.idempotencyKey ||
+          input.journalEntry.status !== "POSTED") {
+        throw new Error("Payment and Journal Entry identities do not match");
       }
       validateJournalEntry(input.journalEntry, input.journalLines, this.readPostingContext(tx));
       this.assertPaymentJournal(input, tx);
@@ -251,20 +265,39 @@ export class SqliteLiabilityRepository implements LiabilityRepository {
   }
 
   private assertPaymentJournal(input: LiabilityPaymentCommit, tx: LiabilityTransaction) {
-    const debitLiability = input.journalLines.filter((line) => line.accountId === input.payment.liabilityId && line.side === "DEBIT")
-      .reduce((sum, line) => sum + line.amountMinor, 0n);
-    const liability = tx.select().from(liabilities).where(eq(liabilities.id, input.payment.liabilityId)).get();
+    const liability = tx.select().from(liabilities)
+      .where(eq(liabilities.id, input.payment.liabilityId)).get();
     if (!liability) throw new Error("Liability does not exist");
-    const principalDebits = input.journalLines.filter((line) => line.accountId === liability.liabilityAccountId && line.side === "DEBIT")
-      .reduce((sum, line) => sum + line.amountMinor, 0n);
-    const interestDebits = input.journalLines.filter((line) => line.accountId === liability.interestExpenseAccountId && line.side === "DEBIT")
-      .reduce((sum, line) => sum + line.amountMinor, 0n);
-    const sourceCredits = input.journalLines.filter((line) => line.accountId === input.payment.sourceAccountId && line.side === "CREDIT")
-      .reduce((sum, line) => sum + line.amountMinor, 0n);
-    const expected = input.payment.principalPaidMinor + input.payment.interestPaidMinor + input.payment.feePaidMinor;
-    if (debitLiability !== 0n || principalDebits !== input.payment.principalPaidMinor ||
-        interestDebits !== input.payment.interestPaidMinor || sourceCredits !== expected) {
+    const accountRows = tx.select().from(accounts).all();
+    const accountById = new Map(accountRows.map((row) => [row.id, row]));
+    const sum = (accountId: string, side: "DEBIT" | "CREDIT") =>
+      input.journalLines.filter((line) => line.accountId === accountId && line.side === side)
+        .reduce((total, line) => total + line.amountMinor, 0n);
+    const expectedTotal = input.payment.principalPaidMinor +
+      input.payment.interestPaidMinor + input.payment.feePaidMinor;
+    const source = accountById.get(input.payment.sourceAccountId);
+    if (!source || source.type !== "ASSET") throw new Error("Payment source must be an ASSET account");
+    if (sum(liability.liabilityAccountId, "DEBIT") !== input.payment.principalPaidMinor ||
+        sum(liability.interestExpenseAccountId, "DEBIT") !== input.payment.interestPaidMinor ||
+        sum(input.payment.sourceAccountId, "CREDIT") !== expectedTotal) {
       throw new Error("Payment journal lines do not match principal, interest and payment source allocations");
+    }
+    const feeLines = input.journalLines.filter((line) =>
+      line.side === "DEBIT" &&
+      line.accountId !== liability.liabilityAccountId &&
+      line.accountId !== liability.interestExpenseAccountId);
+    if (feeLines.reduce((total, line) => total + line.amountMinor, 0n) !== input.payment.feePaidMinor ||
+        feeLines.some((line) => accountById.get(line.accountId)?.type !== "EXPENSE")) {
+      throw new Error("Payment fee must be posted to a separate EXPENSE account");
+    }
+    const allowed = new Set([
+      liability.liabilityAccountId,
+      liability.interestExpenseAccountId,
+      input.payment.sourceAccountId,
+      ...feeLines.map((line) => line.accountId),
+    ]);
+    if (input.journalLines.some((line) => !allowed.has(line.accountId))) {
+      throw new Error("Payment journal contains an unexpected account line");
     }
   }
 
