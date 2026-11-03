@@ -630,7 +630,10 @@ export class LiabilityService {
     add(interestAccount, "DEBIT", interestPaid, "Interest expense");
     if (feeMinor > 0n && feeAccount)
       add(feeAccount, "DEBIT", feeMinor, "Early repayment fee");
-    add(source, "CREDIT", paymentTotal, "Payment source", debitBaseTotal);
+    if (debitBaseTotal !== baseAmount(paymentTotal)) {
+      throw new Error("FX rounding makes this payment journal unbalanced in base currency; adjust the FX snapshot or payment allocation");
+    }
+    add(source, "CREDIT", paymentTotal, "Payment source");
     const payment: LiabilityPayment = {
       id: paymentId,
       liabilityId: liability.id,
