@@ -2,7 +2,7 @@
 
 - Giai đoạn: 3 — MVP 2: Tài sản và lãi
 - Ưu tiên: P1
-- Trạng thái: READY FOR REVIEW — Android SQLCipher acceptance 15/15 PASS; CI PASS; interest accrual thuộc TASK-05; iOS NOT VERIFIED; metals provider DEFERRED
+- Trạng thái: COMPLETED — PR #6 merged; Android SQLCipher acceptance 15/15 PASS; CI PASS; interest accrual thuộc TASK-05; iOS NOT VERIFIED; metals provider DEFERRED
 - Phụ thuộc: TASK-02, TASK-03
 
 ## 1. Mục tiêu
@@ -285,3 +285,13 @@ Không lưu trùng số dư ACCOUNT của TASK-03 trong bảng asset. Bảo đ�
 - Acceptance phát hiện và đã sửa các lỗi: schema/domain chỉ cho currency 3 ký tự trong khi crypto dùng USDT; regex snapshot date bị escape sai; đóng DCA component không xóa `merged_into_id`; Hermes không nhận `bigint` trực tiếp trong `Intl.NumberFormat`. Migration `0004_usdt_currency_code` mở rộng currency code lên 4 ký tự và bảo toàn các foreign key hiện có.
 - `npx expo lint` và `npx tsc --noEmit` PASS sau các sửa đổi.
 - TASK-04 đạt Android SQLCipher acceptance 15/15; CI trên PR head trước cập nhật tài liệu PASS. Các commit sau acceptance chỉ cập nhật tài liệu, không sửa code. Metals provider DEFERRED; iOS runtime NOT VERIFIED; background scheduling BEST-EFFORT. PR chờ CI xác nhận trên head tài liệu mới nhất trước khi merge.
+
+
+## 17. Closeout TASK-04 (2026-11-04)
+
+- PR #6 đã merge vào main tại merge commit `38b6453ed6eb7fbc257c25cb8121a80df9af1d79`.
+- CI trên final documentation head `b5c603456f04da00d4af7176228ccbc62397cc45`, workflow run `41687377667`: dependency install, TypeScript, lint, format check và unit tests PASS.
+- CLI Android arm64 development-build acceptance trên SQLCipher 4.17.0: 15/15 PASS. Các sửa lỗi phát hiện trong acceptance đã nằm trong source được merge.
+- Interest accrual/capitalization/payout được chuyển hoàn toàn sang TASK-05; TASK-04 không tạo interest engine riêng.
+- iOS runtime NOT VERIFIED; metals provider DEFERRED; OS background scheduling BEST-EFFORT. Đây là giới hạn được công khai, không tuyên bố đã nghiệm thu.
+- Task04 hoàn thành trong phạm vi Android đã duyệt.
