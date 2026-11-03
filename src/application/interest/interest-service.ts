@@ -50,7 +50,7 @@ export class InterestService {
   async createPlan(input: CreateInterestPlanInput): Promise<InterestPlan> {
     const name = input.name.trim();
     if (!name) throw new Error("Interest plan name is required");
-    if (input.annualRatePpm < 0n || input.annualRatePpm > 1_000_000_000n) {
+    if (input.annualRatePpm < 0n || input.annualRatePpm > 10_000_000n) {
       throw new Error("Annual APR must be between 0% and 1000%");
     }
     const maturityDate = input.maturityDate ?? null;
