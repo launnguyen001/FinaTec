@@ -22,10 +22,21 @@ export interface LiabilityRepository {
   listInstallments(liabilityId: string): Promise<LiabilityInstallment[]>;
   listPayments(liabilityId: string): Promise<LiabilityPayment[]>;
   listRateChanges(liabilityId: string): Promise<LiabilityRateChange[]>;
-  addRateChange(change: LiabilityRateChange, installments: LiabilityInstallment[]): Promise<void>;
-  reversePayment(input: { paymentId: string; reversal: LiabilityJournalCommit; record: LiabilityPaymentReversal }): Promise<void>;
-  findPaymentReversal(paymentId: string): Promise<LiabilityPaymentReversal | null>;
-  listPaymentReversals(liabilityId: string): Promise<LiabilityPaymentReversal[]>;
+  addRateChange(
+    change: LiabilityRateChange,
+    installments: LiabilityInstallment[],
+  ): Promise<void>;
+  reversePayment(input: {
+    paymentId: string;
+    reversal: LiabilityJournalCommit;
+    record: LiabilityPaymentReversal;
+  }): Promise<void>;
+  findPaymentReversal(
+    paymentId: string,
+  ): Promise<LiabilityPaymentReversal | null>;
+  listPaymentReversals(
+    liabilityId: string,
+  ): Promise<LiabilityPaymentReversal[]>;
   commitPayment(input: LiabilityPaymentCommit): Promise<LiabilityPayment>;
   syncStatuses(liabilityId: string, localDate: string): Promise<void>;
   archive(id: string, archivedAt: string): Promise<void>;

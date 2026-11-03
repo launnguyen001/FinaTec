@@ -42,7 +42,10 @@ function parseAprPpm(value: string): bigint {
   return BigInt(whole!) * 10_000n + BigInt((fraction + "0000").slice(0, 4));
 }
 
-function parseFxRateRatio(value: string): { numerator: string; denominator: string } {
+function parseFxRateRatio(value: string): {
+  numerator: string;
+  denominator: string;
+} {
   const normalized = value.trim().replace(",", ".");
   if (!/^(?:0|[1-9]\\d*)(?:\\.\\d{1,8})?$/.test(normalized)) {
     throw new Error("Tỷ giá phải là số thập phân dương, tối đa 8 chữ số");
@@ -51,7 +54,10 @@ function parseFxRateRatio(value: string): { numerator: string; denominator: stri
   const denominator = 10n ** BigInt(fraction.length);
   const numerator = BigInt(whole!) * denominator + BigInt(fraction || "0");
   if (numerator <= 0n) throw new Error("Tỷ giá phải lớn hơn 0");
-  return { numerator: numerator.toString(), denominator: denominator.toString() };
+  return {
+    numerator: numerator.toString(),
+    denominator: denominator.toString(),
+  };
 }
 
 function formatMoney(
@@ -127,8 +133,22 @@ export function LiabilityScreen() {
   const [selectedId, setSelectedId] = useState("");
   const [installments, setInstallments] = useState<LiabilityInstallment[]>([]);
   const [payments, setPayments] = useState<LiabilityPayment[]>([]);
-  const [rateChanges, setRateChanges] = useState<{ id: string; annualRatePpm: bigint; effectiveDate: string; reason: string | null }[]>([]);
-  const [reversals, setReversals] = useState<{ id: string; paymentId: string; reason: string | null; createdAt: string }[]>([]);
+  const [rateChanges, setRateChanges] = useState<
+    {
+      id: string;
+      annualRatePpm: bigint;
+      effectiveDate: string;
+      reason: string | null;
+    }[]
+  >([]);
+  const [reversals, setReversals] = useState<
+    {
+      id: string;
+      paymentId: string;
+      reason: string | null;
+      createdAt: string;
+    }[]
+  >([]);
   const [replacementPaymentId, setReplacementPaymentId] = useState("");
   const [name, setName] = useState("");
   const [principal, setPrincipal] = useState("");
@@ -292,15 +312,21 @@ export function LiabilityScreen() {
         .toISOString()
         .slice(0, 10);
       const dueDate = firstDueDate || nextDate;
-      const principalParts = method === "DECLINING"
-        ? decliningPrincipalInput
-            .split(/[;\\n]+/)
-            .map((part) => part.trim())
-            .filter(Boolean)
-            .map((part) => parseMinorUnits(part, selectedCurrency.minorUnit))
-        : undefined;
-      if (method === "DECLINING" && (!principalParts || principalParts.length !== months)) {
-        throw new Error("DECLINING cần nhập đúng số tiền gốc cho từng kỳ, phân tách bằng xuống dòng hoặc dấu chấm phẩy");
+      const principalParts =
+        method === "DECLINING"
+          ? decliningPrincipalInput
+              .split(/[;\\n]+/)
+              .map((part) => part.trim())
+              .filter(Boolean)
+              .map((part) => parseMinorUnits(part, selectedCurrency.minorUnit))
+          : undefined;
+      if (
+        method === "DECLINING" &&
+        (!principalParts || principalParts.length !== months)
+      ) {
+        throw new Error(
+          "DECLINING cần nhập đúng số tiền gốc cho từng kỳ, phân tách bằng xuống dòng hoặc dấu chấm phẩy",
+        );
       }
       const liability = await runtime.liabilities.create({
         name,
@@ -367,9 +393,14 @@ export function LiabilityScreen() {
   const reversePayment = (paymentId: string) =>
     run(async () => {
       if (!runtime) return;
-      await runtime.liabilities.reversePayment(paymentId, "Điều chỉnh thanh toán theo yêu cầu người dùng");
+      await runtime.liabilities.reversePayment(
+        paymentId,
+        "Điều chỉnh thanh toán theo yêu cầu người dùng",
+      );
       setReplacementPaymentId(paymentId);
-      setMessage("Đã đảo bút toán thanh toán; có thể tạo khoản thanh toán thay thế liên kết với giao dịch này.");
+      setMessage(
+        "Đã đảo bút toán thanh toán; có thể tạo khoản thanh toán thay thế liên kết với giao dịch này.",
+      );
     });
 
   const archive = () =>
@@ -439,7 +470,9 @@ export function LiabilityScreen() {
               ) : (
                 rateChanges.map((change) => (
                   <Text key={change.id} style={styles.rowText}>
-                    {change.effectiveDate} · {(Number(change.annualRatePpm) / 10000).toFixed(4)}% · {change.reason || "Không có ghi chú"}
+                    {change.effectiveDate} ·{" "}
+                    {(Number(change.annualRatePpm) / 10000).toFixed(4)}% ·{" "}
+                    {change.reason || "Không có ghi chú"}
                   </Text>
                 ))
               )}
@@ -460,8 +493,14 @@ export function LiabilityScreen() {
                     onChangeText={setAprReason}
                     style={styles.input}
                   />
-                  <Pressable disabled={busy} onPress={() => void changeApr()} style={styles.primary}>
-                    <Text style={styles.primaryText}>Áp dụng APR từ kỳ chưa đến hạn</Text>
+                  <Pressable
+                    disabled={busy}
+                    onPress={() => void changeApr()}
+                    style={styles.primary}
+                  >
+                    <Text style={styles.primaryText}>
+                      Áp dụng APR từ kỳ chưa đến hạn
+                    </Text>
                   </Pressable>
                 </View>
               ) : null}
@@ -473,17 +512,46 @@ export function LiabilityScreen() {
                   <View key={payment.id} style={styles.group}>
                     <Text style={styles.rowText}>
                       {payment.paidAt.slice(0, 10)} · gốc{" "}
-                      {formatMoney(payment.principalPaidMinor, currencies.find((item) => item.code === activeLiability.currencyCode))} · lãi{" "}
-                      {formatMoney(payment.interestPaidMinor, currencies.find((item) => item.code === activeLiability.currencyCode))} · phí{" "}
-                      {formatMoney(payment.feePaidMinor, currencies.find((item) => item.code === activeLiability.currencyCode))}
+                      {formatMoney(
+                        payment.principalPaidMinor,
+                        currencies.find(
+                          (item) => item.code === activeLiability.currencyCode,
+                        ),
+                      )}{" "}
+                      · lãi{" "}
+                      {formatMoney(
+                        payment.interestPaidMinor,
+                        currencies.find(
+                          (item) => item.code === activeLiability.currencyCode,
+                        ),
+                      )}{" "}
+                      · phí{" "}
+                      {formatMoney(
+                        payment.feePaidMinor,
+                        currencies.find(
+                          (item) => item.code === activeLiability.currencyCode,
+                        ),
+                      )}
                     </Text>
                     <Text style={styles.muted}>
-                      {reversals.some((item) => item.paymentId === payment.id) ? "Đã đảo bút toán" : "Đang hiệu lực"}
-                      {payment.replacesPaymentId ? ` · thay thế ${payment.replacesPaymentId}` : ""}
+                      {reversals.some((item) => item.paymentId === payment.id)
+                        ? "Đã đảo bút toán"
+                        : "Đang hiệu lực"}
+                      {payment.replacesPaymentId
+                        ? ` · thay thế ${payment.replacesPaymentId}`
+                        : ""}
                     </Text>
-                    {!reversals.some((item) => item.paymentId === payment.id) ? (
-                      <Pressable disabled={busy} onPress={() => void reversePayment(payment.id)} style={styles.choice}>
-                        <Text style={styles.choiceText}>Đảo thanh toán này</Text>
+                    {!reversals.some(
+                      (item) => item.paymentId === payment.id,
+                    ) ? (
+                      <Pressable
+                        disabled={busy}
+                        onPress={() => void reversePayment(payment.id)}
+                        style={styles.choice}
+                      >
+                        <Text style={styles.choiceText}>
+                          Đảo thanh toán này
+                        </Text>
                       </Pressable>
                     ) : null}
                   </View>
@@ -616,14 +684,21 @@ export function LiabilityScreen() {
           </View>
           {method === "DECLINING" ? (
             <View style={styles.group}>
-              <Text style={styles.label}>Gốc dự kiến từng kỳ (đơn vị tiền tệ của khoản vay)</Text>
+              <Text style={styles.label}>
+                Gốc dự kiến từng kỳ (đơn vị tiền tệ của khoản vay)
+              </Text>
               <TextInput
                 accessibilityLabel="Gốc từng kỳ DECLINING"
-                placeholder={"Nhập một kỳ mỗi dòng, ví dụ:\\n3000000\\n3000000\\n4000000"}
+                placeholder={
+                  "Nhập một kỳ mỗi dòng, ví dụ:\\n3000000\\n3000000\\n4000000"
+                }
                 multiline
                 value={decliningPrincipalInput}
                 onChangeText={setDecliningPrincipalInput}
-                style={[styles.input, { minHeight: 100, textAlignVertical: "top" }]}
+                style={[
+                  styles.input,
+                  { minHeight: 100, textAlignVertical: "top" },
+                ]}
               />
             </View>
           ) : null}

@@ -281,14 +281,22 @@ export async function runLiabilityAcceptanceDiagnostic(): Promise<LiabilityAccep
       timezoneId: "UTC",
       earlyPaymentPolicy: "KEEP_MATURITY_REDUCE_INSTALLMENT",
     });
-    const rateChange = await service.changeApr(earlyLoan.id, 240_000n, "Acceptance APR reset");
+    const rateChange = await service.changeApr(
+      earlyLoan.id,
+      240_000n,
+      "Acceptance APR reset",
+    );
     const afterRateChange = await service.getDetail(earlyLoan.id);
     check(
       "APR history and forward-only recalculation",
       rateChange.annualRatePpm === 240_000n &&
         afterRateChange.rateChanges.some((item) => item.id === rateChange.id) &&
-        afterRateChange.installments.filter((item) => item.status === "CANCELLED").length === 3 &&
-        afterRateChange.installments.filter((item) => item.status === "UPCOMING").every((item) => item.annualRatePpm === 240_000n),
+        afterRateChange.installments.filter(
+          (item) => item.status === "CANCELLED",
+        ).length === 3 &&
+        afterRateChange.installments
+          .filter((item) => item.status === "UPCOMING")
+          .every((item) => item.annualRatePpm === 240_000n),
       "APR change is immutable history and only replaces not-yet-due installments with the new APR snapshot",
     );
     await service.recordPayment({

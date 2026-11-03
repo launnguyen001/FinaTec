@@ -155,13 +155,26 @@ export class LiabilityService {
       );
     }
     const baseCurrencyCode = await this.ledger.getBaseCurrencyCode();
-    if (!baseCurrencyCode) throw new Error("Ledger base currency is not configured");
-    const baseCurrencyRecord = (await this.ledger.listCurrencies(false)).find((item) => item.code === baseCurrencyCode);
-    if (!baseCurrencyRecord) throw new Error("Ledger base currency is unavailable");
-    const fxRateNumerator = currencyCode === baseCurrencyCode ? "1" : input.fxRateNumerator;
-    const fxRateDenominator = currencyCode === baseCurrencyCode ? "1" : input.fxRateDenominator;
-    if (!fxRateNumerator || !fxRateDenominator || !/^[1-9]\d*$/.test(fxRateNumerator) || !/^[1-9]\d*$/.test(fxRateDenominator)) {
-      throw new Error("A positive rational FX snapshot is required for a non-base-currency liability");
+    if (!baseCurrencyCode)
+      throw new Error("Ledger base currency is not configured");
+    const baseCurrencyRecord = (await this.ledger.listCurrencies(false)).find(
+      (item) => item.code === baseCurrencyCode,
+    );
+    if (!baseCurrencyRecord)
+      throw new Error("Ledger base currency is unavailable");
+    const fxRateNumerator =
+      currencyCode === baseCurrencyCode ? "1" : input.fxRateNumerator;
+    const fxRateDenominator =
+      currencyCode === baseCurrencyCode ? "1" : input.fxRateDenominator;
+    if (
+      !fxRateNumerator ||
+      !fxRateDenominator ||
+      !/^[1-9]\d*$/.test(fxRateNumerator) ||
+      !/^[1-9]\d*$/.test(fxRateDenominator)
+    ) {
+      throw new Error(
+        "A positive rational FX snapshot is required for a non-base-currency liability",
+      );
     }
     const fxRate = new FxRate(
       BigInt(fxRateNumerator),
@@ -169,7 +182,12 @@ export class LiabilityService {
       new Currency(currencyCode, currencyRecord.minorUnit),
       new Currency(baseCurrencyCode, baseCurrencyRecord.minorUnit),
     );
-    const basePrincipalMinor = fxRate.convertToBase(new Money(input.principalMinor, new Currency(currencyCode, currencyRecord.minorUnit))).minorUnits;
+    const basePrincipalMinor = fxRate.convertToBase(
+      new Money(
+        input.principalMinor,
+        new Currency(currencyCode, currencyRecord.minorUnit),
+      ),
+    ).minorUnits;
     const timezoneId =
       input.timezoneId ??
       Intl.DateTimeFormat().resolvedOptions().timeZone ??
@@ -277,7 +295,14 @@ export class LiabilityService {
       this.repository.listRateChanges(id),
       this.repository.listPaymentReversals(id),
     ]);
-    return { liability, installments, payments, rateChanges, reversals, reconciliation };
+    return {
+      liability,
+      installments,
+      payments,
+      rateChanges,
+      reversals,
+      reconciliation,
+    };
   }
 
   async syncStatuses(): Promise<void> {
@@ -299,34 +324,51 @@ export class LiabilityService {
       throw new Error("Annual APR must be between 0% and 1000%");
     }
     const liability = await this.requireLiability(liabilityId);
-    if (liability.status !== "ACTIVE") throw new Error("Only an ACTIVE liability can change APR");
+    if (liability.status !== "ACTIVE")
+      throw new Error("Only an ACTIVE liability can change APR");
     const localDate = localDateAt(this.now(), liability.timezoneId);
     const schedule = await this.repository.listInstallments(liabilityId);
     const pastOutstanding = schedule.filter(
-      (item) => item.dueDate < localDate && item.status !== "PAID" && item.status !== "CANCELLED",
+      (item) =>
+        item.dueDate < localDate &&
+        item.status !== "PAID" &&
+        item.status !== "CANCELLED",
     );
     if (pastOutstanding.length) {
       throw new Error("Settle overdue installments before changing APR");
     }
     const future = schedule.filter(
-      (item) => item.dueDate >= localDate && item.status !== "PAID" && item.status !== "CANCELLED",
+      (item) =>
+        item.dueDate >= localDate &&
+        item.status !== "PAID" &&
+        item.status !== "CANCELLED",
     );
-    if (!future.length) throw new Error("There is no future installment for the new APR to take effect");
+    if (!future.length)
+      throw new Error(
+        "There is no future installment for the new APR to take effect",
+      );
     const first = future[0]!;
     if (first.principalPaidMinor > 0n || first.interestPaidMinor > 0n) {
       throw new Error("The next installment already has payment allocations");
     }
     const currentChanges = await this.repository.listRateChanges(liabilityId);
-    const effectiveNow = currentChanges
-      .filter((item) => item.effectiveDate <= first.periodStart)
-      .sort((a, b) => a.effectiveDate.localeCompare(b.effectiveDate) || a.createdAt.localeCompare(b.createdAt))
-      .at(-1)?.annualRatePpm ?? liability.annualRatePpm;
-    if (effectiveNow === annualRatePpm) throw new Error("New APR matches the currently effective APR");
+    const effectiveNow =
+      currentChanges
+        .filter((item) => item.effectiveDate <= first.periodStart)
+        .sort(
+          (a, b) =>
+            a.effectiveDate.localeCompare(b.effectiveDate) ||
+            a.createdAt.localeCompare(b.createdAt),
+        )
+        .at(-1)?.annualRatePpm ?? liability.annualRatePpm;
+    if (effectiveNow === annualRatePpm)
+      throw new Error("New APR matches the currently effective APR");
     const principal = first.openingPrincipalMinor;
     const termMonths = future.length;
-    const declining = liability.repaymentMethod === "DECLINING"
-      ? future.map((item) => item.principalDueMinor)
-      : undefined;
+    const declining =
+      liability.repaymentMethod === "DECLINING"
+        ? future.map((item) => item.principalDueMinor)
+        : undefined;
     const calculated = calculateRepaymentSchedule({
       principalMinor: principal,
       annualRatePpm,
@@ -337,7 +379,8 @@ export class LiabilityService {
       decliningPrincipalMinor: declining,
     });
     const timestamp = this.now();
-    const nextSequence = Math.max(...schedule.map((item) => item.sequence), 0) + 1;
+    const nextSequence =
+      Math.max(...schedule.map((item) => item.sequence), 0) + 1;
     const change: LiabilityRateChange = {
       id: this.options.createId(),
       liabilityId,
@@ -346,18 +389,20 @@ export class LiabilityService {
       reason: reason?.trim() || null,
       createdAt: timestamp,
     };
-    const replacements: LiabilityInstallment[] = calculated.installments.map((item) => ({
-      ...item,
-      id: this.options.createId(),
-      liabilityId,
-      sequence: nextSequence + item.sequence - 1,
-      annualRatePpm,
-      principalPaidMinor: 0n,
-      interestPaidMinor: 0n,
-      status: "UPCOMING",
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    }));
+    const replacements: LiabilityInstallment[] = calculated.installments.map(
+      (item) => ({
+        ...item,
+        id: this.options.createId(),
+        liabilityId,
+        sequence: nextSequence + item.sequence - 1,
+        annualRatePpm,
+        principalPaidMinor: 0n,
+        interestPaidMinor: 0n,
+        status: "UPCOMING",
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      }),
+    );
     await this.repository.addRateChange(change, replacements);
     return change;
   }
@@ -372,9 +417,17 @@ export class LiabilityService {
     ).find((item) => item.idempotencyKey === key);
     if (existing) return existing;
     if (input.replacesPaymentId) {
-      const replacedPayment = await this.repository.findPaymentById(input.replacesPaymentId);
-      if (!replacedPayment || replacedPayment.liabilityId !== input.liabilityId || !(await this.repository.findPaymentReversal(input.replacesPaymentId))) {
-        throw new Error("A replacement payment must reference a reversed payment on the same liability");
+      const replacedPayment = await this.repository.findPaymentById(
+        input.replacesPaymentId,
+      );
+      if (
+        !replacedPayment ||
+        replacedPayment.liabilityId !== input.liabilityId ||
+        !(await this.repository.findPaymentReversal(input.replacesPaymentId))
+      ) {
+        throw new Error(
+          "A replacement payment must reference a reversed payment on the same liability",
+        );
       }
     }
     if (input.amountMinor <= 0n)
@@ -410,16 +463,35 @@ export class LiabilityService {
       );
     }
     const baseCurrencyCode = await this.ledger.getBaseCurrencyCode();
-    if (!baseCurrencyCode) throw new Error("Ledger base currency is not configured");
+    if (!baseCurrencyCode)
+      throw new Error("Ledger base currency is not configured");
     const [nativeCurrencyRecord, baseCurrencyRecord] = await Promise.all([
-      this.ledger.listCurrencies(false).then((items) => items.find((item) => item.code === liability.currencyCode)),
-      this.ledger.listCurrencies(false).then((items) => items.find((item) => item.code === baseCurrencyCode)),
+      this.ledger
+        .listCurrencies(false)
+        .then((items) =>
+          items.find((item) => item.code === liability.currencyCode),
+        ),
+      this.ledger
+        .listCurrencies(false)
+        .then((items) => items.find((item) => item.code === baseCurrencyCode)),
     ]);
-    if (!nativeCurrencyRecord || !baseCurrencyRecord) throw new Error("Payment currency metadata is unavailable");
-    const fxRateNumerator = liability.currencyCode === baseCurrencyCode ? "1" : input.fxRateNumerator;
-    const fxRateDenominator = liability.currencyCode === baseCurrencyCode ? "1" : input.fxRateDenominator;
-    if (!fxRateNumerator || !fxRateDenominator || !/^[1-9]\d*$/.test(fxRateNumerator) || !/^[1-9]\d*$/.test(fxRateDenominator)) {
-      throw new Error("A positive rational FX snapshot is required for a non-base-currency payment");
+    if (!nativeCurrencyRecord || !baseCurrencyRecord)
+      throw new Error("Payment currency metadata is unavailable");
+    const fxRateNumerator =
+      liability.currencyCode === baseCurrencyCode ? "1" : input.fxRateNumerator;
+    const fxRateDenominator =
+      liability.currencyCode === baseCurrencyCode
+        ? "1"
+        : input.fxRateDenominator;
+    if (
+      !fxRateNumerator ||
+      !fxRateDenominator ||
+      !/^[1-9]\d*$/.test(fxRateNumerator) ||
+      !/^[1-9]\d*$/.test(fxRateDenominator)
+    ) {
+      throw new Error(
+        "A positive rational FX snapshot is required for a non-base-currency payment",
+      );
     }
     const fxRate = new FxRate(
       BigInt(fxRateNumerator),
@@ -427,7 +499,13 @@ export class LiabilityService {
       new Currency(liability.currencyCode, nativeCurrencyRecord.minorUnit),
       new Currency(baseCurrencyCode, baseCurrencyRecord.minorUnit),
     );
-    const baseAmount = (amount: bigint) => fxRate.convertToBase(new Money(amount, new Currency(liability.currencyCode, nativeCurrencyRecord.minorUnit))).minorUnits;
+    const baseAmount = (amount: bigint) =>
+      fxRate.convertToBase(
+        new Money(
+          amount,
+          new Currency(liability.currencyCode, nativeCurrencyRecord.minorUnit),
+        ),
+      ).minorUnits;
 
     const paidAt = input.paidAt ?? this.now();
     const localDate = localDateAt(paidAt, liability.timezoneId);
@@ -641,7 +719,9 @@ export class LiabilityService {
     if (feeMinor > 0n && feeAccount)
       add(feeAccount, "DEBIT", feeMinor, "Early repayment fee");
     if (debitBaseTotal !== baseAmount(paymentTotal)) {
-      throw new Error("FX rounding makes this payment journal unbalanced in base currency; adjust the FX snapshot or payment allocation");
+      throw new Error(
+        "FX rounding makes this payment journal unbalanced in base currency; adjust the FX snapshot or payment allocation",
+      );
     }
     add(source, "CREDIT", paymentTotal, "Payment source");
     const payment: LiabilityPayment = {
@@ -666,8 +746,10 @@ export class LiabilityService {
     for (const updated of installmentUpdates) {
       const before = schedules.find((item) => item.id === updated.id);
       if (!before) continue;
-      const principalDelta = updated.principalPaidMinor - before.principalPaidMinor;
-      const interestDelta = updated.interestPaidMinor - before.interestPaidMinor;
+      const principalDelta =
+        updated.principalPaidMinor - before.principalPaidMinor;
+      const interestDelta =
+        updated.interestPaidMinor - before.interestPaidMinor;
       if (principalDelta === 0n && interestDelta === 0n) continue;
       allocations.push({
         id: this.options.createId(),
@@ -688,7 +770,8 @@ export class LiabilityService {
           paymentId,
           installmentId: item.id,
           action: "CANCELLED" as const,
-          previousStatus: schedules.find((before) => before.id === item.id)?.status ?? null,
+          previousStatus:
+            schedules.find((before) => before.id === item.id)?.status ?? null,
         })),
       ...newInstallments.map((item) => ({
         id: this.options.createId(),
@@ -710,21 +793,33 @@ export class LiabilityService {
     });
   }
 
-  async reversePayment(paymentId: string, reason?: string | null): Promise<void> {
+  async reversePayment(
+    paymentId: string,
+    reason?: string | null,
+  ): Promise<void> {
     const payment = await this.repository.findPaymentById(paymentId);
     if (!payment) throw new Error("Liability payment does not exist");
     const liability = await this.requireLiability(payment.liabilityId);
-    if (liability.status === "ARCHIVED") throw new Error("Archived liabilities cannot receive payment reversals");
+    if (liability.status === "ARCHIVED")
+      throw new Error("Archived liabilities cannot receive payment reversals");
     const payments = await this.repository.listPayments(payment.liabilityId);
     if (await this.repository.findPaymentReversal(paymentId)) return;
-    const laterPayments = payments.filter((item) => item.id !== paymentId && item.postingOrder > payment.postingOrder);
+    const laterPayments = payments.filter(
+      (item) =>
+        item.id !== paymentId && item.postingOrder > payment.postingOrder,
+    );
     for (const later of laterPayments) {
       if (!(await this.repository.findPaymentReversal(later.id))) {
-        throw new Error("Reverse payments in reverse chronological order; a later payment is still active");
+        throw new Error(
+          "Reverse payments in reverse chronological order; a later payment is still active",
+        );
       }
     }
-    const original = await this.ledger.findJournalEntryById(payment.journalEntryId);
-    if (!original || original.status !== "POSTED") throw new Error("Original payment journal is missing or not POSTED");
+    const original = await this.ledger.findJournalEntryById(
+      payment.journalEntryId,
+    );
+    if (!original || original.status !== "POSTED")
+      throw new Error("Original payment journal is missing or not POSTED");
     const originalLines = await this.ledger.listJournalLines(original.id);
     const timestamp = this.now();
     const reversalEntry: JournalEntry = {
@@ -746,7 +841,7 @@ export class LiabilityService {
         id: this.options.createId(),
         entryId: reversalEntry.id,
         lineNumber: index + 1,
-        side: line.side === "DEBIT" ? "CREDIT" as const : "DEBIT" as const,
+        side: line.side === "DEBIT" ? ("CREDIT" as const) : ("DEBIT" as const),
         createdAt: timestamp,
       }));
     await this.repository.reversePayment({

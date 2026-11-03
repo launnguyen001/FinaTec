@@ -808,44 +808,94 @@ export const liabilityRateChanges = sqliteTable(
     id: text("id").primaryKey(),
     liabilityId: text("liability_id")
       .notNull()
-      .references(() => liabilities.id, { onDelete: "restrict", onUpdate: "restrict" }),
+      .references(() => liabilities.id, {
+        onDelete: "restrict",
+        onUpdate: "restrict",
+      }),
     annualRatePpm: integer("annual_rate_ppm").notNull(),
     effectiveDate: text("effective_date").notNull(),
     reason: text("reason"),
     createdAt: text("created_at").notNull(),
   },
   (table) => [
-    index("liability_rate_changes_effective_idx").on(table.liabilityId, table.effectiveDate),
-    check("liability_rate_changes_apr_range", sql`${table.annualRatePpm} BETWEEN 0 AND 10000000`),
+    index("liability_rate_changes_effective_idx").on(
+      table.liabilityId,
+      table.effectiveDate,
+    ),
+    check(
+      "liability_rate_changes_apr_range",
+      sql`${table.annualRatePpm} BETWEEN 0 AND 10000000`,
+    ),
   ],
 );
 
-export const liabilityPaymentAllocations = sqliteTable("liability_payment_allocations", {
-  id: text("id").primaryKey(),
-  paymentId: text("payment_id").notNull().references(() => liabilityPayments.id, { onDelete: "restrict", onUpdate: "restrict" }),
-  installmentId: text("installment_id").notNull().references(() => liabilityInstallments.id, { onDelete: "restrict", onUpdate: "restrict" }),
-  principalMinor: integer("principal_minor").notNull(),
-  interestMinor: integer("interest_minor").notNull(),
-  principalBeforeMinor: integer("principal_before_minor").notNull(),
-  interestBeforeMinor: integer("interest_before_minor").notNull(),
-  statusBefore: text("status_before").notNull(),
-});
+export const liabilityPaymentAllocations = sqliteTable(
+  "liability_payment_allocations",
+  {
+    id: text("id").primaryKey(),
+    paymentId: text("payment_id")
+      .notNull()
+      .references(() => liabilityPayments.id, {
+        onDelete: "restrict",
+        onUpdate: "restrict",
+      }),
+    installmentId: text("installment_id")
+      .notNull()
+      .references(() => liabilityInstallments.id, {
+        onDelete: "restrict",
+        onUpdate: "restrict",
+      }),
+    principalMinor: integer("principal_minor").notNull(),
+    interestMinor: integer("interest_minor").notNull(),
+    principalBeforeMinor: integer("principal_before_minor").notNull(),
+    interestBeforeMinor: integer("interest_before_minor").notNull(),
+    statusBefore: text("status_before").notNull(),
+  },
+);
 
-export const liabilityPaymentScheduleChanges = sqliteTable("liability_payment_schedule_changes", {
-  id: text("id").primaryKey(),
-  paymentId: text("payment_id").notNull().references(() => liabilityPayments.id, { onDelete: "restrict", onUpdate: "restrict" }),
-  installmentId: text("installment_id").notNull().references(() => liabilityInstallments.id, { onDelete: "restrict", onUpdate: "restrict" }),
-  action: text("action", { enum: ["CANCELLED", "CREATED"] }).notNull(),
-  previousStatus: text("previous_status"),
-});
+export const liabilityPaymentScheduleChanges = sqliteTable(
+  "liability_payment_schedule_changes",
+  {
+    id: text("id").primaryKey(),
+    paymentId: text("payment_id")
+      .notNull()
+      .references(() => liabilityPayments.id, {
+        onDelete: "restrict",
+        onUpdate: "restrict",
+      }),
+    installmentId: text("installment_id")
+      .notNull()
+      .references(() => liabilityInstallments.id, {
+        onDelete: "restrict",
+        onUpdate: "restrict",
+      }),
+    action: text("action", { enum: ["CANCELLED", "CREATED"] }).notNull(),
+    previousStatus: text("previous_status"),
+  },
+);
 
-export const liabilityPaymentReversals = sqliteTable("liability_payment_reversals", {
-  id: text("id").primaryKey(),
-  paymentId: text("payment_id").notNull().unique().references(() => liabilityPayments.id, { onDelete: "restrict", onUpdate: "restrict" }),
-  journalEntryId: text("journal_entry_id").notNull().unique().references(() => journalEntries.id, { onDelete: "restrict", onUpdate: "restrict" }),
-  reason: text("reason"),
-  createdAt: text("created_at").notNull(),
-});
+export const liabilityPaymentReversals = sqliteTable(
+  "liability_payment_reversals",
+  {
+    id: text("id").primaryKey(),
+    paymentId: text("payment_id")
+      .notNull()
+      .unique()
+      .references(() => liabilityPayments.id, {
+        onDelete: "restrict",
+        onUpdate: "restrict",
+      }),
+    journalEntryId: text("journal_entry_id")
+      .notNull()
+      .unique()
+      .references(() => journalEntries.id, {
+        onDelete: "restrict",
+        onUpdate: "restrict",
+      }),
+    reason: text("reason"),
+    createdAt: text("created_at").notNull(),
+  },
+);
 
 export const ledgerSchema = {
   currencies,

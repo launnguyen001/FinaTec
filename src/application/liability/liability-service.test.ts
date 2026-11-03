@@ -167,7 +167,10 @@ function installment(
 describe("LiabilityService", () => {
   it("posts a foreign-currency loan with an immutable rational FX snapshot", async () => {
     const { service, repository, ledger } = createHarness(baseLiability());
-    const usdAccounts = accounts.map((account) => ({ ...account, currencyCode: "USD" }));
+    const usdAccounts = accounts.map((account) => ({
+      ...account,
+      currencyCode: "USD",
+    }));
     const usdCurrency: CurrencyRecord = {
       code: "USD",
       name: "US dollar",
@@ -175,7 +178,10 @@ describe("LiabilityService", () => {
       isActive: true,
       createdAt: timestamp,
     };
-    (ledger.listCurrencies as jest.Mock).mockResolvedValue([currency, usdCurrency]);
+    (ledger.listCurrencies as jest.Mock).mockResolvedValue([
+      currency,
+      usdCurrency,
+    ]);
     (ledger.findAccountById as jest.Mock).mockImplementation(
       async (id: string) => usdAccounts.find((item) => item.id === id) ?? null,
     );
@@ -196,7 +202,11 @@ describe("LiabilityService", () => {
     const commit = (repository.createLiability as jest.Mock).mock.calls[0]![0];
     expect(created.currencyCode).toBe("USD");
     expect(created.fxRateNumerator).toBe("25000");
-    expect(commit.journal.journalLines.map((line: { baseAmountMinor: bigint }) => line.baseAmountMinor)).toEqual([250_000n, 250_000n]);
+    expect(
+      commit.journal.journalLines.map(
+        (line: { baseAmountMinor: bigint }) => line.baseAmountMinor,
+      ),
+    ).toEqual([250_000n, 250_000n]);
   });
 
   it("records an APR change and recalculates only future installments", async () => {
@@ -213,8 +223,18 @@ describe("LiabilityService", () => {
     const saved = (repository.addRateChange as jest.Mock).mock.calls[0]!;
     expect(saved[0].annualRatePpm).toBe(240_000n);
     expect(saved[1]).toHaveLength(3);
-    expect(saved[1].every((item: LiabilityInstallment) => item.annualRatePpm === 240_000n)).toBe(true);
-    expect(saved[1].reduce((sum: bigint, item: LiabilityInstallment) => sum + item.principalDueMinor, 0n)).toBe(100_000n);
+    expect(
+      saved[1].every(
+        (item: LiabilityInstallment) => item.annualRatePpm === 240_000n,
+      ),
+    ).toBe(true);
+    expect(
+      saved[1].reduce(
+        (sum: bigint, item: LiabilityInstallment) =>
+          sum + item.principalDueMinor,
+        0n,
+      ),
+    ).toBe(100_000n);
   });
 
   it("originates a loan with a balanced ASSET debit and LIABILITY credit", async () => {
@@ -455,8 +475,34 @@ describe("LiabilityService", () => {
       postedAt: timestamp,
     };
     const lines = [
-      { id: "line-1", entryId: original.id, lineNumber: 1, accountId: "loan", currencyCode: "VND", side: "DEBIT" as const, amountMinor: 4_000n, fxRateNumerator: "1", fxRateDenominator: "1", baseAmountMinor: 4_000n, memo: null, createdAt: timestamp },
-      { id: "line-2", entryId: original.id, lineNumber: 2, accountId: "cash-out", currencyCode: "VND", side: "CREDIT" as const, amountMinor: 4_000n, fxRateNumerator: "1", fxRateDenominator: "1", baseAmountMinor: 4_000n, memo: null, createdAt: timestamp },
+      {
+        id: "line-1",
+        entryId: original.id,
+        lineNumber: 1,
+        accountId: "loan",
+        currencyCode: "VND",
+        side: "DEBIT" as const,
+        amountMinor: 4_000n,
+        fxRateNumerator: "1",
+        fxRateDenominator: "1",
+        baseAmountMinor: 4_000n,
+        memo: null,
+        createdAt: timestamp,
+      },
+      {
+        id: "line-2",
+        entryId: original.id,
+        lineNumber: 2,
+        accountId: "cash-out",
+        currencyCode: "VND",
+        side: "CREDIT" as const,
+        amountMinor: 4_000n,
+        fxRateNumerator: "1",
+        fxRateDenominator: "1",
+        baseAmountMinor: 4_000n,
+        memo: null,
+        createdAt: timestamp,
+      },
     ];
     const { service, repository, ledger } = createHarness(current);
     (repository.findPaymentById as jest.Mock).mockResolvedValue(existing);
@@ -469,7 +515,9 @@ describe("LiabilityService", () => {
     const commit = (repository.reversePayment as jest.Mock).mock.calls[0]![0];
     expect(commit.reversal.journalEntry.reversalOfId).toBe(original.id);
     expect(commit.reversal.journalEntry.transactionKind).toBe("REVERSAL");
-    expect(commit.reversal.journalLines.map((line: { side: string }) => line.side)).toEqual(["CREDIT", "DEBIT"]);
+    expect(
+      commit.reversal.journalLines.map((line: { side: string }) => line.side),
+    ).toEqual(["CREDIT", "DEBIT"]);
     expect(commit.record.paymentId).toBe(existing.id);
   });
 
