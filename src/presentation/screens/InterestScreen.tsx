@@ -127,6 +127,7 @@ export function InterestScreen() {
     )?.currencyCode;
     return accounts.filter(
       (account) =>
+        !account.isArchived &&
         account.type === "INCOME" &&
         (!currencyCode || account.currencyCode === currencyCode),
     );
@@ -135,6 +136,7 @@ export function InterestScreen() {
     () =>
       accounts.filter(
         (account) =>
+          !account.isArchived &&
           account.type === "ASSET" &&
           account.id !== principalAccountId &&
           (!principalAccountId ||
@@ -388,7 +390,19 @@ export function InterestScreen() {
           title="Tài khoản gốc · INVESTMENT ASSET"
           accounts={principalAccounts}
           selectedId={principalAccountId}
-          onSelect={setPrincipalAccountId}
+          onSelect={(id) => {
+            const currencyCode = accounts.find((item) => item.id === id)?.currencyCode;
+            setPrincipalAccountId(id);
+            setPayoutAccountId("");
+            setIncomeAccountId(
+              accounts.find(
+                (item) =>
+                  !item.isArchived &&
+                  item.type === "INCOME" &&
+                  item.currencyCode === currencyCode,
+              )?.id ?? "",
+            );
+          }}
         />
         <AccountPicker
           title="Tài khoản thu nhập lãi · INCOME"
