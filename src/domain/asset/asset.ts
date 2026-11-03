@@ -152,6 +152,21 @@ export function normalizeDecimal(value: string, precision: number): string {
   return fraction ? whole.toString() + "." + fraction : whole.toString();
 }
 
+export function decimalToMinorUnits(value: string, precision: number): bigint {
+  return decimalParts(value, precision).units;
+}
+
+export function sumDecimalQuantities(
+  values: readonly string[],
+  precision: number,
+): string {
+  const total = values.reduce(
+    (sum, value) => sum + decimalParts(value, precision).units,
+    0n,
+  );
+  return formatUnits(total, precision);
+}
+
 function formatUnits(units: bigint, precision: number): string {
   const scale = 10n ** BigInt(precision);
   const whole = units / scale;
