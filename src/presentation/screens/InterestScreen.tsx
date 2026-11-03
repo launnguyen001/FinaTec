@@ -103,9 +103,7 @@ export function InterestScreen() {
   const [accruals, setAccruals] = useState<InterestAccrual[]>([]);
   const [name, setName] = useState("");
   const [ratePercent, setRatePercent] = useState("5.5");
-  const [startDate, setStartDate] = useState(
-    getLocalDate(),
-  );
+  const [startDate, setStartDate] = useState(getLocalDate());
   const [maturityDate, setMaturityDate] = useState("");
   const [principalAccountId, setPrincipalAccountId] = useState("");
   const [incomeAccountId, setIncomeAccountId] = useState("");
@@ -117,9 +115,7 @@ export function InterestScreen() {
     "SIMPLE" | "AFTER_CAPITALIZATION"
   >("SIMPLE");
   const [periodStart, setPeriodStart] = useState("");
-  const [periodEnd, setPeriodEnd] = useState(
-    getLocalDate(),
-  );
+  const [periodEnd, setPeriodEnd] = useState(getLocalDate());
   const [kind, setKind] = useState<"CAPITALIZATION" | "PAYOUT">("PAYOUT");
   const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -175,8 +171,7 @@ export function InterestScreen() {
       setSelectedPlanId(nextPlans[0]!.id);
     }
     const defaultPrincipal = nextAccounts.find(
-      (item) =>
-        !item.isArchived && item.type === "ASSET" && item.isInvestment,
+      (item) => !item.isArchived && item.type === "ASSET" && item.isInvestment,
     );
     const effectivePrincipalId = principalAccountId || defaultPrincipal?.id;
     const principalCurrency = nextAccounts.find(
@@ -372,7 +367,9 @@ export function InterestScreen() {
       await load();
     } catch (cause) {
       setFailure(
-        cause instanceof Error ? cause.message : "Không thể cập nhật trạng thái kế hoạch.",
+        cause instanceof Error
+          ? cause.message
+          : "Không thể cập nhật trạng thái kế hoạch.",
       );
     } finally {
       setBusy(false);
@@ -406,7 +403,9 @@ export function InterestScreen() {
       <Text style={styles.title}>Interest Engine</Text>
       <Text style={styles.subtitle}>
         Nominal APR · ACT/365 Fixed · daily accrual · HALF_UP khi posting.
-        Accrued chưa POSTED không làm thay đổi số dư Ledger. MVP yêu cầu cùng base currency và principal được nạp trước ngày bắt đầu, không thay đổi ngoài InterestPlan.
+        Accrued chưa POSTED không làm thay đổi số dư Ledger. MVP yêu cầu cùng
+        base currency và principal được nạp trước ngày bắt đầu, không thay đổi
+        ngoài InterestPlan.
       </Text>
       {loading ? <ActivityIndicator color={colors.primary} /> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -615,7 +614,11 @@ export function InterestScreen() {
                 </Text>
                 <Text style={styles.muted}>
                   {item.accrualKind} · {item.status} ·{" "}
-                  {roundHalfUp(item.accruedNumerator, item.accruedDenominator).toString()} minor units (HALF_UP at posting)
+                  {roundHalfUp(
+                    item.accruedNumerator,
+                    item.accruedDenominator,
+                  ).toString()}{" "}
+                  minor units (HALF_UP at posting)
                 </Text>
                 {item.journalEntryId ? (
                   <Text style={styles.muted}>
