@@ -140,6 +140,11 @@ export class InterestService {
       createdAt: timestamp,
       updatedAt: timestamp,
     };
+    if (await this.repository.hasExternalPrincipalMovements(plan)) {
+      throw new Error(
+        "Principal must be fully funded before the plan start date; later principal movements are not supported in this MVP",
+      );
+    }
     await this.readPrincipalBalance(plan);
     await this.repository.createPlan(plan);
     return plan;
