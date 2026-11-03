@@ -68,7 +68,7 @@ export class AccountService {
     await this.accounts.archive(id, this.options.now());
   }
 
-  async restore(id: string): Promise<void> {
+  async restoreAccount(id: string): Promise<void> {
     const current = await this.requireAccount(id);
     if (!current.isArchived) return;
     if (current.isSystem) throw new Error("System accounts cannot be restored");
