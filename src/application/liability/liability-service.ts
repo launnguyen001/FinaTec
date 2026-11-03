@@ -319,7 +319,7 @@ export class LiabilityService {
     const currentChanges = await this.repository.listRateChanges(liabilityId);
     const effectiveNow = currentChanges
       .filter((item) => item.effectiveDate <= first.periodStart)
-      .sort((a, b) => a.effectiveDate.localeCompare(b.effectiveDate))
+      .sort((a, b) => a.effectiveDate.localeCompare(b.effectiveDate) || a.createdAt.localeCompare(b.createdAt))
       .at(-1)?.annualRatePpm ?? liability.annualRatePpm;
     if (effectiveNow === annualRatePpm) throw new Error("New APR matches the currently effective APR");
     const principal = first.openingPrincipalMinor;
