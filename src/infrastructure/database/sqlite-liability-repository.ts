@@ -199,6 +199,19 @@ export class SqliteLiabilityRepository implements LiabilityRepository {
     return row ?? null;
   }
 
+  async listPaymentReversals(liabilityId: string): Promise<LiabilityPaymentReversal[]> {
+    return this.db.select({
+      id: liabilityPaymentReversals.id,
+      paymentId: liabilityPaymentReversals.paymentId,
+      journalEntryId: liabilityPaymentReversals.journalEntryId,
+      reason: liabilityPaymentReversals.reason,
+      createdAt: liabilityPaymentReversals.createdAt,
+    }).from(liabilityPaymentReversals)
+      .innerJoin(liabilityPayments, eq(liabilityPayments.id, liabilityPaymentReversals.paymentId))
+      .where(eq(liabilityPayments.liabilityId, liabilityId))
+      .all();
+  }
+
   async listPayments(liabilityId: string): Promise<LiabilityPayment[]> {
     const rows = await this.db
       .select()
