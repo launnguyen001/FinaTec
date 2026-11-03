@@ -43,6 +43,10 @@ export interface LiabilityRepository {
   reconcile(id: string): Promise<{
     ledgerPrincipalMinor: bigint;
     recordedPrincipalMinor: bigint;
+    schedulePrincipalMinor: bigint;
+    paymentDerivedPrincipalMinor: bigint;
     differenceMinor: bigint;
+    scheduleDifferenceMinor: bigint;
+    paymentDifferenceMinor: bigint;
   }>;
 }
