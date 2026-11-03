@@ -42,6 +42,18 @@ function parseAprPpm(value: string): bigint {
   return BigInt(whole!) * 10_000n + BigInt((fraction + "0000").slice(0, 4));
 }
 
+function parseFxRateRatio(value: string): { numerator: string; denominator: string } {
+  const normalized = value.trim().replace(",", ".");
+  if (!/^(?:0|[1-9]\\d*)(?:\\.\\d{1,8})?$/.test(normalized)) {
+    throw new Error("Tỷ giá phải là số thập phân dương, tối đa 8 chữ số");
+  }
+  const [whole, fraction = ""] = normalized.split(".");
+  const denominator = 10n ** BigInt(fraction.length);
+  const numerator = BigInt(whole!) * denominator + BigInt(fraction || "0");
+  if (numerator <= 0n) throw new Error("Tỷ giá phải lớn hơn 0");
+  return { numerator: numerator.toString(), denominator: denominator.toString() };
+}
+
 function formatMoney(
   amount: bigint,
   currency: CurrencyRecord | undefined,
@@ -119,6 +131,8 @@ export function LiabilityScreen() {
   const [name, setName] = useState("");
   const [principal, setPrincipal] = useState("");
   const [apr, setApr] = useState("12");
+  const [originationFxRate, setOriginationFxRate] = useState("1");
+  const [paymentFxRate, setPaymentFxRate] = useState("1");
   const [newApr, setNewApr] = useState("");
   const [aprReason, setAprReason] = useState("");
   const [term, setTerm] = useState("12");
@@ -268,6 +282,7 @@ export function LiabilityScreen() {
         throw new Error("Số kỳ phải là số nguyên từ 1 đến 600");
       }
       const rate = parseAprPpm(apr);
+      const fx = parseFxRateRatio(originationFxRate);
       const [year, month, day] = startDate.split("-").map(Number);
       const nextDate = new Date(Date.UTC(year!, month! - 1, day! + 1))
         .toISOString()
@@ -296,6 +311,8 @@ export function LiabilityScreen() {
         firstDueDate: dueDate,
         earlyPaymentPolicy,
         decliningPrincipalMinor: principalParts,
+        fxRateNumerator: fx.numerator,
+        fxRateDenominator: fx.denominator,
       });
       setSelectedId(liability.id);
       setMessage("Đã tạo khoản nợ và ghi nhận khoản vay vào Ledger.");
@@ -313,6 +330,7 @@ export function LiabilityScreen() {
       const fee = parseMinorUnits(feeAmount || "0", selectedCurrency.minorUnit);
       const idempotencyKey =
         paymentIdempotencyKey || `liability-payment:${runtime.createId()}`;
+      const fx = parseFxRateRatio(paymentFxRate);
       setPaymentIdempotencyKey(idempotencyKey);
       await runtime.liabilities.recordPayment({
         liabilityId: activeLiability.id,
@@ -320,6 +338,8 @@ export function LiabilityScreen() {
         amountMinor: amount,
         feeMinor: fee,
         feeExpenseAccountId: feeAccountId || undefined,
+        fxRateNumerator: fx.numerator,
+        fxRateDenominator: fx.denominator,
         idempotencyKey,
       });
       setPaymentAmount("");
@@ -530,6 +550,14 @@ export function LiabilityScreen() {
             style={styles.input}
           />
           <TextInput
+            accessibilityLabel="Tỷ giá lúc nhận khoản vay"
+            placeholder="Tỷ giá: 1 đơn vị tiền khoản vay = ? tiền cơ sở"
+            keyboardType="decimal-pad"
+            value={originationFxRate}
+            onChangeText={setOriginationFxRate}
+            style={styles.input}
+          />
+          <TextInput
             accessibilityLabel="APR phần trăm"
             placeholder="APR %"
             keyboardType="decimal-pad"
@@ -633,6 +661,14 @@ export function LiabilityScreen() {
               keyboardType="decimal-pad"
               value={paymentAmount}
               onChangeText={setPaymentAmount}
+              style={styles.input}
+            />
+            <TextInput
+              accessibilityLabel="Tỷ giá thanh toán"
+              placeholder="Tỷ giá tại ngày thanh toán (base / 1 native)"
+              keyboardType="decimal-pad"
+              value={paymentFxRate}
+              onChangeText={setPaymentFxRate}
               style={styles.input}
             />
             <TextInput
