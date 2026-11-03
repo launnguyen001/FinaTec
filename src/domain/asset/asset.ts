@@ -184,9 +184,13 @@ export function calculateSale(params: {
   quantityPrecision: number;
   grossProceedsMinor: bigint;
   feeMinor: bigint;
+  /** True only after the repository verifies this MERGED lot is a component of the selected active DCA aggregate. */
+  isDcaComponent?: boolean;
 }): SaleCalculation {
   const { lot, quantitySold, quantityPrecision, grossProceedsMinor, feeMinor } = params;
-  if (lot.status !== "ACTIVE") throw new Error("Only an ACTIVE lot can be sold");
+  if (lot.status !== "ACTIVE" && !(lot.status === "MERGED" && params.isDcaComponent === true)) {
+    throw new Error("Only an ACTIVE lot or a verified DCA component can be sold");
+  }
   if (grossProceedsMinor < 0n || feeMinor < 0n) throw new Error("Sale proceeds and fee cannot be negative");
   const remaining = decimalParts(lot.remainingQuantity, quantityPrecision).units;
   if (lot.remainingCostBasisMinor < 0n || lot.remainingCostBasisMinor > lot.costBasisMinor) {
