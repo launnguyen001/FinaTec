@@ -87,6 +87,8 @@ No rounding line is created. Rounding is half-up once per line, then the resulti
 Schema v2 adds `journal_entries.transaction_kind` and nullable `category_id`.
 
 - INCOME and EXPENSE are business classifications on the Journal Entry; they still post through the same balanced Ledger Engine.
+- INCOME means money enters the assets managed by the owner; EXPENSE means money leaves that managed-asset boundary, regardless of whether the user considers it personal spending, business cost, owner withdrawal or another purpose. The user supplies Category and description/note; no separate WITHDRAWAL or OWNER_DRAWING transaction kind is introduced.
+- TRANSFER is reserved for movement between ASSET Accounts inside the same managed-asset boundary. Category classifies the event but does not determine whether money crossed that boundary.
 - Income uses a DEBIT line on an ASSET account and a CREDIT line on an INCOME account.
 - Expense uses a CREDIT line on an ASSET account and a DEBIT line on an EXPENSE account.
 - TRANSFER and OPENING_BALANCE must have no Category and do not contribute to income/expense totals.
