@@ -95,8 +95,16 @@ export function LiabilityScreen() {
     setReconciliation(detail.reconciliation.differenceMinor.toString());
   }, [runtime, selectedId]);
 
-  useEffect(() => {\n    // The loader synchronizes remote persistence state after runtime initialization.\n    // eslint-disable-next-line react-hooks/set-state-in-effect\n    if (runtime) void refresh().catch((cause) => setFailure(cause instanceof Error ? cause.message : "Không thể tải dữ liệu"));\n  }, [runtime, refresh]);
-  useEffect(() => {\n    // Detail is read from the repository when the selected liability changes.\n    // eslint-disable-next-line react-hooks/set-state-in-effect\n    if (runtime && selectedId) void loadDetail().catch((cause) => setFailure(cause instanceof Error ? cause.message : "Không thể tải lịch trả nợ"));\n  }, [runtime, selectedId, loadDetail]);
+  useEffect(() => {
+    // The loader synchronizes remote persistence state after runtime initialization.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (runtime) void refresh().catch((cause) => setFailure(cause instanceof Error ? cause.message : "Không thể tải dữ liệu"));
+  }, [runtime, refresh]);
+  useEffect(() => {
+    // Detail is read from the repository when the selected liability changes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (runtime && selectedId) void loadDetail().catch((cause) => setFailure(cause instanceof Error ? cause.message : "Không thể tải lịch trả nợ"));
+  }, [runtime, selectedId, loadDetail]);
 
   const run = async (action: () => Promise<void>) => {
     setBusy(true); setFailure(null); setMessage(null);
