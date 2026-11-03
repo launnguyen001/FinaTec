@@ -203,7 +203,48 @@ describe("LiabilityService", () => {
     expect(commit.installmentUpdates.every((item: LiabilityInstallment) => item.status === "CANCELLED")).toBe(true);
     expect(commit.newInstallments).toHaveLength(3);
     expect(commit.newInstallments.reduce((sum: bigint, item: LiabilityInstallment) => sum + item.principalDueMinor, 0n)).toBe(80_000n);
-    expect(commit.newInstallments[0].sequence).toBe(4);
+    expect(commit.newInstallments[0]!.sequence).toBe(4);
+  });
+
+  it("shortens the remaining term when the selected early-payment policy keeps installment size", async () => {
+    const current = baseLiability({
+      earlyPaymentPolicy: "KEEP_INSTALLMENT_SHORTEN_TERM",
+    });
+    const calculated = calculateRepaymentSchedule({
+      principalMinor: current.outstandingPrincipalMinor,
+      annualRatePpm: current.annualRatePpm,
+      termMonths: 3,
+      method: current.repaymentMethod,
+      startDate: current.startDate,
+      firstDueDate: current.firstDueDate,
+    });
+    const schedule = calculated.installments.map((item) => ({
+      ...item,
+      id: `schedule-${item.sequence}`,
+      liabilityId: current.id,
+      annualRatePpm: current.annualRatePpm,
+      principalPaidMinor: 0n,
+      interestPaidMinor: 0n,
+      status: "UPCOMING" as const,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    }));
+    const { service, repository } = createHarness(current, schedule);
+    await service.recordPayment({
+      liabilityId: current.id,
+      sourceAccountId: "cash-out",
+      amountMinor: 20_000n,
+      paidAt: timestamp,
+      idempotencyKey: "payment-early-shorter-term",
+    });
+
+    const commit = (repository.commitPayment as jest.Mock).mock.calls[0]![0];
+    expect(commit.outstandingPrincipalMinor).toBe(80_000n);
+    expect(commit.newInstallments).toHaveLength(2);
+    expect(commit.newInstallments.reduce(
+      (sum: bigint, item: LiabilityInstallment) => sum + item.principalDueMinor,
+      0n,
+    )).toBe(80_000n);
   });
 
   it("returns an existing payment for the same idempotency key", async () => {
