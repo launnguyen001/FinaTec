@@ -558,7 +558,7 @@ export const interestPlans = sqliteTable(
     check("interest_plans_name_nonempty", sql`length(trim(${table.name})) > 0`),
     check(
       "interest_plans_rate_range",
-      sql`${table.annualRatePpm} BETWEEN 0 AND 1000000000`,
+      sql`${table.annualRatePpm} BETWEEN 0 AND 10000000`,
     ),
     check(
       "interest_plans_maturity_after_start",
