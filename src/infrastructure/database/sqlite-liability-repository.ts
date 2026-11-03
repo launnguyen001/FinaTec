@@ -246,7 +246,7 @@ export class SqliteLiabilityRepository implements LiabilityRepository {
         .where(eq(liabilityRateChanges.liabilityId, change.liabilityId)).all();
       const latest = current
         .filter((item) => item.effectiveDate <= change.effectiveDate)
-        .sort((a, b) => a.effectiveDate.localeCompare(b.effectiveDate))
+        .sort((a, b) => a.effectiveDate.localeCompare(b.effectiveDate) || a.createdAt.localeCompare(b.createdAt))
         .at(-1);
       const currentApr = latest ? BigInt(latest.annualRatePpm) : BigInt(liability.annualRatePpm);
       if (currentApr === change.annualRatePpm) {
