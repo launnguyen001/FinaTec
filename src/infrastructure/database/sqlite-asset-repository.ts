@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, lte, or } from "drizzle-orm";
 
 import {
   aggregateDcaLots,
@@ -392,6 +392,47 @@ export class SqliteAssetRepository implements AssetRepository {
           nextAttemptAt: null,
           lastError: null,
         };
+  }
+
+  async claimRefreshAttempt(
+    providerKey: string,
+    attemptedAt: string,
+    minimumGapMs: number,
+  ): Promise<boolean> {
+    const attemptedAtMs = Date.parse(attemptedAt);
+    if (!Number.isFinite(attemptedAtMs) || minimumGapMs < 0) {
+      throw new Error("Refresh claim timestamp or cooldown is invalid");
+    }
+    const cutoff = new Date(attemptedAtMs - minimumGapMs).toISOString();
+    return this.db.transaction((tx) => {
+      const inserted = tx
+        .insert(assetRefreshStates)
+        .values({
+          providerKey,
+          lastAttemptAt: attemptedAt,
+          lastSuccessAt: null,
+          failureCount: 0,
+          nextAttemptAt: null,
+          lastError: null,
+        })
+        .onConflictDoNothing()
+        .run();
+      if (inserted.changes === 1) return true;
+      const updated = tx
+        .update(assetRefreshStates)
+        .set({ lastAttemptAt: attemptedAt })
+        .where(
+          and(
+            eq(assetRefreshStates.providerKey, providerKey),
+            or(
+              isNull(assetRefreshStates.lastAttemptAt),
+              lte(assetRefreshStates.lastAttemptAt, cutoff),
+            ),
+          ),
+        )
+        .run();
+      return updated.changes === 1;
+    });
   }
 
   async saveRefreshState(state: AssetRefreshStateRecord): Promise<void> {

@@ -131,6 +131,11 @@ export interface AssetRepository {
   updateSettings(settings: AssetSettingsRecord): Promise<AssetSettingsRecord>;
   getLatestQuote(assetId: string): Promise<MarketQuote | null>;
   getRefreshState(providerKey: string): Promise<AssetRefreshStateRecord>;
+  claimRefreshAttempt(
+    providerKey: string,
+    attemptedAt: string,
+    minimumGapMs: number,
+  ): Promise<boolean>;
   saveRefreshState(state: AssetRefreshStateRecord): Promise<void>;
   findAssetForTransaction(
     assetId: string,

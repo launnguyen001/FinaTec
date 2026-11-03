@@ -61,6 +61,7 @@ function createHarness(overrides?: {
         lastError: null,
       },
     ),
+    claimRefreshAttempt: jest.fn().mockResolvedValue(true),
     saveRefreshState: jest.fn().mockResolvedValue(undefined),
     getLatestQuote: jest.fn().mockResolvedValue(overrides?.latestQuote ?? null),
   } as unknown as AssetRepository;

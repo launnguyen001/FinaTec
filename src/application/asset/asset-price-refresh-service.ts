@@ -110,10 +110,18 @@ export class AssetPriceRefreshService {
       };
     }
 
-    await this.assets.saveRefreshState({
-      ...previousState,
-      lastAttemptAt: now,
-    });
+    const claimed = await this.assets.claimRefreshAttempt(
+      providerKey,
+      now,
+      30_000,
+    );
+    if (!claimed) {
+      return {
+        assetId,
+        status: "SKIPPED",
+        reason: "Another refresh attempt owns the provider cooldown",
+      };
+    }
 
     try {
       const provider = await this.options.createProvider(
