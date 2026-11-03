@@ -585,6 +585,8 @@ describe("LiabilityService", () => {
         amountMinor: 6_000n,
         idempotencyKey: "payment-retry",
       }),
-    ).rejects.toThrow("Payment idempotency key was reused with a different payload");
+    ).rejects.toThrow(
+      "Payment idempotency key was reused with a different payload",
+    );
   });
 });
