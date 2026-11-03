@@ -2,7 +2,7 @@
 
 - Giai đoạn: 4 — MVP 3: Khoản nợ, định kỳ và ngân sách
 - Ưu tiên: P1
-- Trạng thái: IN_PROGRESS
+- Trạng thái: IN_PROGRESS — core implementation đang được hoàn thiện; chưa nghiệm thu/merge
 - Phụ thuộc: TASK-02, TASK-03, TASK-05
 
 ## 1. Mục tiêu
@@ -83,6 +83,8 @@ Liability, RepaymentSchedule, LiabilityPayment (hoặc tên tương ứng theo n
 ## 11. Nhật ký tiến độ
 - Đã làm: TASK-05 PR #7 đã merge vào main tại fe91858; branch TASK-06 được tạo từ đúng merge commit này.
 - Đã duyệt: hai chính sách trả gốc trước hạn KEEP_MATURITY_REDUCE_INSTALLMENT và KEEP_INSTALLMENT_SHORTEN_TERM.
-- Đang làm: triển khai domain, calculator, persistence, ledger integration và UI.
-- Vấn đề mở: xác định chính xác cách biểu diễn APR/12 theo tiền tệ minor unit trong calculator; không được dùng floating point.
-- Kiểm chứng: chưa chạy trên branch TASK-06.
+- Đã triển khai trên branch TASK-06: domain records, pure calculator, migration 0006, Drizzle schema, SQLite repository, loan origination posting, partial/full/early payment posting, idempotency, schedule status catch-up, archive guard, reconciliation, UI và SQLCipher acceptance diagnostic cô lập.
+- Đã bổ sung unit tests cho origination, phân bổ lãi trước gốc, idempotency, hai chính sách trả trước hạn và tất toán.
+- Đã xác nhận TypeScript typecheck và ESLint pass trên snapshot trước lần format cuối; cần chờ CI chạy lại trên commit đã format để xác nhận toàn bộ pipeline.
+- Còn mở trước khi có thể nghiệm thu: APR change history/use case (APR mới chỉ được lưu ở điều khoản hiện tại và snapshot lịch), reversal + replacement payment linkage, nhập custom principal allocation cho DECLINING trên UI (hiện UI tự chia đều), và hỗ trợ khoản nợ ngoại tệ với FX snapshot (hiện yêu cầu cùng Ledger base currency).
+- Acceptance diagnostic đã được thêm nhưng chưa chạy trên Development Build/thiết bị thật. Không đánh dấu Task06 hoàn tất và không merge PR #8 cho đến khi xử lý các mục mở, CI pass và CLI nghiệm thu.
