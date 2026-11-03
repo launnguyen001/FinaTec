@@ -772,14 +772,11 @@ export class SqliteLiabilityRepository implements LiabilityRepository {
         .from(liabilityPaymentReversals)
         .all(),
     ]);
-    const reversedPaymentIds = new Set(
-      reversals.map((item) => item.paymentId),
-    );
+    const reversedPaymentIds = new Set(reversals.map((item) => item.paymentId));
     const netPrincipalPaidMinor = payments
       .filter((item) => !reversedPaymentIds.has(item.id))
       .reduce(
-        (total, item) =>
-          total + fromSqliteInteger(item.principalPaidMinor),
+        (total, item) => total + fromSqliteInteger(item.principalPaidMinor),
         0n,
       );
     const paymentDerivedPrincipalMinor =
@@ -790,8 +787,7 @@ export class SqliteLiabilityRepository implements LiabilityRepository {
       schedulePrincipalMinor,
       paymentDerivedPrincipalMinor,
       differenceMinor: ledgerPrincipalMinor - recordedPrincipalMinor,
-      scheduleDifferenceMinor:
-        schedulePrincipalMinor - recordedPrincipalMinor,
+      scheduleDifferenceMinor: schedulePrincipalMinor - recordedPrincipalMinor,
       paymentDifferenceMinor:
         paymentDerivedPrincipalMinor - recordedPrincipalMinor,
     };
