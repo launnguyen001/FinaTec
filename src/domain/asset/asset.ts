@@ -1,6 +1,7 @@
 export type AssetValuationModel = "STABLE_VALUE" | "MARKET_VALUED";
 export type AssetLotStatus = "ACTIVE" | "MERGED" | "CLOSED";
-export type QuoteSource = "COINPAPRIKA" | "COINGECKO" | "FRANKFURTER" | "METALS_PROVIDER" | "MANUAL";
+export type QuoteSource =
+  "COINPAPRIKA" | "COINGECKO" | "FRANKFURTER" | "METALS_PROVIDER" | "MANUAL";
 export type QuoteStatus = "FRESH" | "STALE" | "REJECTED";
 
 export interface AssetLot {
@@ -69,12 +70,18 @@ export function multiplyDecimalToMinor(params: {
   if (quantity.units <= 0n || price.units <= 0n) {
     throw new Error("Quantity and unit price must be positive");
   }
-  if (!Number.isInteger(params.currencyMinorUnit) || params.currencyMinorUnit < 0 || params.currencyMinorUnit > 6) {
+  if (
+    !Number.isInteger(params.currencyMinorUnit) ||
+    params.currencyMinorUnit < 0 ||
+    params.currencyMinorUnit > 6
+  ) {
     throw new Error("Currency precision must be between 0 and 6");
   }
   const numerator = quantity.units * price.units;
-  const denominatorPower = params.quantityPrecision + params.pricePrecision - params.currencyMinorUnit;
-  if (denominatorPower <= 0) return numerator * (10n ** BigInt(-denominatorPower));
+  const denominatorPower =
+    params.quantityPrecision + params.pricePrecision - params.currencyMinorUnit;
+  if (denominatorPower <= 0)
+    return numerator * 10n ** BigInt(-denominatorPower);
   const denominator = 10n ** BigInt(denominatorPower);
   return (numerator + denominator / 2n) / denominator;
 }
@@ -111,7 +118,10 @@ export interface SaleCalculation {
   realizedGainLossAfterFeeMinor: bigint;
 }
 
-function decimalParts(value: string, precision: number): { units: bigint; scale: bigint } {
+function decimalParts(
+  value: string,
+  precision: number,
+): { units: bigint; scale: bigint } {
   const normalized = value.trim();
   if (!Number.isInteger(precision) || precision < 0 || precision > 12) {
     throw new Error("Decimal precision must be between 0 and 12");
@@ -124,7 +134,10 @@ function decimalParts(value: string, precision: number): { units: bigint; scale:
     throw new Error("Decimal value exceeds configured precision");
   }
   const scale = 10n ** BigInt(precision);
-  const digits = precision === 0 ? "" : (fraction + "0".repeat(precision)).slice(0, precision);
+  const digits =
+    precision === 0
+      ? ""
+      : (fraction + "0".repeat(precision)).slice(0, precision);
   return { units: BigInt(whole) * scale + BigInt(digits || "0"), scale };
 }
 
@@ -132,7 +145,10 @@ export function normalizeDecimal(value: string, precision: number): string {
   const { units, scale } = decimalParts(value, precision);
   const whole = units / scale;
   if (precision === 0) return whole.toString();
-  const fraction = (units % scale).toString().padStart(precision, "0").replace(/0+$/, "");
+  const fraction = (units % scale)
+    .toString()
+    .padStart(precision, "0")
+    .replace(/0+$/, "");
   return fraction ? whole.toString() + "." + fraction : whole.toString();
 }
 
@@ -140,11 +156,17 @@ function formatUnits(units: bigint, precision: number): string {
   const scale = 10n ** BigInt(precision);
   const whole = units / scale;
   if (precision === 0) return whole.toString();
-  const fraction = (units % scale).toString().padStart(precision, "0").replace(/0+$/, "");
+  const fraction = (units % scale)
+    .toString()
+    .padStart(precision, "0")
+    .replace(/0+$/, "");
   return fraction ? whole.toString() + "." + fraction : whole.toString();
 }
 
-export function aggregateDcaLots(lots: readonly AssetLot[], quantityPrecision: number): DcaAggregate {
+export function aggregateDcaLots(
+  lots: readonly AssetLot[],
+  quantityPrecision: number,
+): DcaAggregate {
   if (lots.length < 2) throw new Error("DCA requires at least two source lots");
   const first = lots[0];
   if (!first) throw new Error("DCA source lots are missing");
@@ -152,28 +174,47 @@ export function aggregateDcaLots(lots: readonly AssetLot[], quantityPrecision: n
   let totalQuantity = 0n;
   let totalCost = 0n;
   for (const lot of lots) {
-    if (ids.has(lot.id)) throw new Error("A DCA source lot cannot be selected twice");
+    if (ids.has(lot.id))
+      throw new Error("A DCA source lot cannot be selected twice");
     ids.add(lot.id);
-    if (lot.assetId !== first.assetId || lot.currencyCode !== first.currencyCode) {
+    if (
+      lot.assetId !== first.assetId ||
+      lot.currencyCode !== first.currencyCode
+    ) {
       throw new Error("DCA lots must belong to the same asset and currency");
     }
-    if (lot.status !== "ACTIVE") throw new Error("Only ACTIVE lots can be merged into DCA");
-    const quantity = decimalParts(lot.remainingQuantity, quantityPrecision).units;
-    if (quantity <= 0n) throw new Error("DCA source lot must have positive remaining quantity");
+    if (lot.status !== "ACTIVE")
+      throw new Error("Only ACTIVE lots can be merged into DCA");
+    const quantity = decimalParts(
+      lot.remainingQuantity,
+      quantityPrecision,
+    ).units;
+    if (quantity <= 0n)
+      throw new Error("DCA source lot must have positive remaining quantity");
     totalQuantity += quantity;
-    if (lot.remainingCostBasisMinor < 0n || lot.remainingCostBasisMinor > lot.costBasisMinor) {
-      throw new Error("Remaining lot cost basis must be between zero and original cost basis");
+    if (
+      lot.remainingCostBasisMinor < 0n ||
+      lot.remainingCostBasisMinor > lot.costBasisMinor
+    ) {
+      throw new Error(
+        "Remaining lot cost basis must be between zero and original cost basis",
+      );
     }
     totalCost += lot.remainingCostBasisMinor;
   }
-  if (totalQuantity <= 0n) throw new Error("DCA aggregate quantity must be positive");
-  const weightedAverage = (totalCost * (10n ** BigInt(quantityPrecision))) / totalQuantity;
+  if (totalQuantity <= 0n)
+    throw new Error("DCA aggregate quantity must be positive");
+  const weightedAverage =
+    (totalCost * 10n ** BigInt(quantityPrecision)) / totalQuantity;
   return {
     assetId: first.assetId,
     currencyCode: first.currencyCode,
     quantity: formatUnits(totalQuantity, quantityPrecision),
     costBasisMinor: totalCost,
-    weightedAverageUnitCostMinor: formatUnits(weightedAverage, quantityPrecision),
+    weightedAverageUnitCostMinor: formatUnits(
+      weightedAverage,
+      quantityPrecision,
+    ),
     componentIds: [...ids],
   };
 }
@@ -187,22 +228,42 @@ export function calculateSale(params: {
   /** True only after the repository verifies this MERGED lot is a component of the selected active DCA aggregate. */
   isDcaComponent?: boolean;
 }): SaleCalculation {
-  const { lot, quantitySold, quantityPrecision, grossProceedsMinor, feeMinor } = params;
-  if (lot.status !== "ACTIVE" && !(lot.status === "MERGED" && params.isDcaComponent === true)) {
-    throw new Error("Only an ACTIVE lot or a verified DCA component can be sold");
+  const { lot, quantitySold, quantityPrecision, grossProceedsMinor, feeMinor } =
+    params;
+  if (
+    lot.status !== "ACTIVE" &&
+    !(lot.status === "MERGED" && params.isDcaComponent === true)
+  ) {
+    throw new Error(
+      "Only an ACTIVE lot or a verified DCA component can be sold",
+    );
   }
-  if (grossProceedsMinor < 0n || feeMinor < 0n) throw new Error("Sale proceeds and fee cannot be negative");
-  const remaining = decimalParts(lot.remainingQuantity, quantityPrecision).units;
-  if (lot.remainingCostBasisMinor < 0n || lot.remainingCostBasisMinor > lot.costBasisMinor) {
-    throw new Error("Remaining lot cost basis must be between zero and original cost basis");
+  if (grossProceedsMinor < 0n || feeMinor < 0n)
+    throw new Error("Sale proceeds and fee cannot be negative");
+  const remaining = decimalParts(
+    lot.remainingQuantity,
+    quantityPrecision,
+  ).units;
+  if (
+    lot.remainingCostBasisMinor < 0n ||
+    lot.remainingCostBasisMinor > lot.costBasisMinor
+  ) {
+    throw new Error(
+      "Remaining lot cost basis must be between zero and original cost basis",
+    );
   }
   const sold = decimalParts(quantitySold, quantityPrecision).units;
   if (sold <= 0n) throw new Error("Sale quantity must be positive");
-  if (sold > remaining) throw new Error("Sale quantity exceeds the selected lot's remaining quantity");
-  if (feeMinor > grossProceedsMinor) throw new Error("Sale fee cannot exceed gross proceeds");
-  const costSold = sold === remaining
-    ? lot.remainingCostBasisMinor
-    : (lot.remainingCostBasisMinor * sold + remaining / 2n) / remaining;
+  if (sold > remaining)
+    throw new Error(
+      "Sale quantity exceeds the selected lot's remaining quantity",
+    );
+  if (feeMinor > grossProceedsMinor)
+    throw new Error("Sale fee cannot exceed gross proceeds");
+  const costSold =
+    sold === remaining
+      ? lot.remainingCostBasisMinor
+      : (lot.remainingCostBasisMinor * sold + remaining / 2n) / remaining;
   const remainingCost = lot.remainingCostBasisMinor - costSold;
   const net = grossProceedsMinor - feeMinor;
   const realizedBeforeFee = grossProceedsMinor - costSold;
@@ -236,11 +297,16 @@ export function resolveAssetTimeZone(
   configuredTimeZone: string,
   deviceTimeZone?: string,
 ): string {
-  const candidate = mode === "DEVICE"
-    ? (deviceTimeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC")
-    : configuredTimeZone;
+  const candidate =
+    mode === "DEVICE"
+      ? deviceTimeZone ||
+        Intl.DateTimeFormat().resolvedOptions().timeZone ||
+        "UTC"
+      : configuredTimeZone;
   try {
-    new Intl.DateTimeFormat("en-US", { timeZone: candidate }).format(new Date(0));
+    new Intl.DateTimeFormat("en-US", { timeZone: candidate }).format(
+      new Date(0),
+    );
   } catch {
     throw new Error("Configured application timezone is invalid");
   }
@@ -249,7 +315,8 @@ export function resolveAssetTimeZone(
 
 export function getValuationDate(timestamp: string, timeZone: string): string {
   const date = new Date(timestamp);
-  if (!Number.isFinite(date.getTime())) throw new Error("Valuation timestamp is invalid");
+  if (!Number.isFinite(date.getTime()))
+    throw new Error("Valuation timestamp is invalid");
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone,
     year: "numeric",
@@ -257,7 +324,9 @@ export function getValuationDate(timestamp: string, timeZone: string): string {
     day: "2-digit",
   }).formatToParts(date);
   const values = new Map(parts.map((part) => [part.type, part.value]));
-  return values.get("year") + "-" + values.get("month") + "-" + values.get("day");
+  return (
+    values.get("year") + "-" + values.get("month") + "-" + values.get("day")
+  );
 }
 
 export function getMinimumRefreshIntervalMs(
@@ -269,7 +338,13 @@ export function getMinimumRefreshIntervalMs(
   const maximum = assetClass === "FIAT_FX" ? 10_080 : 1_440;
   const selected = configuredMinutes ?? defaults[assetClass];
   if (!Number.isFinite(selected) || selected < minimum || selected > maximum) {
-    throw new Error("Price refresh interval must be between " + minimum + " and " + maximum + " minutes");
+    throw new Error(
+      "Price refresh interval must be between " +
+        minimum +
+        " and " +
+        maximum +
+        " minutes",
+    );
   }
   return selected * 60_000;
 }
@@ -279,28 +354,52 @@ export function canRefreshPrice(params: {
   lastSuccessAtMs: number | null;
   intervalMs: number;
 }): boolean {
-  if (!Number.isFinite(params.nowMs) || !Number.isFinite(params.intervalMs) || params.intervalMs < 15 * 60_000) {
+  if (
+    !Number.isFinite(params.nowMs) ||
+    !Number.isFinite(params.intervalMs) ||
+    params.intervalMs < 15 * 60_000
+  ) {
     throw new Error("Refresh schedule is invalid");
   }
-  return params.lastSuccessAtMs === null || params.nowMs - params.lastSuccessAtMs >= params.intervalMs;
+  return (
+    params.lastSuccessAtMs === null ||
+    params.nowMs - params.lastSuccessAtMs >= params.intervalMs
+  );
 }
 
-export function canManualRefresh(lastManualRefreshAtMs: number | null, nowMs: number): boolean {
+export function canManualRefresh(
+  lastManualRefreshAtMs: number | null,
+  nowMs: number,
+): boolean {
   if (!Number.isFinite(nowMs)) throw new Error("Current time is invalid");
-  return lastManualRefreshAtMs === null || nowMs - lastManualRefreshAtMs >= 30_000;
+  return (
+    lastManualRefreshAtMs === null || nowMs - lastManualRefreshAtMs >= 30_000
+  );
 }
 
-export function getRefreshBackoffMs(failureCount: number, retryAfterMs?: number): number {
-  if (retryAfterMs !== undefined && Number.isFinite(retryAfterMs) && retryAfterMs > 0) {
+export function getRefreshBackoffMs(
+  failureCount: number,
+  retryAfterMs?: number,
+): number {
+  if (
+    retryAfterMs !== undefined &&
+    Number.isFinite(retryAfterMs) &&
+    retryAfterMs > 0
+  ) {
     return retryAfterMs;
   }
   const exponent = Math.max(0, Math.min(10, Math.floor(failureCount)));
   return Math.min(30_000 * 2 ** exponent, 6 * 60 * 60 * 1000);
 }
 
-export function assertTransactionFee(feeMinor: bigint, feeCategoryId: string | null): void {
+export function assertTransactionFee(
+  feeMinor: bigint,
+  feeCategoryId: string | null,
+): void {
   if (feeMinor < 0n) throw new Error("Transaction fee cannot be negative");
   if (feeMinor > 0n && !feeCategoryId?.trim()) {
-    throw new Error("A transaction fee must be assigned to an EXPENSE category");
+    throw new Error(
+      "A transaction fee must be assigned to an EXPENSE category",
+    );
   }
 }
