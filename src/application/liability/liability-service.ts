@@ -11,6 +11,7 @@ import type {
   Liability,
   LiabilityInstallment,
   LiabilityPayment,
+  LiabilityRateChange,
   RepaymentStatus,
 } from "../../domain/liability/liability";
 import type { LiabilityRepository } from "../../domain/liability/repository";
@@ -244,8 +245,11 @@ export class LiabilityService {
     const liability = await this.requireLiability(id);
     const installments = await this.repository.listInstallments(id);
     const payments = await this.repository.listPayments(id);
-    const reconciliation = await this.repository.reconcile(id);
-    return { liability, installments, payments, reconciliation };
+    const [reconciliation, rateChanges] = await Promise.all([
+      this.repository.reconcile(id),
+      this.repository.listRateChanges(id),
+    ]);
+    return { liability, installments, payments, rateChanges, reconciliation };
   }
 
   async syncStatuses(): Promise<void> {
@@ -256,6 +260,78 @@ export class LiabilityService {
         localDateAt(this.now(), liability.timezoneId),
       );
     }
+  }
+
+  async changeApr(
+    liabilityId: string,
+    annualRatePpm: bigint,
+    reason?: string | null,
+  ): Promise<LiabilityRateChange> {
+    if (annualRatePpm < 0n || annualRatePpm > 10_000_000n) {
+      throw new Error("Annual APR must be between 0% and 1000%");
+    }
+    const liability = await this.requireLiability(liabilityId);
+    if (liability.status !== "ACTIVE") throw new Error("Only an ACTIVE liability can change APR");
+    const localDate = localDateAt(this.now(), liability.timezoneId);
+    const schedule = await this.repository.listInstallments(liabilityId);
+    const pastOutstanding = schedule.filter(
+      (item) => item.dueDate < localDate && item.status !== "PAID" && item.status !== "CANCELLED",
+    );
+    if (pastOutstanding.length) {
+      throw new Error("Settle overdue installments before changing APR");
+    }
+    const future = schedule.filter(
+      (item) => item.dueDate >= localDate && item.status !== "PAID" && item.status !== "CANCELLED",
+    );
+    if (!future.length) throw new Error("There is no future installment for the new APR to take effect");
+    const first = future[0]!;
+    if (first.principalPaidMinor > 0n || first.interestPaidMinor > 0n) {
+      throw new Error("The next installment already has payment allocations");
+    }
+    const currentChanges = await this.repository.listRateChanges(liabilityId);
+    const effectiveNow = currentChanges
+      .filter((item) => item.effectiveDate <= first.periodStart)
+      .sort((a, b) => a.effectiveDate.localeCompare(b.effectiveDate))
+      .at(-1)?.annualRatePpm ?? liability.annualRatePpm;
+    if (effectiveNow === annualRatePpm) throw new Error("New APR matches the currently effective APR");
+    const principal = first.openingPrincipalMinor;
+    const termMonths = future.length;
+    const declining = liability.repaymentMethod === "DECLINING"
+      ? future.map((item) => item.principalDueMinor)
+      : undefined;
+    const calculated = calculateRepaymentSchedule({
+      principalMinor: principal,
+      annualRatePpm,
+      termMonths,
+      method: liability.repaymentMethod,
+      startDate: first.periodStart,
+      firstDueDate: first.dueDate,
+      decliningPrincipalMinor: declining,
+    });
+    const timestamp = this.now();
+    const nextSequence = Math.max(...schedule.map((item) => item.sequence), 0) + 1;
+    const change: LiabilityRateChange = {
+      id: this.options.createId(),
+      liabilityId,
+      annualRatePpm,
+      effectiveDate: first.periodStart,
+      reason: reason?.trim() || null,
+      createdAt: timestamp,
+    };
+    const replacements: LiabilityInstallment[] = calculated.installments.map((item) => ({
+      ...item,
+      id: this.options.createId(),
+      liabilityId,
+      sequence: nextSequence + item.sequence - 1,
+      annualRatePpm,
+      principalPaidMinor: 0n,
+      interestPaidMinor: 0n,
+      status: "UPCOMING",
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    }));
+    await this.repository.addRateChange(change, replacements);
+    return change;
   }
 
   async recordPayment(
