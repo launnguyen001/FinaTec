@@ -122,6 +122,7 @@ export function LiabilityScreen() {
   const [newApr, setNewApr] = useState("");
   const [aprReason, setAprReason] = useState("");
   const [term, setTerm] = useState("12");
+  const [decliningPrincipalInput, setDecliningPrincipalInput] = useState("");
   const [startDate, setStartDate] = useState(
     new Date().toISOString().slice(0, 10),
   );
@@ -272,12 +273,16 @@ export function LiabilityScreen() {
         .toISOString()
         .slice(0, 10);
       const dueDate = firstDueDate || nextDate;
-      const principalParts = Array.from(
-        { length: months },
-        (_, index) =>
-          amount / BigInt(months) +
-          (BigInt(index) < amount % BigInt(months) ? 1n : 0n),
-      );
+      const principalParts = method === "DECLINING"
+        ? decliningPrincipalInput
+            .split(/[;\\n]+/)
+            .map((part) => part.trim())
+            .filter(Boolean)
+            .map((part) => parseMinorUnits(part, selectedCurrency.minorUnit))
+        : undefined;
+      if (method === "DECLINING" && (!principalParts || principalParts.length !== months)) {
+        throw new Error("DECLINING cần nhập đúng số tiền gốc cho từng kỳ, phân tách bằng xuống dòng hoặc dấu chấm phẩy");
+      }
       const liability = await runtime.liabilities.create({
         name,
         liabilityAccountId,
@@ -290,8 +295,7 @@ export function LiabilityScreen() {
         startDate,
         firstDueDate: dueDate,
         earlyPaymentPolicy,
-        decliningPrincipalMinor:
-          method === "DECLINING" ? principalParts : undefined,
+        decliningPrincipalMinor: principalParts,
       });
       setSelectedId(liability.id);
       setMessage("Đã tạo khoản nợ và ghi nhận khoản vay vào Ledger.");
@@ -574,6 +578,19 @@ export function LiabilityScreen() {
               }
             />
           </View>
+          {method === "DECLINING" ? (
+            <View style={styles.group}>
+              <Text style={styles.label}>Gốc dự kiến từng kỳ (đơn vị tiền tệ của khoản vay)</Text>
+              <TextInput
+                accessibilityLabel="Gốc từng kỳ DECLINING"
+                placeholder={"Nhập một kỳ mỗi dòng, ví dụ:\\n3000000\\n3000000\\n4000000"}
+                multiline
+                value={decliningPrincipalInput}
+                onChangeText={setDecliningPrincipalInput}
+                style={[styles.input, { minHeight: 100, textAlignVertical: "top" }]}
+              />
+            </View>
+          ) : null}
           <View style={styles.wrap}>
             {(
               [
