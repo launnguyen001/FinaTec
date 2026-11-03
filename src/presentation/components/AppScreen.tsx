@@ -103,7 +103,6 @@ export function AppScreen() {
           <Link href="/quick-income" style={styles.navigationLink}>Ghi khoản thu</Link>
           <Link href="/transfer" style={styles.navigationLink}>Chuyển tiền</Link>
           <Link href="/opening-balance" style={styles.navigationLink}>Số dư đầu kỳ</Link>
-          <Link href="/archived-settlement" style={styles.navigationLink}>Tất toán archive</Link>
           <Link href="/accounts" style={styles.navigationLink}>Tài khoản</Link>
           <Link href="/categories" style={styles.navigationLink}>Danh mục</Link>
           <Link href="/history" style={styles.navigationLink}>Lịch sử</Link>
