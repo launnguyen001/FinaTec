@@ -64,6 +64,7 @@ export async function runLiabilityAcceptanceDiagnostic(): Promise<LiabilityAccep
   let cipherVersion = "unavailable";
   let currentTime = "2026-11-04T12:00:00.000Z";
   let sequence = 0;
+  let stage = "initialize isolated SQLCipher database";
   const now = () => currentTime;
   const createId = () => `task06-${suffix}-id-${++sequence}`;
   const check = (name: string, passed: boolean, detail: string) => {
@@ -72,6 +73,7 @@ export async function runLiabilityAcceptanceDiagnostic(): Promise<LiabilityAccep
   };
 
   try {
+    stage = "store and restore the temporary SQLCipher key";
     await SecureStore.setItemAsync(secureStoreName, key);
     const restoredKey = await SecureStore.getItemAsync(secureStoreName);
     assert(
@@ -79,6 +81,7 @@ export async function runLiabilityAcceptanceDiagnostic(): Promise<LiabilityAccep
       "Diagnostic SQLCipher key could not be restored",
     );
 
+    stage = "open isolated SQLite database and initialize SQLCipher";
     client = await SQLite.openDatabaseAsync(databaseName, {
       useNewConnection: true,
     });
@@ -94,6 +97,7 @@ export async function runLiabilityAcceptanceDiagnostic(): Promise<LiabilityAccep
     await client.execAsync("PRAGMA foreign_keys = ON");
     await client.execAsync("PRAGMA journal_mode = WAL");
 
+    stage = "run core migrations 0000-0001";
     const db = drizzle(client, { schema: ledgerSchema });
     const coreMigrations = {
       journal: { entries: ledgerMigrations.journal.entries.slice(0, 2) },
@@ -103,6 +107,7 @@ export async function runLiabilityAcceptanceDiagnostic(): Promise<LiabilityAccep
       },
     };
     await migrate(db, coreMigrations);
+    stage = "seed legacy Core Finance fixture rows";
     const legacyAt = "2026-01-01T00:00:00.000Z";
     const legacyId = `task06-${suffix}-legacy-cash`;
     await client.runAsync(
@@ -116,8 +121,10 @@ export async function runLiabilityAcceptanceDiagnostic(): Promise<LiabilityAccep
       legacyAt,
       legacyAt,
     );
+    stage = "apply Task06 migrations 0000-0010 to the legacy database";
     await migrate(db, ledgerMigrations);
 
+    stage = "verify Task06 migration tables";
     const liabilityTable = await client.getFirstAsync<{ name: string }>(
       "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'liabilities'",
     );
@@ -135,6 +142,7 @@ export async function runLiabilityAcceptanceDiagnostic(): Promise<LiabilityAccep
       "the migration chain upgraded a legacy Core Finance database and created all liability tables",
     );
 
+    stage = "initialize Ledger repository and base currency";
     const ledger = new SqliteLedgerRepository(db);
     await ledger.setBaseCurrencyCode("VND", legacyAt);
 
@@ -155,6 +163,7 @@ export async function runLiabilityAcceptanceDiagnostic(): Promise<LiabilityAccep
     const earlyLoanAccount = makeAccount("early-loan-account", "LIABILITY");
     const interestExpense = makeAccount("interest-expense", "EXPENSE");
     const feeExpense = makeAccount("fee-expense", "EXPENSE");
+    stage = "create diagnostic Ledger accounts";
     for (const account of [
       cashIn,
       cashOut,
@@ -171,6 +180,7 @@ export async function runLiabilityAcceptanceDiagnostic(): Promise<LiabilityAccep
       createId,
       now,
     });
+    stage = "originate the first scheduled liability and persist its journal/installments";
     const loan = await service.create({
       name: "Scheduled repayment diagnostic",
       liabilityAccountId: loanAccount.id,
@@ -201,6 +211,7 @@ export async function runLiabilityAcceptanceDiagnostic(): Promise<LiabilityAccep
       "loan origination debited the receiving ASSET, credited the LIABILITY and balanced the subledger",
     );
 
+    stage = "record the first partial payment";
     const partial = await service.recordPayment({
       liabilityId: loan.id,
       sourceAccountId: cashOut.id,
@@ -212,6 +223,7 @@ export async function runLiabilityAcceptanceDiagnostic(): Promise<LiabilityAccep
     const journalCountAfterPayment = await client.getFirstAsync<{
       count: number;
     }>("SELECT COUNT(*) AS count FROM journal_entries");
+    stage = "retry the partial payment with the same idempotency key";
     const retry = await service.recordPayment({
       liabilityId: loan.id,
       sourceAccountId: cashOut.id,
@@ -237,6 +249,7 @@ export async function runLiabilityAcceptanceDiagnostic(): Promise<LiabilityAccep
       `original payment id=${partial.id}, retry payment id=${retry.id}, journals before retry=${journalCountAfterPayment?.count}, journals after retry=${journalCountAfterRetry?.count}`,
     );
 
+    stage = "reverse the original partial payment";
     await service.reversePayment(partial.id, "Acceptance reversal");
     const afterReversal = await service.reconcile(loan.id);
     check(
@@ -246,6 +259,7 @@ export async function runLiabilityAcceptanceDiagnostic(): Promise<LiabilityAccep
         afterReversal.differenceMinor === 0n,
       "reversal posted a linked counter-entry and restored the liability subledger without editing the original journal",
     );
+    stage = "record the replacement payment linked to the reversal";
     const replacement = await service.recordPayment({
       liabilityId: loan.id,
       sourceAccountId: cashOut.id,
@@ -263,6 +277,7 @@ export async function runLiabilityAcceptanceDiagnostic(): Promise<LiabilityAccep
       "replacement payment explicitly references the reversed payment and restores the expected balance",
     );
 
+    stage = "verify archive guard with outstanding principal";
     await expectFailure(
       () => service.archive(loan.id),
       /fully paid|fully paid off|archive/i,
@@ -274,6 +289,7 @@ export async function runLiabilityAcceptanceDiagnostic(): Promise<LiabilityAccep
       "a liability with non-zero principal cannot be archived",
     );
 
+    stage = "originate the early-repayment diagnostic liability";
     const earlyLoan = await service.create({
       name: "Early repayment diagnostic",
       liabilityAccountId: earlyLoanAccount.id,
@@ -288,6 +304,7 @@ export async function runLiabilityAcceptanceDiagnostic(): Promise<LiabilityAccep
       timezoneId: "UTC",
       earlyPaymentPolicy: "KEEP_MATURITY_REDUCE_INSTALLMENT",
     });
+    stage = "change APR and recalculate future installments";
     const rateChange = await service.changeApr(
       earlyLoan.id,
       240_000n,
@@ -306,8 +323,9 @@ export async function runLiabilityAcceptanceDiagnostic(): Promise<LiabilityAccep
           .every((item) => item.annualRatePpm === 240_000n),
       "APR change is immutable history and only replaces not-yet-due installments with the new APR snapshot",
     );
+    stage = "record early principal repayment and recalculate schedule";
     await service.recordPayment({
-      liabilityId: earlyLoan.id,
+      liabilityId: earlyLoan.id, 1
       sourceAccountId: cashOut.id,
       amountMinor: 20_000n,
       paidAt: currentTime,
@@ -334,6 +352,7 @@ export async function runLiabilityAcceptanceDiagnostic(): Promise<LiabilityAccep
       "old future rows were retained as CANCELLED history and replaced by a schedule for the reduced principal",
     );
 
+    stage = "record full payoff and cancel remaining installments";
     await service.recordPayment({
       liabilityId: earlyLoan.id,
       sourceAccountId: cashOut.id,
@@ -350,6 +369,7 @@ export async function runLiabilityAcceptanceDiagnostic(): Promise<LiabilityAccep
         paidOff.reconciliation.differenceMinor === 0n,
       "principal reached zero, all future installments were cancelled, and the LIABILITY Ledger account reconciled to zero",
     );
+    stage = "archive the fully paid liability";
     await service.archive(earlyLoan.id);
     const archived = await service.getDetail(earlyLoan.id);
     check(
@@ -359,6 +379,7 @@ export async function runLiabilityAcceptanceDiagnostic(): Promise<LiabilityAccep
       "archive succeeded only after payoff and preserved both immutable payment records",
     );
 
+    stage = "record payment with a separately posted fee expense";
     const feePayment = await service.recordPayment({
       liabilityId: loan.id,
       sourceAccountId: cashOut.id,
@@ -390,6 +411,7 @@ export async function runLiabilityAcceptanceDiagnostic(): Promise<LiabilityAccep
       "fee was debited to a separate EXPENSE account while the payment source was credited for principal/interest plus fee",
     );
 
+    stage = "perform final Ledger/subledger reconciliation";
     const finalReconciliation = await service.reconcile(loan.id);
     check(
       "Ledger/subledger reconciliation",
@@ -409,6 +431,30 @@ export async function runLiabilityAcceptanceDiagnostic(): Promise<LiabilityAccep
       cleanup:
         "The isolated diagnostic database and temporary SecureStore key are removed in finally.",
     };
+  } catch (error) {
+    const cause =
+      error instanceof Error
+        ? Object.getOwnPropertyNames(error)
+            .map((key) => `${key}=${String((error as Error & Record<string, unknown>)[key])}`)
+            .join("; ")
+        : String(error);
+    let foreignKeyState = "unavailable";
+    if (client) {
+      try {
+        const violations = await client.getAllAsync(
+          "PRAGMA foreign_key_check",
+        );
+        foreignKeyState = JSON.stringify(violations);
+      } catch (inspectionError) {
+        foreignKeyState = `inspection failed: ${String(inspectionError)}`;
+      }
+    }
+    const completed = checks
+      .map((item) => `${item.passed ? "PASS" : "FAIL"} ${item.name}`)
+      .join(" | ") || "none";
+    throw new Error(
+      `Task06 diagnostic failed during "${stage}". Completed checks: ${completed}. PRAGMA foreign_key_check: ${foreignKeyState}. Cause: ${cause}`,
+    );
   } finally {
     if (client) {
       try {
