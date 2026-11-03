@@ -14,6 +14,7 @@ import type {
   LiabilityPayment,
   LiabilityPaymentCommit,
   LiabilityRateChange,
+  LiabilityPaymentReversal,
 } from "../../domain/liability/liability";
 import type {
   CreateLiabilityRecord,
@@ -31,6 +32,9 @@ import {
   liabilityInstallments,
   liabilityPayments,
   liabilityRateChanges,
+  liabilityPaymentAllocations,
+  liabilityPaymentScheduleChanges,
+  liabilityPaymentReversals,
 } from "./schema";
 
 type LiabilityTransaction = Parameters<
@@ -182,6 +186,18 @@ export class SqliteLiabilityRepository implements LiabilityRepository {
     return rows.map(mapInstallment);
   }
 
+  async findPaymentById(id: string): Promise<LiabilityPayment | null> {
+    const row = await this.db.select().from(liabilityPayments)
+      .where(eq(liabilityPayments.id, id)).get();
+    return row ? mapPayment(row) : null;
+  }
+
+  async findPaymentReversal(paymentId: string): Promise<LiabilityPaymentReversal | null> {
+    const row = await this.db.select().from(liabilityPaymentReversals)
+      .where(eq(liabilityPaymentReversals.paymentId, paymentId)).get();
+    return row ?? null;
+  }
+
   async listPayments(liabilityId: string): Promise<LiabilityPayment[]> {
     const rows = await this.db
       .select()
@@ -330,6 +346,19 @@ export class SqliteLiabilityRepository implements LiabilityRepository {
         })
         .run();
 
+      if (input.allocations.length) {
+        tx.insert(liabilityPaymentAllocations).values(input.allocations.map((item) => ({
+          ...item,
+          principalMinor: toSqliteSafeInteger(item.principalMinor),
+          interestMinor: toSqliteSafeInteger(item.interestMinor),
+          principalBeforeMinor: toSqliteSafeInteger(item.principalBeforeMinor),
+          interestBeforeMinor: toSqliteSafeInteger(item.interestBeforeMinor),
+        }))).run();
+      }
+      if (input.scheduleChanges.length) {
+        tx.insert(liabilityPaymentScheduleChanges).values(input.scheduleChanges).run();
+      }
+
       for (const item of input.installmentUpdates) {
         const changed = tx
           .update(liabilityInstallments)
@@ -376,6 +405,79 @@ export class SqliteLiabilityRepository implements LiabilityRepository {
       if (changedLiability.changes !== 1)
         throw new Error("Liability balance could not be updated");
       return input.payment;
+    });
+  }
+
+  async reversePayment(input: {
+    paymentId: string;
+    reversal: LiabilityPaymentCommit["journal"];
+    record: LiabilityPaymentReversal;
+  }): Promise<void> {
+    this.db.transaction((tx) => {
+      const payment = tx.select().from(liabilityPayments)
+        .where(eq(liabilityPayments.id, input.paymentId)).get();
+      if (!payment) throw new Error("Liability payment does not exist");
+      const existing = tx.select().from(liabilityPaymentReversals)
+        .where(eq(liabilityPaymentReversals.paymentId, input.paymentId)).get();
+      if (existing) throw new Error("Payment has already been reversed");
+      const liability = tx.select().from(liabilities)
+        .where(eq(liabilities.id, payment.liabilityId)).get();
+      if (!liability) throw new Error("Liability does not exist");
+      const paymentRows = tx.select().from(liabilityPayments)
+        .where(eq(liabilityPayments.liabilityId, payment.liabilityId)).all();
+      const reversals = tx.select().from(liabilityPaymentReversals).all();
+      const reversedIds = new Set(reversals.map((item) => item.paymentId));
+      if (paymentRows.some((item) => item.id !== payment.id && item.paidAt >= payment.paidAt && !reversedIds.has(item.id))) {
+        throw new Error("Reverse payments in reverse chronological order");
+      }
+      if (input.reversal.journalEntry.reversalOfId !== payment.journalEntryId ||
+          input.reversal.journalEntry.transactionKind !== "REVERSAL" ||
+          input.reversal.journalEntry.status !== "POSTED") {
+        throw new Error("Payment reversal journal link is invalid");
+      }
+      validateJournalEntry(input.reversal.journalEntry, input.reversal.journalLines, this.readPostingContext(tx));
+      const originalLines = tx.select().from(journalLines)
+        .where(eq(journalLines.entryId, payment.journalEntryId)).all();
+      if (originalLines.length !== input.reversal.journalLines.length) {
+        throw new Error("Payment reversal must reverse every original journal line");
+      }
+      this.insertPostedJournal(tx, input.reversal.journalEntry, input.reversal.journalLines);
+
+      const allocations = tx.select().from(liabilityPaymentAllocations)
+        .where(eq(liabilityPaymentAllocations.paymentId, payment.id)).all();
+      for (const allocation of allocations) {
+        const changed = tx.update(liabilityInstallments).set({
+          principalPaidMinor: allocation.principalBeforeMinor,
+          interestPaidMinor: allocation.interestBeforeMinor,
+          status: allocation.statusBefore as LiabilityInstallment["status"],
+          updatedAt: input.record.createdAt,
+        }).where(eq(liabilityInstallments.id, allocation.installmentId)).run();
+        if (changed.changes !== 1) throw new Error("Allocated installment is missing during reversal");
+      }
+      const scheduleChanges = tx.select().from(liabilityPaymentScheduleChanges)
+        .where(eq(liabilityPaymentScheduleChanges.paymentId, payment.id)).all();
+      for (const change of scheduleChanges) {
+        const status = change.action === "CREATED" ? "CANCELLED" : change.previousStatus;
+        if (status) {
+          const updated = tx.update(liabilityInstallments).set({
+            status: status as LiabilityInstallment["status"],
+            updatedAt: input.record.createdAt,
+          }).where(eq(liabilityInstallments.id, change.installmentId)).run();
+          if (updated.changes !== 1) throw new Error("Changed installment is missing during reversal");
+        }
+      }
+      const nextPrincipal = fromSqliteInteger(liability.outstandingPrincipalMinor) +
+        fromSqliteInteger(payment.principalPaidMinor);
+      if (nextPrincipal > fromSqliteInteger(liability.originalPrincipalMinor)) {
+        throw new Error("Reversal would exceed the original loan principal");
+      }
+      tx.update(liabilities).set({
+        outstandingPrincipalMinor: toSqliteSafeInteger(nextPrincipal),
+        status: "ACTIVE",
+        paidOffAt: null,
+        updatedAt: input.record.createdAt,
+      }).where(eq(liabilities.id, payment.liabilityId)).run();
+      tx.insert(liabilityPaymentReversals).values(input.record).run();
     });
   }
 
