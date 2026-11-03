@@ -322,13 +322,12 @@ export class LiabilityService {
         throw new Error(
           "Selected installment is not due or does not belong to this liability",
         );
-      due.sort((a, b) =>
-        a.id === selected.id
-          ? -1
-          : b.id === selected.id
-            ? 1
-            : a.sequence - b.sequence,
-      );
+      due.sort((a, b) => {
+        if (a.id === b.id) return 0;
+        if (a.id === selected.id) return -1;
+        if (b.id === selected.id) return 1;
+        return a.sequence - b.sequence;
+      });
     } else {
       due.sort((a, b) => a.sequence - b.sequence);
     }
