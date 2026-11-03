@@ -555,6 +555,9 @@ export const interestPlans = sqliteTable(
       table.principalAccountId,
       table.status,
     ),
+    uniqueIndex("interest_plans_one_active_per_principal")
+      .on(table.principalAccountId)
+      .where(sql`${table.status} = 'ACTIVE'`),
     check("interest_plans_name_nonempty", sql`length(trim(${table.name})) > 0`),
     check(
       "interest_plans_rate_range",
