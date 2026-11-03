@@ -307,6 +307,7 @@ export const assetLots = sqliteTable("asset_lots", {
   quantity: text("quantity").notNull(),
   remainingQuantity: text("remaining_quantity").notNull(),
   costBasisMinor: integer("cost_basis_minor").notNull(),
+  remainingCostBasisMinor: integer("remaining_cost_basis_minor").notNull(),
   acquiredAt: text("acquired_at").notNull(),
   status: text("status", { enum: ["ACTIVE", "MERGED", "CLOSED"] }).notNull(),
   mergedIntoId: text("merged_into_id").references((): AnySQLiteColumn => assetLots.id, { onDelete: "restrict", onUpdate: "restrict" }),
