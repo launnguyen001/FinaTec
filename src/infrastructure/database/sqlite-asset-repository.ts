@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 
 import { aggregateDcaLots, calculateSale, type AssetLot, type DcaAggregate } from "../../domain/asset/asset";
+import type { AssetRepository } from "../../domain/asset/repository";
 import { toSqliteSafeInteger } from "../../domain/ledger/money";
 import { validateJournalEntry, type PostingContext } from "../../domain/ledger/posting";
 import type { PostingCommitInput } from "../../domain/ledger/repository";
@@ -48,8 +49,64 @@ type LedgerTransaction = Parameters<
  * repository. A purchase/sale is not split across AccountingService and an
  * asset repository because those two independent commits cannot be atomic.
  */
-export class SqliteAssetRepository {
+export class SqliteAssetRepository implements AssetRepository {
   constructor(private readonly db: LedgerDatabase) {}
+
+  async findAssetForTransaction(assetId: string) {
+    const asset = await this.db.select().from(assets).where(eq(assets.id, assetId)).get();
+    if (!asset) return null;
+    const assetType = await this.db.select().from(assetTypes)
+      .where(eq(assetTypes.id, asset.assetTypeId)).get();
+    if (!assetType) return null;
+    return {
+      asset: {
+        id: asset.id,
+        assetTypeId: asset.assetTypeId,
+        quoteCurrency: asset.quoteCurrency,
+        isArchived: asset.isArchived,
+      },
+      assetType: {
+        id: assetType.id,
+        valuationModel: assetType.valuationModel,
+        quantityPrecision: assetType.quantityPrecision,
+        pricePrecision: assetType.pricePrecision,
+        quoteCurrency: assetType.quoteCurrency,
+        isArchived: assetType.isArchived,
+      },
+    };
+  }
+
+  async findLotForSale(lotId: string) {
+    const row = await this.db.select().from(assetLots)
+      .where(eq(assetLots.id, lotId)).get();
+    if (!row) return null;
+    let isDcaComponent = false;
+    if (row.status === "MERGED") {
+      const link = await this.db.select({ aggregateLotId: assetDcaComponents.aggregateLotId })
+        .from(assetDcaComponents)
+        .where(eq(assetDcaComponents.componentLotId, row.id)).get();
+      if (link) {
+        const aggregate = await this.db.select({ status: assetLots.status })
+          .from(assetLots).where(eq(assetLots.id, link.aggregateLotId)).get();
+        isDcaComponent = aggregate?.status === "ACTIVE";
+      }
+    }
+    return {
+      lot: {
+        id: row.id,
+        assetId: row.assetId,
+        currencyCode: row.currencyCode,
+        quantity: row.quantity,
+        remainingQuantity: row.remainingQuantity,
+        costBasisMinor: BigInt(row.costBasisMinor),
+        remainingCostBasisMinor: BigInt(row.remainingCostBasisMinor),
+        acquiredAt: row.acquiredAt,
+        status: row.status,
+        mergedIntoId: row.mergedIntoId,
+      },
+      isDcaComponent,
+    };
+  }
 
   async commitPurchase(input: {
     lot: typeof assetLots.$inferInsert;
