@@ -593,4 +593,48 @@ describe("LiabilityService", () => {
       "Payment idempotency key was reused with a different payload",
     );
   });
+  it("blocks archive when schedule reconciliation is not balanced", async () => {
+    const current = baseLiability({
+      status: "PAID_OFF",
+      outstandingPrincipalMinor: 0n,
+    });
+    const { service, repository } = createHarness(current);
+    (repository.reconcile as jest.Mock).mockResolvedValue({
+      ledgerPrincipalMinor: 0n,
+      recordedPrincipalMinor: 0n,
+      schedulePrincipalMinor: 1n,
+      paymentDerivedPrincipalMinor: 0n,
+      differenceMinor: 0n,
+      scheduleDifferenceMinor: 1n,
+      paymentDifferenceMinor: 0n,
+    });
+
+    await expect(service.archive(current.id)).rejects.toThrow(
+      "Ledger, schedule and payment history must reconcile before archiving",
+    );
+    expect(repository.archive).not.toHaveBeenCalled();
+  });
+
+  it("blocks archive when payment history reconciliation is not balanced", async () => {
+    const current = baseLiability({
+      status: "PAID_OFF",
+      outstandingPrincipalMinor: 0n,
+    });
+    const { service, repository } = createHarness(current);
+    (repository.reconcile as jest.Mock).mockResolvedValue({
+      ledgerPrincipalMinor: 0n,
+      recordedPrincipalMinor: 0n,
+      schedulePrincipalMinor: 0n,
+      paymentDerivedPrincipalMinor: 1n,
+      differenceMinor: 0n,
+      scheduleDifferenceMinor: 0n,
+      paymentDifferenceMinor: 1n,
+    });
+
+    await expect(service.archive(current.id)).rejects.toThrow(
+      "Ledger, schedule and payment history must reconcile before archiving",
+    );
+    expect(repository.archive).not.toHaveBeenCalled();
+  });
+
 });
