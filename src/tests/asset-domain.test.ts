@@ -10,6 +10,7 @@ import {
   getValuationDate,
   resolveQuoteAfterRefresh,
   resolveAssetTimeZone,
+  sumDecimalQuantities,
   type AssetLot,
   type MarketQuote,
 } from "../domain/asset/asset";
@@ -28,6 +29,12 @@ const lot = (overrides: Partial<AssetLot> = {}): AssetLot => ({
 });
 
 describe("Task04 asset domain rules", () => {
+  it("sums current quantities with exact decimal arithmetic", () => {
+    expect(sumDecimalQuantities(["0.125", "1.2", "0.00000001"], 8)).toBe(
+      "1.32500001",
+    );
+  });
+
   it("aggregates DCA lots without mutating their source records", () => {
     const source = [
       lot(),
