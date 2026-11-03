@@ -33,6 +33,17 @@ export interface AssetLotRecord extends AssetLot {
   mergedIntoId: string | null;
 }
 
+export interface AssetSettingsRecord {
+  timezoneMode: "DEVICE" | "CUSTOM";
+  timezoneId: string;
+  cryptoRefreshMinutes: number;
+  metalRefreshMinutes: number;
+  fiatRefreshMinutes: number;
+  primaryCryptoProvider: "COINPAPRIKA" | "COINGECKO";
+  fallbackCryptoProvider: "COINPAPRIKA" | "COINGECKO";
+  updatedAt: string;
+}
+
 export interface AssetTransactionWrite {
   id: string;
   assetId: string;
@@ -93,6 +104,10 @@ export interface AssetRepository {
   }): Promise<AssetRecord>;
   listAssetTypes(includeArchived?: boolean): Promise<AssetTypeRecord[]>;
   listAssets(includeArchived?: boolean): Promise<AssetRecord[]>;
+  archiveAsset(assetId: string, archivedAt: string): Promise<void>;
+  archiveAssetType(assetTypeId: string, archivedAt: string): Promise<void>;
+  getSettings(): Promise<AssetSettingsRecord>;
+  updateSettings(settings: AssetSettingsRecord): Promise<AssetSettingsRecord>;
   findAssetForTransaction(
     assetId: string,
   ): Promise<{ asset: AssetRecord; assetType: AssetTypeRecord } | null>;

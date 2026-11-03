@@ -11,7 +11,10 @@ import {
   type DailyValuation,
   type MarketQuote,
 } from "../../domain/asset/asset";
-import type { AssetRepository } from "../../domain/asset/repository";
+import type {
+  AssetRepository,
+  AssetSettingsRecord,
+} from "../../domain/asset/repository";
 import { toSqliteSafeInteger } from "../../domain/ledger/money";
 import {
   validateJournalEntry,
@@ -23,6 +26,7 @@ import {
   accounts,
   assetDcaComponents,
   assetDailyValuations,
+  assetSettings,
   assetLots,
   assetPriceQuotes,
   assetTransactions,
@@ -204,6 +208,72 @@ export class SqliteAssetRepository implements AssetRepository {
       quoteCurrency: row.quoteCurrency,
       isArchived: row.isArchived,
     }));
+  }
+
+  async archiveAsset(assetId: string, archivedAt: string): Promise<void> {
+    await this.db.transaction((tx) => {
+      const asset = tx.select().from(assets).where(eq(assets.id, assetId)).get();
+      if (!asset) throw new Error("Asset does not exist");
+      if (asset.isArchived) return;
+      const type = tx.select().from(assetTypes).where(eq(assetTypes.id, asset.assetTypeId)).get();
+      if (!type) throw new Error("Asset type does not exist");
+      const rows = tx.select().from(assetLots).where(eq(assetLots.assetId, assetId)).all();
+      const activeAggregateIds = new Set(rows.filter((row) => row.status === "ACTIVE").map((row) => row.id));
+      const componentIds = new Set(tx.select().from(assetDcaComponents).all().map((row) => row.componentLotId));
+      const openLots = rows.filter((row) => {
+        if (row.status === "ACTIVE" && row.mergedIntoId === null) return true;
+        return row.status === "MERGED" && row.mergedIntoId !== null &&
+          activeAggregateIds.has(row.mergedIntoId) && componentIds.has(row.id);
+      });
+      const quantity = sumDecimalQuantities(openLots.map((row) => row.remainingQuantity), type.quantityPrecision);
+      if (quantity !== "0") {
+        throw new Error("An asset can only be archived when its remaining quantity is zero");
+      }
+      tx.update(assets).set({ isArchived: true, updatedAt: archivedAt }).where(eq(assets.id, assetId)).run();
+    });
+  }
+
+  async archiveAssetType(assetTypeId: string, archivedAt: string): Promise<void> {
+    await this.db.transaction((tx) => {
+      const type = tx.select().from(assetTypes).where(eq(assetTypes.id, assetTypeId)).get();
+      if (!type) throw new Error("Asset type does not exist");
+      if (type.isArchived) return;
+      const activeAssets = tx.select().from(assets).where(eq(assets.assetTypeId, assetTypeId)).all().filter((asset) => !asset.isArchived);
+      if (activeAssets.length > 0) {
+        throw new Error("Archive all asset profiles before archiving the asset type");
+      }
+      tx.update(assetTypes).set({ isArchived: true, updatedAt: archivedAt }).where(eq(assetTypes.id, assetTypeId)).run();
+    });
+  }
+
+  async getSettings(): Promise<AssetSettingsRecord> {
+    const row = await this.db.select().from(assetSettings).where(eq(assetSettings.id, 1)).get();
+    if (!row) throw new Error("Asset settings have not been initialized");
+    return {
+      timezoneMode: row.timezoneMode,
+      timezoneId: row.timezoneId,
+      cryptoRefreshMinutes: row.cryptoRefreshMinutes,
+      metalRefreshMinutes: row.metalRefreshMinutes,
+      fiatRefreshMinutes: row.fiatRefreshMinutes,
+      primaryCryptoProvider: row.primaryCryptoProvider,
+      fallbackCryptoProvider: row.fallbackCryptoProvider,
+      updatedAt: row.updatedAt,
+    };
+  }
+
+  async updateSettings(settings: AssetSettingsRecord): Promise<AssetSettingsRecord> {
+    const updated = await this.db.update(assetSettings).set({
+      timezoneMode: settings.timezoneMode,
+      timezoneId: settings.timezoneId,
+      cryptoRefreshMinutes: settings.cryptoRefreshMinutes,
+      metalRefreshMinutes: settings.metalRefreshMinutes,
+      fiatRefreshMinutes: settings.fiatRefreshMinutes,
+      primaryCryptoProvider: settings.primaryCryptoProvider,
+      fallbackCryptoProvider: settings.fallbackCryptoProvider,
+      updatedAt: settings.updatedAt,
+    }).where(eq(assetSettings.id, 1)).run();
+    if (updated.changes !== 1) throw new Error("Asset settings could not be updated");
+    return settings;
   }
 
   async findAssetForTransaction(assetId: string) {

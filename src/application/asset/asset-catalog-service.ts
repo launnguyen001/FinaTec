@@ -76,6 +76,16 @@ export class AssetCatalogService {
     });
   }
 
+  async archiveAsset(assetId: string) {
+    if (!assetId.trim()) throw new Error("Asset id is required");
+    await this.assets.archiveAsset(assetId, this.options.now());
+  }
+
+  async archiveAssetType(assetTypeId: string) {
+    if (!assetTypeId.trim()) throw new Error("Asset type id is required");
+    await this.assets.archiveAssetType(assetTypeId, this.options.now());
+  }
+
   listAssetTypes(includeArchived = false) {
     return this.assets.listAssetTypes(includeArchived);
   }

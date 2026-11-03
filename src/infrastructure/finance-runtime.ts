@@ -3,6 +3,7 @@ import { AccountService } from "../application/account/account-service";
 import { AssetTransactionService } from "../application/asset/asset-transaction-service";
 import { AssetCatalogService } from "../application/asset/asset-catalog-service";
 import { AssetValuationService } from "../application/asset/asset-valuation-service";
+import { AssetSettingsService } from "../application/asset/asset-settings-service";
 import { CategoryService } from "../application/category/category-service";
 import { DashboardService } from "../application/finance/dashboard-service";
 import { FinanceTransactionService } from "../application/finance/finance-transaction-service";
@@ -39,6 +40,10 @@ export async function createFinanceRuntime() {
     assetValuations: new AssetValuationService(assetRepository, ledger, {
       now,
       createId,
+    }),
+    assetSettings: new AssetSettingsService(assetRepository, {
+      now,
+      deviceTimeZone: () => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
     }),
     accounts: new AccountService(accountRepository, ledger, { createId, now }),
     categories: new CategoryService(categoryRepository, { createId, now }),
