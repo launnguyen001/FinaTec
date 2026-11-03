@@ -118,6 +118,8 @@ export function LiabilityScreen() {
   const [name, setName] = useState("");
   const [principal, setPrincipal] = useState("");
   const [apr, setApr] = useState("12");
+  const [newApr, setNewApr] = useState("");
+  const [aprReason, setAprReason] = useState("");
   const [term, setTerm] = useState("12");
   const [startDate, setStartDate] = useState(
     new Date().toISOString().slice(0, 10),
@@ -319,6 +321,16 @@ export function LiabilityScreen() {
       setMessage("Đã ghi nhận thanh toán và hạch toán Journal Entry.");
     });
 
+  const changeApr = () =>
+    run(async () => {
+      if (!runtime || !activeLiability) return;
+      const rate = parseAprPpm(newApr);
+      await runtime.liabilities.changeApr(activeLiability.id, rate, aprReason);
+      setNewApr("");
+      setAprReason("");
+      setMessage("Đã lưu lịch sử APR và tính lại các kỳ chưa đến hạn.");
+    });
+
   const archive = () =>
     run(async () => {
       if (!runtime || !activeLiability) return;
@@ -380,6 +392,38 @@ export function LiabilityScreen() {
                     ? "Đang kiểm tra"
                     : `Chênh lệch ${reconciliation} minor units`}
               </Text>
+              <Text style={styles.label}>Lịch sử thay đổi APR</Text>
+              {rateChanges.length === 0 ? (
+                <Text style={styles.muted}>Chưa có lần điều chỉnh APR.</Text>
+              ) : (
+                rateChanges.map((change) => (
+                  <Text key={change.id} style={styles.rowText}>
+                    {change.effectiveDate} · {(Number(change.annualRatePpm) / 10000).toFixed(4)}% · {change.reason || "Không có ghi chú"}
+                  </Text>
+                ))
+              )}
+              {activeLiability.status === "ACTIVE" ? (
+                <View style={styles.group}>
+                  <TextInput
+                    accessibilityLabel="APR mới"
+                    placeholder="APR mới (%)"
+                    keyboardType="decimal-pad"
+                    value={newApr}
+                    onChangeText={setNewApr}
+                    style={styles.input}
+                  />
+                  <TextInput
+                    accessibilityLabel="Lý do thay đổi APR"
+                    placeholder="Lý do điều chỉnh (không bắt buộc)"
+                    value={aprReason}
+                    onChangeText={setAprReason}
+                    style={styles.input}
+                  />
+                  <Pressable disabled={busy} onPress={() => void changeApr()} style={styles.primary}>
+                    <Text style={styles.primaryText}>Áp dụng APR từ kỳ chưa đến hạn</Text>
+                  </Pressable>
+                </View>
+              ) : null}
               <Text style={styles.label}>Lịch sử thanh toán</Text>
               {payments.length === 0 ? (
                 <Text style={styles.muted}>Chưa có giao dịch thanh toán.</Text>
