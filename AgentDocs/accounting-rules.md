@@ -94,14 +94,18 @@ Schema v2 adds `journal_entries.transaction_kind` and nullable `category_id`.
 - REVERSAL retains the original Category reference and swaps every original line side. Reporting must include the reversal's negative effect.
 - Existing v1 entries are LEGACY and remain uncategorized unless a future audited backfill can infer their meaning without guessing.
 
-## 11. Archived Account policy — TASK-03 extension
+## 11. Archived Account policy — strict lifecycle invariant
 
-Default behavior remains unchanged: ordinary income, expense, transfer, opening-balance, draft and direct posting commands reject archived Accounts.
+TASK-03 does not extend or bypass the TASK-02 posting policy. The existing invariant remains: every posting rejects an archived Account.
 
-Two narrow exceptions are implemented:
-- `ARCHIVED_ACCOUNT_SETTLEMENT`: one archived ASSET with a positive residual balance may be reduced by a same-currency CREDIT line, with the matching DEBIT to one active ASSET destination. Exactly two lines are accepted. Amount cannot exceed the archived Account's current positive Ledger balance.
-- `ARCHIVED_ACCOUNT_REVERSAL`: an original POSTED entry touching an Account that has since been archived may be reversed only by an exact line-for-line mirror with opposite sides, preserving account, native amount, currency, FX snapshot and base amount.
+- An Account may be archived only when its current Ledger balance is exactly zero in its native currency.
+- Balance is derived only from lines belonging to POSTED Journal Entries. Do not trust a UI-provided balance or a separately persisted balance.
+- A non-zero balance, whether positive or negative, rejects archive. The user must bring the balance to zero through ordinary valid postings while the Account is ACTIVE.
+- The zero-balance check and archive-state update must be atomic with posting operations. The repository must prevent a posting from being committed between the balance check and the archive update.
+- `restoreAccount()` transitions ARCHIVED → ACTIVE without creating a Journal Entry or changing historical balances.
+- Every posting that references an archived Account is rejected, regardless of transaction kind or posting purpose. This includes income, expense, transfer, opening balance, adjustment and reversal.
+- To reverse a historical entry that references an archived Account, restore every affected Account first, then call the ordinary AccountingService reversal use case.
+- Do not use `allowedArchivedAccountIds`, `allowArchived`, `ARCHIVED_ACCOUNT_SETTLEMENT`, `ARCHIVED_ACCOUNT_ADJUSTMENT` or `ARCHIVED_ACCOUNT_REVERSAL` as bypasses. Remove TASK-03-only archived posting exceptions and their UI/use cases. Because schema v2 exists only on the unmerged TASK-03 branch, remove archived-exception-only persisted purpose/reason fields from that unreleased migration rather than adding an unnecessary compatibility migration. Never rewrite a migration after it has been released to users.
+- Preserve balancing, atomicity, idempotency and posted-history immutability.
 
-Both exceptions require a non-empty audit reason of at least 8 trimmed characters. The purpose and reason are persisted on the Journal Entry. The SQLite repository revalidates the purpose and line shape inside the same atomic transaction before inserting the entry. Callers cannot pass a generic `allowArchived` boolean. Presentation must call the dedicated Application use case; direct journal-table writes remain forbidden.
-
-`ARCHIVED_ACCOUNT_ADJUSTMENT` is reserved in the persisted purpose enum but must obey the same strict settlement line policy until a separately reviewed adjustment use case is added.
+Required tests: archive succeeds at exactly zero; archive rejects positive and negative balances; restore succeeds and preserves history; every posting kind rejects archived Accounts; reversal rejects until all referenced archived Accounts are restored; concurrent archive/post attempts cannot violate the invariant.
