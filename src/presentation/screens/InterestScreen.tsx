@@ -406,7 +406,7 @@ export function InterestScreen() {
       <Text style={styles.title}>Interest Engine</Text>
       <Text style={styles.subtitle}>
         Nominal APR · ACT/365 Fixed · daily accrual · HALF_UP khi posting.
-        Accrued chưa POSTED không làm thay đổi số dư Ledger.
+        Accrued chưa POSTED không làm thay đổi số dư Ledger. MVP yêu cầu cùng base currency và principal được nạp trước ngày bắt đầu, không thay đổi ngoài InterestPlan.
       </Text>
       {loading ? <ActivityIndicator color={colors.primary} /> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
