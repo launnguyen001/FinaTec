@@ -206,6 +206,43 @@ describe("LiabilityService", () => {
     expect(commit.newInstallments[0]!.sequence).toBe(4);
   });
 
+  it("cancels all future installments when an early payment pays the loan off", async () => {
+    const current = baseLiability();
+    const calculated = calculateRepaymentSchedule({
+      principalMinor: current.outstandingPrincipalMinor,
+      annualRatePpm: current.annualRatePpm,
+      termMonths: 3,
+      method: current.repaymentMethod,
+      startDate: current.startDate,
+      firstDueDate: current.firstDueDate,
+    });
+    const schedule = calculated.installments.map((item) => ({
+      ...item,
+      id: `schedule-${item.sequence}`,
+      liabilityId: current.id,
+      annualRatePpm: current.annualRatePpm,
+      principalPaidMinor: 0n,
+      interestPaidMinor: 0n,
+      status: "UPCOMING" as const,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    }));
+    const { service, repository } = createHarness(current, schedule);
+    await service.recordPayment({
+      liabilityId: current.id,
+      sourceAccountId: "cash-out",
+      amountMinor: current.outstandingPrincipalMinor,
+      paidAt: timestamp,
+      idempotencyKey: "payment-early-full-payoff",
+    });
+
+    const commit = (repository.commitPayment as jest.Mock).mock.calls[0]![0];
+    expect(commit.outstandingPrincipalMinor).toBe(0n);
+    expect(commit.installmentUpdates).toHaveLength(3);
+    expect(commit.installmentUpdates.every((item: LiabilityInstallment) => item.status === "CANCELLED")).toBe(true);
+    expect(commit.newInstallments).toHaveLength(0);
+  });
+
   it("shortens the remaining term when the selected early-payment policy keeps installment size", async () => {
     const current = baseLiability({
       earlyPaymentPolicy: "KEEP_INSTALLMENT_SHORTEN_TERM",
