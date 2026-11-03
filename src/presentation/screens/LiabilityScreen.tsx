@@ -441,17 +441,6 @@ export function LiabilityScreen() {
                   <Text key={change.id} style={styles.rowText}>
                     {change.effectiveDate} · {(Number(change.annualRatePpm) / 10000).toFixed(4)}% · {change.reason || "Không có ghi chú"}
                   </Text>
-                  <Text style={styles.muted}>
-                    {reversals.some((item) => item.paymentId === payment.id)
-                      ? "Đã đảo bút toán"
-                      : "Đang hiệu lực"}
-                    {!reversals.some((item) => item.paymentId === payment.id) ? " · " : ""}
-                  </Text>
-                  {!reversals.some((item) => item.paymentId === payment.id) ? (
-                    <Pressable disabled={busy} onPress={() => void reversePayment(payment.id)} style={styles.choice}>
-                      <Text style={styles.choiceText}>Đảo thanh toán này</Text>
-                    </Pressable>
-                  ) : null}
                 ))
               )}
               {activeLiability.status === "ACTIVE" ? (
@@ -481,29 +470,23 @@ export function LiabilityScreen() {
                 <Text style={styles.muted}>Chưa có giao dịch thanh toán.</Text>
               ) : (
                 payments.map((payment) => (
-                  <Text key={payment.id} style={styles.rowText}>
-                    {payment.paidAt.slice(0, 10)} · gốc{" "}
-                    {formatMoney(
-                      payment.principalPaidMinor,
-                      currencies.find(
-                        (c) => c.code === activeLiability.currencyCode,
-                      ),
-                    )}{" "}
-                    · lãi{" "}
-                    {formatMoney(
-                      payment.interestPaidMinor,
-                      currencies.find(
-                        (c) => c.code === activeLiability.currencyCode,
-                      ),
-                    )}{" "}
-                    · phí{" "}
-                    {formatMoney(
-                      payment.feePaidMinor,
-                      currencies.find(
-                        (c) => c.code === activeLiability.currencyCode,
-                      ),
-                    )}
-                  </Text>
+                  <View key={payment.id} style={styles.group}>
+                    <Text style={styles.rowText}>
+                      {payment.paidAt.slice(0, 10)} · gốc{" "}
+                      {formatMoney(payment.principalPaidMinor, currencies.find((item) => item.code === activeLiability.currencyCode))} · lãi{" "}
+                      {formatMoney(payment.interestPaidMinor, currencies.find((item) => item.code === activeLiability.currencyCode))} · phí{" "}
+                      {formatMoney(payment.feePaidMinor, currencies.find((item) => item.code === activeLiability.currencyCode))}
+                    </Text>
+                    <Text style={styles.muted}>
+                      {reversals.some((item) => item.paymentId === payment.id) ? "Đã đảo bút toán" : "Đang hiệu lực"}
+                      {payment.replacesPaymentId ? ` · thay thế ${payment.replacesPaymentId}` : ""}
+                    </Text>
+                    {!reversals.some((item) => item.paymentId === payment.id) ? (
+                      <Pressable disabled={busy} onPress={() => void reversePayment(payment.id)} style={styles.choice}>
+                        <Text style={styles.choiceText}>Đảo thanh toán này</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
                 ))
               )}
               <Text style={styles.label}>Lịch trả nợ</Text>
