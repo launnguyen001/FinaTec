@@ -706,12 +706,10 @@ export class LiabilityService {
   }
 
   async reversePayment(paymentId: string, reason?: string | null): Promise<void> {
-    const payments = await this.repository.listPayments((await this.repository.findById(paymentId))?.id ?? "");
-    const payment = payments.find((item) => item.id === paymentId);
+    const payment = await this.repository.findPaymentById(paymentId);
     if (!payment) throw new Error("Liability payment does not exist");
-    if (await this.repository.findPaymentReversal(paymentId)) {
-      throw new Error("Payment has already been reversed");
-    }
+    const payments = await this.repository.listPayments(payment.liabilityId);
+    if (await this.repository.findPaymentReversal(paymentId)) return;
     const laterPayments = payments.filter((item) => item.id !== paymentId && item.paidAt >= payment.paidAt);
     for (const later of laterPayments) {
       if (!(await this.repository.findPaymentReversal(later.id))) {
