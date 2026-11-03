@@ -1,4 +1,4 @@
-export const migration0006 = String.raw\`
+export const migration0006 = String.raw`
 CREATE TABLE liabilities (
   id TEXT PRIMARY KEY NOT NULL,
   name TEXT NOT NULL CHECK (length(trim(name)) > 0),
@@ -130,4 +130,4 @@ WHEN NEW.status = 'ARCHIVED' AND (
   OR EXISTS (SELECT 1 FROM liability_installments s WHERE s.liability_id = OLD.id AND s.status NOT IN ('PAID', 'CANCELLED'))
 )
 BEGIN SELECT RAISE(ABORT, 'liability cannot be archived while principal or unpaid installments remain'); END;
-\`;
+`;
