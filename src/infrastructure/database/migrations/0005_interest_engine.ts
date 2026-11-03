@@ -92,7 +92,7 @@ WHEN
   OR NEW.principal_minor <> OLD.principal_minor
   OR NEW.accrued_numerator <> OLD.accrued_numerator
   OR NEW.accrued_denominator <> OLD.accrued_denominator
-  OR NEW.amount_minor <> OLD.amount_minor
+  OR OLD.amount_minor <> 0
   OR NEW.accrual_kind <> OLD.accrual_kind
   OR NEW.idempotency_key <> OLD.idempotency_key
   OR NEW.created_at <> OLD.created_at
