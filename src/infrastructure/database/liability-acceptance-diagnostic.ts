@@ -351,7 +351,9 @@ export async function runLiabilityAcceptanceDiagnostic() {
         cancelledOriginal.length === 3 &&
         activeFuture.length === 3 &&
         scheduledPrincipal === 80_000n &&
-        afterEarly.reconciliation.differenceMinor === 0n,
+        afterEarly.reconciliation.differenceMinor === 0n &&
+        afterEarly.reconciliation.scheduleDifferenceMinor === 0n &&
+        afterEarly.reconciliation.paymentDifferenceMinor === 0n,
       "old future rows were retained as CANCELLED history and replaced by a schedule for the reduced principal",
     );
 
@@ -369,7 +371,9 @@ export async function runLiabilityAcceptanceDiagnostic() {
       paidOff.liability.status === "PAID_OFF" &&
         paidOff.liability.outstandingPrincipalMinor === 0n &&
         paidOff.installments.every((item) => item.status === "CANCELLED") &&
-        paidOff.reconciliation.differenceMinor === 0n,
+        paidOff.reconciliation.differenceMinor === 0n &&
+        paidOff.reconciliation.scheduleDifferenceMinor === 0n &&
+        paidOff.reconciliation.paymentDifferenceMinor === 0n,
       "principal reached zero, all future installments were cancelled, and the LIABILITY Ledger account reconciled to zero",
     );
     stage = "archive the fully paid liability";
