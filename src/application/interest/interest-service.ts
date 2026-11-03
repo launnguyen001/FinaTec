@@ -77,6 +77,15 @@ export class InterestService {
       ? await this.requireAccount(input.payoutAccountId)
       : null;
     const baseCurrency = await this.ledger.getBaseCurrencyCode();
+    const existingPlan = (await this.repository.listPlans()).find(
+      (plan) =>
+        plan.status === "ACTIVE" && plan.principalAccountId === principal.id,
+    );
+    if (existingPlan) {
+      throw new Error(
+        `Principal account already has an active interest plan: ${existingPlan.id}`,
+      );
+    }
 
     if (principal.type !== "ASSET" || principal.isInvestment !== true) {
       throw new Error("Principal must be a dedicated INVESTMENT ASSET account");
