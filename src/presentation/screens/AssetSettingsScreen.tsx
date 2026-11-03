@@ -16,10 +16,7 @@ import type { AssetSettingsRecord } from "../../domain/asset/repository";
 import { ScreenBackLink } from "../components/ScreenBackLink";
 import { useFinanceRuntime } from "../providers/FinanceRuntimeProvider";
 import { colors, spacing, typography } from "../../shared/theme/tokens";
-import {
-  ASSET_REFRESH_TASK,
-  registerAssetRefreshTask,
-} from "../../infrastructure/background/asset-refresh-task";
+import { ASSET_REFRESH_TASK } from "../../infrastructure/background/asset-refresh-task";
 
 const COINGECKO_KEY = "ketso.asset.coingecko-demo-key.v1";
 
@@ -65,12 +62,10 @@ export function AssetSettingsScreen() {
   const [backgroundStatus, setBackgroundStatus] =
     useState<string>("Chưa kiểm tra");
   const [backgroundBusy, setBackgroundBusy] = useState(false);
+  const [refreshBusy, setRefreshBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (!runtime) return;
-    if (Platform.OS !== "web") {
-      await registerAssetRefreshTask();
-    }
     const [settings, key] = await Promise.all([
       runtime.assetSettings.get(),
       SecureStore.getItemAsync(COINGECKO_KEY),
@@ -110,6 +105,35 @@ export function AssetSettingsScreen() {
       ),
     );
   }, [load]);
+
+  async function refreshNow() {
+    if (!runtime) return;
+    setRefreshBusy(true);
+    setFailure(null);
+    setMessage(null);
+    try {
+      const outcomes = await runtime.assetPriceRefresh.refreshDueAssets(true);
+      const updated = outcomes.filter((item) => item.status === "UPDATED").length;
+      const skipped = outcomes.filter((item) => item.status === "SKIPPED").length;
+      const failed = outcomes.filter((item) => item.status === "FAILED");
+      if (outcomes.length === 0) {
+        setMessage("Không có tài sản crypto đủ điều kiện refresh.");
+      } else {
+        setMessage(
+          `Refresh hoàn tất: ${updated} cập nhật, ${skipped} bỏ qua, ${failed.length} lỗi.`,
+        );
+      }
+      if (failed.length > 0) {
+        setFailure(failed.map((item) => item.reason ?? item.assetId).join("; "));
+      }
+    } catch (cause) {
+      setFailure(
+        cause instanceof Error ? cause.message : "Không thể refresh giá tài sản.",
+      );
+    } finally {
+      setRefreshBusy(false);
+    }
+  }
 
   async function save() {
     if (!runtime) return;
@@ -227,6 +251,19 @@ export function AssetSettingsScreen() {
           {backgroundStatus}. OS chỉ chạy khi điều kiện pin/mạng phù hợp; thời
           điểm thực thi không được bảo đảm chính xác.
         </Text>
+        <Pressable
+          accessibilityRole="button"
+          disabled={refreshBusy || loading || !runtime}
+          onPress={() => void refreshNow()}
+          style={[
+            styles.primaryButton,
+            (refreshBusy || loading || !runtime) && styles.disabled,
+          ]}
+        >
+          <Text style={styles.primaryButtonText}>
+            {refreshBusy ? "Đang refresh…" : "Refresh giá ngay"}
+          </Text>
+        </Pressable>
         {__DEV__ && Platform.OS !== "web" ? (
           <Pressable
             accessibilityRole="button"
