@@ -100,6 +100,17 @@ Implementation may proceed only within the owner-approved baseline below. New co
 
 Các quy tắc trên đã được owner duyệt ngày 2026-11-04 và là business rules cho MVP. APY conversion, liability posting, early-withdrawal penalty và variable-principal scheduling vẫn nằm ngoài MVP cho đến khi có đặc tả riêng.
 
+### 5.2. Reference vectors — ACT/365 Fixed
+
+| Principal | Nominal APR | Period | Exact interest | HALF_UP posting |
+|---:|---:|---:|---:|---:|
+| 1,000.00 | 5.5% | 2026-01-01 → 2027-01-01 (365 days) | 55.0000 | 55.00 |
+| 1,000.00 | 10% | 2024-01-01 → 2025-01-01 (366 days, ACT/365 Fixed) | 100.27397… | 100.27 |
+| 0.01 | 100% | 365 × one-day accruals | 0.0100 total | 0.01 |
+
+Rates are represented as parts per million: 5.5% = 55,000 ppm; 100% = 1,000,000 ppm; 1000% = 10,000,000 ppm. The calculator stores exact rational numerator/denominator values in minor units and rounds HALF_UP only when a posting is committed.
+
+
 
 ## 6. Thay đổi dự kiến
 
