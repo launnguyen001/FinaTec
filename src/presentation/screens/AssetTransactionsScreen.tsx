@@ -68,12 +68,6 @@ export function AssetTransactionsScreen() {
   const selectedAsset = assets.find((item) => item.id === assetId);
   const selectedType = types.find((item) => item.id === selectedAsset?.assetTypeId);
   const currencyCode = selectedAsset?.quoteCurrency ?? "";
-  const currency = runtime
-    ? accounts.find((account) => account.currencyCode === currencyCode)
-    : undefined;
-  const currencyMinorUnit = currency
-    ? 0
-    : 0;
 
   const refresh = useCallback(async () => {
     if (!runtime) return;
