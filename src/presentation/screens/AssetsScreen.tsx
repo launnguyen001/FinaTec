@@ -78,10 +78,13 @@ export function AssetsScreen() {
       runtime.ledger.listCurrencies(false),
     ]);
     const nextQuantities = await Promise.all(
-      nextAssets.map(async (asset) => [
-        asset.id,
-        await runtime.assetRepository.getCurrentQuantity(asset.id),
-      ] as const),
+      nextAssets.map(
+        async (asset) =>
+          [
+            asset.id,
+            await runtime.assetRepository.getCurrentQuantity(asset.id),
+          ] as const,
+      ),
     );
     setAssetTypes(nextTypes);
     setAssets(nextAssets);
@@ -113,7 +116,9 @@ export function AssetsScreen() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void refresh().catch((cause: unknown) =>
       setFailure(
-        cause instanceof Error ? cause.message : "Không thể tải danh mục tài sản.",
+        cause instanceof Error
+          ? cause.message
+          : "Không thể tải danh mục tài sản.",
       ),
     );
   }, [refresh]);
@@ -219,7 +224,9 @@ export function AssetsScreen() {
           <Text style={styles.muted}>Chưa có tài sản nào được khai báo.</Text>
         ) : (
           assets.map((asset) => {
-            const type = assetTypes.find((item) => item.id === asset.assetTypeId);
+            const type = assetTypes.find(
+              (item) => item.id === asset.assetTypeId,
+            );
             return (
               <View key={asset.id} style={styles.assetRow}>
                 <View style={styles.assetIdentity}>
@@ -249,25 +256,29 @@ export function AssetsScreen() {
         />
         <Text style={styles.label}>Asset class</Text>
         <View style={styles.choices}>
-          {(["CRYPTO", "METAL", "STOCK", "OTHER"] as AssetClass[]).map((item) => (
-            <Choice
-              key={item}
-              value={item}
-              selected={assetClass === item}
-              onPress={() => setAssetClass(item)}
-            />
-          ))}
+          {(["CRYPTO", "METAL", "STOCK", "OTHER"] as AssetClass[]).map(
+            (item) => (
+              <Choice
+                key={item}
+                value={item}
+                selected={assetClass === item}
+                onPress={() => setAssetClass(item)}
+              />
+            ),
+          )}
         </View>
         <Text style={styles.label}>Valuation model</Text>
         <View style={styles.choices}>
-          {(["MARKET_VALUED", "STABLE_VALUE"] as ValuationModel[]).map((item) => (
-            <Choice
-              key={item}
-              value={item}
-              selected={valuationModel === item}
-              onPress={() => setValuationModel(item)}
-            />
-          ))}
+          {(["MARKET_VALUED", "STABLE_VALUE"] as ValuationModel[]).map(
+            (item) => (
+              <Choice
+                key={item}
+                value={item}
+                selected={valuationModel === item}
+                onPress={() => setValuationModel(item)}
+              />
+            ),
+          )}
         </View>
         <TextInput
           accessibilityLabel="Đơn vị đo"
@@ -301,14 +312,16 @@ export function AssetsScreen() {
         </View>
         <Text style={styles.label}>Quote currency</Text>
         <View style={styles.choices}>
-          {currencies.filter((item) => item.isActive).map((item) => (
-            <Choice
-              key={item.code}
-              value={item.code}
-              selected={quoteCurrency === item.code}
-              onPress={() => setQuoteCurrency(item.code)}
-            />
-          ))}
+          {currencies
+            .filter((item) => item.isActive)
+            .map((item) => (
+              <Choice
+                key={item.code}
+                value={item.code}
+                selected={quoteCurrency === item.code}
+                onPress={() => setQuoteCurrency(item.code)}
+              />
+            ))}
         </View>
         <Pressable
           accessibilityRole="button"
@@ -359,7 +372,10 @@ export function AssetsScreen() {
           accessibilityRole="button"
           disabled={busy || !selectedTypeId}
           onPress={() => void createProfile()}
-          style={[styles.primaryButton, (busy || !selectedTypeId) && styles.disabled]}
+          style={[
+            styles.primaryButton,
+            (busy || !selectedTypeId) && styles.disabled,
+          ]}
         >
           <Text style={styles.primaryButtonText}>Tạo hồ sơ tài sản</Text>
         </Pressable>
@@ -372,14 +388,22 @@ export function AssetsScreen() {
           tạo Journal Entry.
         </Text>
         <View style={styles.choices}>
-          {assets.filter((asset) => assetTypes.some((type) => type.id === asset.assetTypeId && type.valuationModel === "MARKET_VALUED")).map((item) => (
-            <Choice
-              key={item.id}
-              value={item.symbol}
-              selected={manualAssetId === item.id}
-              onPress={() => setManualAssetId(item.id)}
-            />
-          ))}
+          {assets
+            .filter((asset) =>
+              assetTypes.some(
+                (type) =>
+                  type.id === asset.assetTypeId &&
+                  type.valuationModel === "MARKET_VALUED",
+              ),
+            )
+            .map((item) => (
+              <Choice
+                key={item.id}
+                value={item.symbol}
+                selected={manualAssetId === item.id}
+                onPress={() => setManualAssetId(item.id)}
+              />
+            ))}
         </View>
         <TextInput
           accessibilityLabel="Giá thị trường thủ công"
@@ -393,7 +417,10 @@ export function AssetsScreen() {
           accessibilityRole="button"
           disabled={busy || !manualAssetId}
           onPress={() => void saveManualPrice()}
-          style={[styles.primaryButton, (busy || !manualAssetId) && styles.disabled]}
+          style={[
+            styles.primaryButton,
+            (busy || !manualAssetId) && styles.disabled,
+          ]}
         >
           <Text style={styles.primaryButtonText}>Lưu giá thủ công</Text>
         </Pressable>
