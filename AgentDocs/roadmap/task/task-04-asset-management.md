@@ -264,3 +264,11 @@ Không lưu trùng số dư ACCOUNT của TASK-03 trong bảng asset. Bảo đ�
 - Còn phải kiểm chứng: SQLite repository integration/atomic rollback, migration upgrade trên DB có dữ liệu, thiết bị thật, background behavior theo OS, provider API trên thiết bị và archive flow.
 
 - CLI acceptance screen đã được thêm tại route `/task04-asset-acceptance` (development build, native only). Screen tạo database SQLCipher cô lập, chạy migration upgrade từ Core Finance v1, kiểm tra atomic rollback, partial sale, DCA, daily valuation/P&L, settings, refresh state và archive policy; database cùng SecureStore key được cleanup sau lượt chạy.
+
+
+## 15. Dependency conflict cần owner quyết định
+
+- Tiêu chí nghiệm thu số 3 của TASK-04 yêu cầu tiền gửi có lãi phải ghi nhận theo kỳ và không ghi nhận lãi chưa đến hạn.
+- TASK-05 là task chuyên trách Interest Engine, nhưng TASK-05 hiện phụ thuộc TASK-04; công thức APR/APY, day-count, kỳ tính và quy tắc làm tròn vẫn chưa được chốt trong TASK-05.
+- Vì vậy không triển khai một interest engine thứ hai trong Asset Management và không tự suy diễn công thức lãi. Hiện TASK-04 chưa đáp ứng tiêu chí nghiệm thu số 3.
+- Cần owner quyết định một trong hai hướng: (A) chuyển tiêu chí accrual sang TASK-05 và chỉ yêu cầu TASK-04 lưu metadata/contract cho khoản tiền gửi có lãi; hoặc (B) chốt công thức tối thiểu và interface INTEREST_PLAN/INTEREST_ACCRUAL để TASK-04 tích hợp engine dùng chung.
