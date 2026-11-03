@@ -27,6 +27,8 @@ jobs:
         run: npm ci
       - name: Install Expo SDK 58 background task modules
         run: npx expo install expo-background-task expo-task-manager
+      - name: Validate native Expo configuration
+        run: npx expo prebuild --no-install --platform android --clean
       - name: Apply repository formatter
         run: npm run format
       - name: Typecheck
