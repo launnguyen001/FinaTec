@@ -164,7 +164,7 @@ export class SqliteInterestRepository implements InterestRepository {
           eq(journalEntries.status, "POSTED"),
           gte(
             journalEntries.occurredAt,
-            `${this.nextDate(plan.startDate)}T00:00:00.000Z`,
+            `${plan.startDate}T00:00:00.000Z`,
           ),
         ),
       )
