@@ -52,8 +52,8 @@ Người dùng thao tác bằng ngôn ngữ tài chính thông thường. Mọi 
 
 Cung cấp Application use case riêng cho:
 - Income.
-- Expense.
-- Internal transfer.
+- Expense (mọi khoản tiền rời khỏi phạm vi tài sản mà chủ thể quản lý).
+- Internal transfer (chỉ khi tiền di chuyển giữa hai Account thuộc cùng phạm vi quản lý).
 - Opening balance.
 - Reversal và tạo giao dịch thay thế.
 - Truy vấn lịch sử, chi tiết, số dư Account và Dashboard.
@@ -62,6 +62,9 @@ Các use case nghiệp vụ dùng chung Accounting Engine. Không tạo cơ ch�
 
 Quy tắc:
 - Người dùng không nhập DEBIT/CREDIT.
+- Phân loại theo ranh giới tài sản: tiền đi vào phạm vi quản lý là INCOME; tiền đi ra khỏi phạm vi quản lý là EXPENSE; tiền chỉ chuyển giữa các Account nội bộ là TRANSFER.
+- Không phân biệt khoản tiền ra là chi tiêu cá nhân, chi phí doanh nghiệp, rút vốn hay mục đích nào khác. Người dùng tự mô tả bằng Category và description/note; không tạo transaction kind riêng như WITHDRAWAL/OWNER_DRAWING.
+- Category chỉ phân loại nghiệp vụ; Category không quyết định tiền có rời khỏi phạm vi tài sản hay không. Transaction kind do use case INCOME/EXPENSE/TRANSFER xác định.
 - Transfer chỉ giữa hai Account ASSET, không phải INCOME hoặc EXPENSE.
 - Mọi Journal Entry POSTED phải cân bằng theo invariant TASK-02.
 - Giao dịch POSTED không được sửa/xóa trực tiếp.
@@ -301,13 +304,14 @@ Mọi command ghi dữ liệu phải có Domain/Application validation, idempote
 - **Done:** Chủ dự án chốt scope ngày 2026-11-03; branch `task/03-core-finance` được tạo từ `main`.
 - **Done, needs revision before release:** Migration `0001_core_finance.ts` và migration registry cho schema v2; bổ sung Category, Account subtype, transaction kind/category FK, index và integrity triggers. Loại bỏ posting purpose/audit reason nếu chỉ phục vụ archived-account exceptions. Migration v1 không bị sửa.
 - **Done:** Domain/Application/SQLite repository cho Category tree, parent-kind validation, cycle protection và archive lifecycle.
+- **Done:** AccountService kiểm tra native Ledger balance trước khi Archive, có `restoreAccount()`; SQLite migration có trigger chặn Archive khi balance khác 0, chặn insert journal line vào archived Account và chặn post draft tham chiếu archived Account.
 - **Done:** Account create/list/rename/update metadata/archive; ASSET subtype được validate ở Application và database migration.
 - **Done:** Income/Expense use cases dùng chung AccountingService; transfer, opening balance và reversal được phân loại theo transaction kind; reversal kế thừa Category.
-- **Superseded by scope decision (2026-11-03):** Loại bỏ archived-account settlement/adjustment/reversal exceptions. Account chỉ được archive khi Ledger balance chính xác bằng 0; Account Archived không tham gia bất kỳ posting mới nào; phải restore trước khi posting/reversal. Bổ sung zero-balance archive atomicity và restore vào implementation/test plan.
+- **Done:** Loại bỏ archived-account settlement/adjustment/reversal exceptions khỏi Application, Domain, Repository, schema, UI và tests. Reversal của entry chạm archived Account bị từ chối cho đến khi restore tất cả Account liên quan.
 - **Done:** Dashboard query/service tổng hợp available balance, income, expense và net flow theo native currency; history query/service lọc occurredAt, Category và Account.
-- **Partially done / revise:** UI khung sản phẩm cho Dashboard, Account, Category, Quick Expense, Quick Income, Transfer (có FX snapshot), Opening Balance và History/reversal; loại bỏ UI archived-account settlement, bổ sung Restore và trạng thái archive bị chặn khi số dư khác 0.
-- **Partially done / revise:** Unit tests đã có cho AccountService, CategoryService, income/expense và Dashboard multi-currency; thay các test archived-account settlement/reversal bằng test zero-balance archive, non-zero archive rejection, restore và archived posting rejection.
-- **Doing:** Hoàn thiện UI chỉnh sửa Account/Category, Restore Account, luồng tạo giao dịch thay thế có liên kết; loại bỏ archived-account settlement UI/use cases; bổ sung repository integration tests cho migration/SQLite và kiểm thử UI/accessibility trên thiết bị.
+- **Partially done:** UI Dashboard, Account, Category, Quick Expense, Quick Income, Transfer, Opening Balance và History/reversal; đã bỏ Settlement UI và bổ sung Restore Account.
+- **Partially done:** Unit tests cho AccountService bao gồm zero-balance Archive, positive/negative balance rejection và Restore; accounting tests bao gồm archived posting rejection và yêu cầu Restore trước Reversal.
+- **Doing:** Hoàn thiện linked replacement workflow, UI chỉnh sửa Account/Category, repository integration tests cho migration/SQLite và kiểm thử UI/accessibility trên thiết bị.
 - **Next:** Chạy TypeScript, ESLint, Prettier, Jest; bổ sung migration v1→v2 integration test trên Expo SQLite; sau đó Android offline regression và kiểm tra responsive/accessibility.
 - **Issues:** Không có quyền thực thi package scripts trên môi trường làm việc hiện tại; clone GitHub thất bại do môi trường không phân giải được github.com. Vì vậy chưa có bằng chứng `typecheck`, `lint`, `format:check`, Jest hoặc Android acceptance pass. Migration SQL đã được smoke-test thủ công bằng SQLite, bao gồm subtype CHECK, category parent-kind/cycle và account hard-delete trigger; chưa chạy trên database thiết bị thật.
 - **Verification:** Các thay đổi được ghi trên branch `task/03-core-finance`; chưa merge vào `main`, chưa đánh dấu TASK-03 DONE.
