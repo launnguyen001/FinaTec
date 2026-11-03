@@ -165,6 +165,40 @@ function installment(
 }
 
 describe("LiabilityService", () => {
+  it("posts a foreign-currency loan with an immutable rational FX snapshot", async () => {
+    const { service, repository, ledger } = createHarness(baseLiability());
+    const usdAccounts = accounts.map((account) => ({ ...account, currencyCode: "USD" }));
+    const usdCurrency: CurrencyRecord = {
+      code: "USD",
+      name: "US dollar",
+      minorUnit: 2,
+      isActive: true,
+      createdAt: timestamp,
+    };
+    (ledger.listCurrencies as jest.Mock).mockResolvedValue([currency, usdCurrency]);
+    (ledger.findAccountById as jest.Mock).mockImplementation(
+      async (id: string) => usdAccounts.find((item) => item.id === id) ?? null,
+    );
+    const created = await service.create({
+      name: "USD loan",
+      liabilityAccountId: "loan",
+      receivingAccountId: "cash-in",
+      interestExpenseAccountId: "interest-expense",
+      principalMinor: 1_000n,
+      annualRatePpm: 120_000n,
+      repaymentMethod: "EQUAL_PRINCIPAL",
+      termMonths: 1,
+      startDate: "2026-11-01",
+      firstDueDate: "2026-12-01",
+      fxRateNumerator: "25000",
+      fxRateDenominator: "1",
+    });
+    const commit = (repository.createLiability as jest.Mock).mock.calls[0]![0];
+    expect(created.currencyCode).toBe("USD");
+    expect(created.fxRateNumerator).toBe("25000");
+    expect(commit.journal.journalLines.map((line: { baseAmountMinor: bigint }) => line.baseAmountMinor)).toEqual([250_000n, 250_000n]);
+  });
+
   it("records an APR change and recalculates only future installments", async () => {
     const current = baseLiability();
     const schedule = [
