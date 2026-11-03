@@ -20,6 +20,10 @@ export class AssetValuationService {
     private readonly options: AssetValuationServiceOptions,
   ) {}
 
+  async getRealizedPnl(assetId: string) {
+    return this.assets.getRealizedPnl(assetId);
+  }
+
   async getHistory(assetId: string): Promise<DailyValuation[]> {
     const facts = await this.assets.findAssetForTransaction(assetId);
     if (!facts) throw new Error("Asset does not exist");

@@ -12,6 +12,7 @@ import {
   type MarketQuote,
 } from "../../domain/asset/asset";
 import type {
+  AssetRealizedPnlRecord,
   AssetRefreshStateRecord,
   AssetRepository,
   AssetSettingsRecord,
@@ -760,6 +761,46 @@ export class SqliteAssetRepository implements AssetRepository {
       })
       .map((row) => row.remainingQuantity);
     return sumDecimalQuantities(quantities, facts.assetType.quantityPrecision);
+  }
+
+  async getRealizedPnl(assetId: string): Promise<AssetRealizedPnlRecord> {
+    const facts = await this.findAssetForTransaction(assetId);
+    if (!facts) throw new Error("Asset does not exist");
+    const rows = await this.db
+      .select()
+      .from(assetTransactions)
+      .where(
+        and(
+          eq(assetTransactions.assetId, assetId),
+          eq(assetTransactions.transactionKind, "SELL"),
+        ),
+      )
+      .all();
+    const grossProceedsMinor = rows.reduce(
+      (total, row) => total + BigInt(row.grossAmountMinor),
+      0n,
+    );
+    const costBasisSoldMinor = rows.reduce(
+      (total, row) => total + BigInt(row.costBasisMinor),
+      0n,
+    );
+    const feeMinor = rows.reduce(
+      (total, row) => total + BigInt(row.feeAmountMinor),
+      0n,
+    );
+    const realizedPnlBeforeFeeMinor =
+      grossProceedsMinor - costBasisSoldMinor;
+    return {
+      assetId,
+      currencyCode: facts.asset.quoteCurrency,
+      transactionCount: rows.length,
+      grossProceedsMinor,
+      costBasisSoldMinor,
+      feeMinor,
+      realizedPnlBeforeFeeMinor,
+      realizedPnlAfterFeeMinor:
+        realizedPnlBeforeFeeMinor - feeMinor,
+    };
   }
 
   async listDailyValuations(assetId: string): Promise<DailyValuation[]> {

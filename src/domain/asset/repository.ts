@@ -42,6 +42,17 @@ export interface AssetRefreshStateRecord {
   lastError: string | null;
 }
 
+export interface AssetRealizedPnlRecord {
+  assetId: string;
+  currencyCode: string;
+  transactionCount: number;
+  grossProceedsMinor: bigint;
+  costBasisSoldMinor: bigint;
+  feeMinor: bigint;
+  realizedPnlBeforeFeeMinor: bigint;
+  realizedPnlAfterFeeMinor: bigint;
+}
+
 export interface AssetSettingsRecord {
   timezoneMode: "DEVICE" | "CUSTOM";
   timezoneId: string;
@@ -150,6 +161,7 @@ export interface AssetRepository {
   getCurrentQuantity(assetId: string): Promise<string>;
   listLots(assetId: string): Promise<AssetLotRecord[]>;
   listDailyValuations(assetId: string): Promise<DailyValuation[]>;
+  getRealizedPnl(assetId: string): Promise<AssetRealizedPnlRecord>;
   recordQuoteAndSnapshot(input: {
     quoteId: string;
     snapshotId: string;

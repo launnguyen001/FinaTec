@@ -53,6 +53,15 @@ export function AssetHistoryScreen() {
   const [assetId, setAssetId] = useState("");
   const [history, setHistory] = useState<DailyValuation[]>([]);
   const [performance, setPerformance] = useState<Performance | null>(null);
+  const [realized, setRealized] = useState<{
+    currencyCode: string;
+    transactionCount: number;
+    grossProceedsMinor: bigint;
+    costBasisSoldMinor: bigint;
+    feeMinor: bigint;
+    realizedPnlBeforeFeeMinor: bigint;
+    realizedPnlAfterFeeMinor: bigint;
+  } | null>(null);
   const [precision, setPrecision] = useState(2);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
@@ -82,19 +91,23 @@ export function AssetHistoryScreen() {
       if (!selectedId) {
         setHistory([]);
         setPerformance(null);
+        setRealized(null);
         return;
       }
-      const [nextHistory, nextPerformance, currencies] = await Promise.all([
-        runtime.assetValuations.getHistory(selectedId),
-        runtime.assetValuations.getUnrealizedPnl(selectedId),
-        runtime.ledger.listCurrencies(false),
-      ]);
+      const [nextHistory, nextPerformance, nextRealized, currencies] =
+        await Promise.all([
+          runtime.assetValuations.getHistory(selectedId),
+          runtime.assetValuations.getUnrealizedPnl(selectedId),
+          runtime.assetValuations.getRealizedPnl(selectedId),
+          runtime.ledger.listCurrencies(false),
+        ]);
       const asset = marketAssets.find((item) => item.id === selectedId);
       const currency = currencies.find(
         (item) => item.code === asset?.quoteCurrency,
       );
       setHistory(nextHistory);
       setPerformance(nextPerformance);
+      setRealized(nextRealized);
       setPrecision(currency?.minorUnit ?? 2);
     } catch (cause) {
       setFailure(
@@ -211,6 +224,47 @@ export function AssetHistoryScreen() {
               · {latest.valuationDate} · {latest.source} · {latest.quoteStatus}
             </Text>
           ) : null}
+        </View>
+      ) : null}
+      {realized ? (
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Realized P&L</Text>
+          <Text
+            style={[
+              styles.pnl,
+              realized.realizedPnlAfterFeeMinor < 0n && styles.loss,
+            ]}
+          >
+            {money(
+              realized.realizedPnlAfterFeeMinor,
+              precision,
+              realized.currencyCode,
+            )}
+          </Text>
+          <Text style={styles.muted}>
+            Net realized result after separately recorded trading fees ·{" "}
+            {realized.transactionCount} lần bán
+          </Text>
+          <Text style={styles.muted}>
+            Gross proceeds:{" "}
+            {money(realized.grossProceedsMinor, precision, realized.currencyCode)}
+          </Text>
+          <Text style={styles.muted}>
+            Cost basis disposed:{" "}
+            {money(realized.costBasisSoldMinor, precision, realized.currencyCode)}
+          </Text>
+          <Text style={styles.muted}>
+            Trading fees:{" "}
+            {money(realized.feeMinor, precision, realized.currencyCode)}
+          </Text>
+          <Text style={styles.muted}>
+            Realized P&L before fees:{" "}
+            {money(
+              realized.realizedPnlBeforeFeeMinor,
+              precision,
+              realized.currencyCode,
+            )}
+          </Text>
         </View>
       ) : null}
       <View style={styles.card}>

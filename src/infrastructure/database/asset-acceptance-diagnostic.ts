@@ -424,11 +424,14 @@ export async function runAssetAcceptanceDiagnostic(): Promise<AssetAcceptanceRes
       idempotencyKey: `task04-${suffix}-sell-2`,
     });
     assert(dcaSale.calculation, "DCA component sale calculation is missing");
+    const realizedAfterPartialSales = await valuations.getRealizedPnl(asset.id);
     check(
-      "Explicit DCA component disposal",
+      "Realized P&L aggregation",
       dcaSale.calculation.costBasisSoldMinor === 25_000_000n &&
-        (await assetRepository.getCurrentQuantity(asset.id)) === "1",
-      "sale reduced only the selected component lot and retained 1 BTC",
+        (await assetRepository.getCurrentQuantity(asset.id)) === "1" &&
+        realizedAfterPartialSales.realizedPnlBeforeFeeMinor === 7_500_000n &&
+        realizedAfterPartialSales.realizedPnlAfterFeeMinor === 7_000_000n,
+      "realized proceeds minus disposed cost basis = 7.5 USDT; separately recorded 0.5 USDT fee gives 7.0 USDT net realized result",
     );
 
     currentTime = "2026-11-03T13:00:00.000Z";
