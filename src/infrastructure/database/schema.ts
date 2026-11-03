@@ -816,7 +816,6 @@ export const liabilityRateChanges = sqliteTable(
   },
   (table) => [
     index("liability_rate_changes_effective_idx").on(table.liabilityId, table.effectiveDate),
-    index("liability_rate_changes_effective_idx").on(table.liabilityId, table.effectiveDate),
     check("liability_rate_changes_apr_range", sql`${table.annualRatePpm} BETWEEN 0 AND 10000000`),
   ],
 );
