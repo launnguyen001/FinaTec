@@ -2,7 +2,7 @@
 
 - Giai đoạn: 3 — MVP 2: Tài sản và lãi
 - Ưu tiên: P1
-- Trạng thái: IMPLEMENTATION IN PROGRESS — scope đã khóa; code nền đã push; chưa nghiệm thu
+- Trạng thái: COMPLETED — PR #6 merged; Android SQLCipher acceptance 15/15 PASS; CI PASS; interest accrual thuộc TASK-05; iOS NOT VERIFIED; metals provider DEFERRED
 - Phụ thuộc: TASK-02, TASK-03
 
 ## 1. Mục tiêu
@@ -19,8 +19,8 @@ Ví dụ: tiền mặt, số dư ngân hàng và tiền gửi có lãi có giá 
 
 - Ghi nhận trực tiếp giá trị thực tế/giá trị sổ sách; không cần API thị trường, market valuation hoặc cost-basis engine.
 - Tiền mặt và số dư tài khoản ngân hàng tiếp tục lấy số dư từ ACCOUNT/ledger của TASK-03. TASK-04 tuyệt đối không tạo bản sao số dư để cộng thêm vào tổng tài sản.
-- Tiền gửi có lãi được ghi nhận theo giá trị gốc và kế hoạch lãi đã khai báo. Lãi được ghi nhận khi đến kỳ theo cơ chế INTEREST_PLAN/INTEREST_ACCRUAL của Core Finance; lãi nhập gốc làm tăng giá trị tiền gửi, lãi trả về nguồn tiền làm tăng số dư ACCOUNT tương ứng.
-- Không ghi nhận lãi dự kiến chưa đến kỳ thành giá trị đã xác nhận.
+- Tiền mặt, ngân hàng và tiền gửi được biểu diễn bằng ASSET Account chuyên biệt trong Core Ledger; TASK-04 không tạo bản sao số dư. Khoản tiền gửi có kỳ hạn sử dụng Account ASSET riêng (có thể đánh dấu INVESTMENT để loại khỏi tiền khả dụng).
+- Kế hoạch, công thức, accrual và posting lãi thuộc TASK-05. TASK-04 không tính lãi, không tạo accrual record hoặc journal entry lãi; lãi chưa POSTED không được coi là số dư đã xác nhận.
 - Mọi thay đổi giá trị phải có căn cứ từ giao dịch hoặc bút toán lãi đã ghi nhận, không refresh từ API giá thị trường.
 
 ### 2.2. Nhóm tài sản biến động theo thị trường (market-valued)
@@ -136,7 +136,7 @@ Không lưu trùng số dư ACCOUNT của TASK-03 trong bảng asset. Bảo đ�
 
 ## 10. Kế hoạch kiểm thử
 
-- Stable-value: tiền mặt/ngân hàng không bị nhân đôi; tiền gửi có lãi ghi nhận đúng kỳ; lãi nhập gốc và lãi trả về ACCOUNT.
+- Stable-value: tiền mặt/ngân hàng/tiền gửi lấy số dư từ Core Ledger, không nhân đôi; interest plan và accrual của tiền gửi được triển khai, nghiệm thu riêng ở TASK-05.
 - Market-valued: nhiều bản ghi mua cùng loại tài sản ở thời điểm/giá khác nhau; DCA tạo bản ghi tổng hợp nhưng giữ nguyên bản ghi thành phần; không cộng trùng quantity; giá vốn không đổi khi API refresh; manual quote có provenance.
 - Provider: refresh online, lỗi provider, offline, quote stale, quote bất thường, nhiều lần refresh trong ngày.
 - Snapshot: một snapshot/ngày/tài sản; lấy quote hợp lệ cuối cùng; không có quote mới thì đánh dấu stale; timezone và ngày chuyển tiếp; tái lập biểu đồ.
@@ -146,24 +146,24 @@ Không lưu trùng số dư ACCOUNT của TASK-03 trong bảng asset. Bảo đ�
 
 ## 11. Tiêu chí nghiệm thu
 
-- [ ] Phân biệt đúng stable-value assets và market-valued assets.
-- [ ] Tiền mặt/ngân hàng chỉ lấy số dư từ Core Ledger, không bị ghi nhận trùng.
-- [ ] Tiền gửi có lãi ghi nhận theo kỳ và không ghi nhận lãi chưa đến hạn.
-- [ ] Giá vốn market-valued do người dùng khai báo và được lưu bất biến theo từng bản ghi mua.
-- [ ] Một loại tài sản có thể có nhiều bản ghi mua với thời điểm, số lượng và giá mua khác nhau.
-- [ ] Có thể hợp nhất nhiều bản ghi thành một bản ghi DCA; bản ghi DCA truy xuất được toàn bộ thành phần, giá và thời điểm mua gốc.
-- [ ] Bản ghi gốc sau khi hợp nhất vẫn được giữ để xem chi tiết nhưng không bị cộng trùng vào holdings/total assets.
-- [ ] Hợp nhất DCA không tạo giao dịch tài chính hoặc bút toán Ledger.
-- [ ] API refresh current valuation nhưng không tự tạo giao dịch thu nhập/chi phí.
-- [ ] Người dùng có thể nhập giá thủ công; provenance và thời điểm được lưu.
-- [ ] Daily snapshot lưu quote hợp lệ cuối cùng trong ngày, hỗ trợ trạng thái stale và tái lập lịch sử.
-- [ ] Giá API chỉ là đề xuất; execution price do người dùng xác nhận khi mua/bán.
-- [ ] Phí mua/bán được ghi nhận thành chi phí giao dịch riêng trên Ledger, không cộng vào cost basis hoặc thay đổi execution price.
-- [ ] Mua/bán đối soát nguyên tử với tài khoản và Ledger.
-- [ ] Từ chối bán vượt quantity.
-- [ ] Realized và unrealized P&L được phân biệt chính xác.
-- [ ] Không tính trùng tiền và giá trị tài sản.
-- [ ] Không lưu hoặc truyền thông tin bí mật của ví.
+- [x] Phân biệt đúng stable-value assets và market-valued assets.
+- [x] Tiền mặt/ngân hàng chỉ lấy số dư từ Core Ledger, không bị ghi nhận trùng.
+- [x] Không tạo nguồn số dư stable-value thứ hai ngoài Core Ledger; term deposit dùng ASSET Account riêng. Interest accrual/capitalization/payout thuộc TASK-05 và không được tính hoặc ghi nhận trong TASK-04.
+- [x] Giá vốn market-valued do người dùng khai báo và được lưu bất biến theo từng bản ghi mua.
+- [x] Một loại tài sản có thể có nhiều bản ghi mua với thời điểm, số lượng và giá mua khác nhau.
+- [x] Có thể hợp nhất nhiều bản ghi thành một bản ghi DCA; bản ghi DCA truy xuất được toàn bộ thành phần, giá và thời điểm mua gốc.
+- [x] Bản ghi gốc sau khi hợp nhất vẫn được giữ để xem chi tiết nhưng không bị cộng trùng vào holdings/total assets.
+- [x] Hợp nhất DCA không tạo giao dịch tài chính hoặc bút toán Ledger.
+- [x] API refresh current valuation nhưng không tự tạo giao dịch thu nhập/chi phí.
+- [x] Người dùng có thể nhập giá thủ công; provenance và thời điểm được lưu.
+- [x] Daily snapshot lưu quote hợp lệ cuối cùng trong ngày, hỗ trợ trạng thái stale và tái lập lịch sử.
+- [x] Giá API chỉ là đề xuất; execution price do người dùng xác nhận khi mua/bán.
+- [x] Phí mua/bán được ghi nhận thành chi phí giao dịch riêng trên Ledger, không cộng vào cost basis hoặc thay đổi execution price.
+- [x] Mua/bán đối soát nguyên tử với tài khoản và Ledger.
+- [x] Từ chối bán vượt quantity.
+- [x] Realized và unrealized P&L được phân biệt chính xác.
+- [x] Không tính trùng tiền và giá trị tài sản.
+- [x] Không lưu hoặc truyền thông tin bí mật của ví.
 
 ## 12. Quyết định đã khóa trước triển khai
 
@@ -246,9 +246,9 @@ Không lưu trùng số dư ACCOUNT của TASK-03 trong bảng asset. Bảo đ�
 - Đã bổ sung AssetValuationService cho provider/manual quote và timezone-derived valuation date; manual quote được đánh dấu MANUAL, không tạo Journal Entry.
 - Đã bổ sung AssetsScreen và AssetTransactionsScreen: tạo asset type/profile, nhập giá thủ công, ghi mua/bán, chọn lot nguồn và hợp nhất DCA; AccountsScreen cho phép đánh dấu account ASSET là INVESTMENT.
 - Đã thêm GitHub Actions CI workflow để chạy `npm ci`, typecheck, lint, format check và unit tests trên push/PR; chưa có kết quả run được xác nhận.
-- Còn tồn đọng: chưa có metals price provider được phê duyệt về quota/chi phí/điều khoản; chưa có interest accrual cho tiền gửi có lãi do dependency TASK-05 chưa được owner chốt; chưa chạy CLI acceptance trên thiết bị thật.
-- Tiếp theo: chạy route `/task04-asset-acceptance` trên development build để kiểm tra SQLCipher, migration upgrade và atomic repository behavior; kiểm tra manual/foreground/background refresh trên thiết bị Android/iOS thật; xác nhận provider online/offline và archive flow. Chỉ tích hợp metals provider sau khi chốt provider/budget; chỉ xử lý interest accrual sau quyết định dependency TASK-05.
-- Kiểm chứng trước vòng thiết bị: GitHub Actions Task04 workflow đã PASS sau khi cài module Expo Background Task, validate native Android config bằng `expo prebuild`, formatter, typecheck, lint và unit tests. CI format-check trên commit trước formatter thất bại; workflow Task04 đã chạy formatter và tạo commit đã format. Cần CI/acceptance tiếp theo trên head mới và CLI acceptance trên thiết bị; không đánh dấu Task04 DONE trước khi các tiêu chí nghiệm thu pass.
+- Còn giới hạn đã chấp nhận: metals provider DEFERRED do quota/chi phí/điều khoản; iOS runtime NOT VERIFIED; background scheduling BEST-EFFORT theo OS. Các giới hạn này không được mô tả thành PASS.
+- Đã chạy CLI acceptance trên Android development build với SQLCipher 4.17.0: 15/15 checks PASS; diagnostic database/key được cleanup.
+- Verification cuối: GitHub Actions CI trên PR head `afcfc550956a1edbfcdf7d31d9f0f91f8c028bb2` PASS toàn bộ dependency install, typecheck, lint, format check và unit tests. CLI Android SQLCipher acceptance 15/15 PASS sau các sửa lỗi USDT, snapshot date, DCA component linkage và Hermes BigInt formatting.
 
 
 
@@ -261,7 +261,7 @@ Không lưu trùng số dư ACCOUNT của TASK-03 trong bảng asset. Bảo đ�
 - Đã bổ sung archive policy: chỉ archive asset khi remaining quantity bằng 0; chỉ archive asset type sau khi mọi asset profile thuộc type đã archived.
 - Crypto quote currency được khóa ở USDT theo quy ước đã duyệt; CoinPaprika/CoinGecko USD quote được gắn conversion basis USDT/USD parity.
 - Metals provider evaluation: MetalCharts có endpoint batch `/v1/prices` trả nhiều metal trong một request; Free cho 200 request/tháng, 10 request/phút, commercial use được phép nhưng public display cần attribution link; Starter được công bố ở mức USD 9/tháng và 10.000 request/tháng. Với chu kỳ mặc định 60 phút, một batch request mỗi giờ tương đương khoảng 720 request/tháng, vượt free quota; nếu gọi riêng từng asset thì còn cao hơn. Vì vậy chưa tích hợp MetalCharts vào refresh mặc định cho đến khi chốt ngân sách hoặc thay đổi cadence. Corgano có API miễn phí cho gold và attribution nhưng không đáp ứng danh mục nhiều kim loại. Nguồn đánh giá: https://metalcharts.org/metals-api ; https://goldprice.corgano.com/gold-price-api
-- Còn phải kiểm chứng: SQLite repository integration/atomic rollback, migration upgrade trên DB có dữ liệu, thiết bị thật, background behavior theo OS, provider API trên thiết bị và archive flow.
+- Giới hạn được công khai: iOS runtime NOT VERIFIED; background scheduling BEST-EFFORT theo OS; metals provider DEFERRED chờ ngân sách/điều khoản. Android SQLCipher repository acceptance và archive flow đã PASS trên thiết bị.
 
 - Đã triển khai native background refresh bằng `expo-background-task` và `expo-task-manager`; task được define ở module scope, đăng ký sau khi FinanceRuntime khởi tạo, chu kỳ OS tối thiểu 15 phút. Đây là best-effort, không bảo đảm thời điểm chạy khi app bị suspend/terminated.
 - Đã thêm Settings action `Refresh giá ngay` cho crypto; hiển thị số asset cập nhật/bỏ qua/lỗi. Cooldown thủ công 30 giây và refresh claim được bảo vệ bằng atomic SQLite transaction để tránh hai worker cùng nhận một lượt.
@@ -270,12 +270,13 @@ Không lưu trùng số dư ACCOUNT của TASK-03 trong bảng asset. Bảo đ�
 - CLI acceptance screen đã được thêm tại route `/task04-asset-acceptance` (development build, native only). Screen tạo database SQLCipher cô lập, chạy migration upgrade từ Core Finance v1, kiểm tra atomic rollback, partial sale, DCA, daily valuation/P&L, settings, refresh state và archive policy; database cùng SecureStore key được cleanup sau lượt chạy.
 
 
-## 15. Dependency conflict cần owner quyết định
+## 15. Ranh giới TASK-04 / TASK-05 đã được chốt (2026-11-04)
 
-- Tiêu chí nghiệm thu số 3 của TASK-04 yêu cầu tiền gửi có lãi phải ghi nhận theo kỳ và không ghi nhận lãi chưa đến hạn.
-- TASK-05 là task chuyên trách Interest Engine, nhưng TASK-05 hiện phụ thuộc TASK-04; công thức APR/APY, day-count, kỳ tính và quy tắc làm tròn vẫn chưa được chốt trong TASK-05.
-- Vì vậy không triển khai một interest engine thứ hai trong Asset Management và không tự suy diễn công thức lãi. Hiện TASK-04 chưa đáp ứng tiêu chí nghiệm thu số 3.
-- Cần owner quyết định một trong hai hướng: (A) chuyển tiêu chí accrual sang TASK-05 và chỉ yêu cầu TASK-04 lưu metadata/contract cho khoản tiền gửi có lãi; hoặc (B) chốt công thức tối thiểu và interface INTEREST_PLAN/INTEREST_ACCRUAL để TASK-04 tích hợp engine dùng chung.
+- TASK-04 sở hữu Asset catalog/profile, stable-value/market-valued classification, lots, DCA, valuation, quote history và asset transactions.
+- Khoản tiền gửi có kỳ hạn được biểu diễn bằng một ASSET Account riêng trong Core Ledger; không lưu principal thành một số dư song song trong Asset domain.
+- TASK-05 sở hữu InterestPlan, APR/APY conventions, day-count, compounding, accrual lifecycle, rounding, catch-up, capitalization/payout và journal posting lãi. InterestPlan tham chiếu ASSET Account làm nguồn principal; currency và balance được đọc từ Ledger, không sao chép.
+- TASK-04 không tự tính hoặc ghi nhận lãi. Acceptance về interest accrual, capitalization và payout chuyển sang TASK-05.
+- Các convention tính lãi phải có ví dụ tham chiếu được owner duyệt trước khi implement; không tự suy diễn công thức.
 
 ## 16. Kiểm chứng acceptance trên Android (2026-11-04)
 
@@ -283,4 +284,14 @@ Không lưu trùng số dư ACCOUNT của TASK-03 trong bảng asset. Bảo đ�
 - CLI acceptance trên database SQLCipher cô lập đã PASS 15 kiểm tra: Core Finance → Task04 migration upgrade; settings migration/persistence; rollback nguyên tử; nhiều lot; partial-sale cost basis; DCA không tạo Ledger entry; realized/unrealized P&L; same-day snapshot upsert và rollover; archive guard/lifecycle; atomic refresh claim và refresh-state persistence. Diagnostic báo SQLCipher 4.17.0 và xác nhận file/key cô lập được cleanup.
 - Acceptance phát hiện và đã sửa các lỗi: schema/domain chỉ cho currency 3 ký tự trong khi crypto dùng USDT; regex snapshot date bị escape sai; đóng DCA component không xóa `merged_into_id`; Hermes không nhận `bigint` trực tiếp trong `Intl.NumberFormat`. Migration `0004_usdt_currency_code` mở rộng currency code lên 4 ký tự và bảo toàn các foreign key hiện có.
 - `npx expo lint` và `npx tsc --noEmit` PASS sau các sửa đổi.
-- TASK-04 vẫn chưa DONE: tiêu chí interest accrual đang chờ quyết định owner tại mục 15; chưa chốt ngân sách/provider kim loại; chưa xác nhận kiểm thử iOS và background behavior theo từng OS.
+- TASK-04 đạt Android SQLCipher acceptance 15/15; CI trên PR head trước cập nhật tài liệu PASS. Các commit sau acceptance chỉ cập nhật tài liệu, không sửa code. Metals provider DEFERRED; iOS runtime NOT VERIFIED; background scheduling BEST-EFFORT. PR chờ CI xác nhận trên head tài liệu mới nhất trước khi merge.
+
+
+## 17. Closeout TASK-04 (2026-11-04)
+
+- PR #6 đã merge vào main tại merge commit `38b6453ed6eb7fbc257c25cb8121a80df9af1d79`.
+- CI trên final documentation head `b5c603456f04da00d4af7176228ccbc62397cc45`, workflow run `41687377667`: dependency install, TypeScript, lint, format check và unit tests PASS.
+- CLI Android arm64 development-build acceptance trên SQLCipher 4.17.0: 15/15 PASS. Các sửa lỗi phát hiện trong acceptance đã nằm trong source được merge.
+- Interest accrual/capitalization/payout được chuyển hoàn toàn sang TASK-05; TASK-04 không tạo interest engine riêng.
+- iOS runtime NOT VERIFIED; metals provider DEFERRED; OS background scheduling BEST-EFFORT. Đây là giới hạn được công khai, không tuyên bố đã nghiệm thu.
+- Task04 hoàn thành trong phạm vi Android đã duyệt.
