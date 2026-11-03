@@ -593,6 +593,7 @@ describe("LiabilityService", () => {
       "Payment idempotency key was reused with a different payload",
     );
   });
+
   it("blocks archive when schedule reconciliation is not balanced", async () => {
     const current = baseLiability({
       status: "PAID_OFF",
