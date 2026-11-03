@@ -164,7 +164,7 @@ Không được:
 
 ### 4.3 Presentation
 
-App hiện mới ở mức khung/skeleton và diagnostic/acceptance screens. TASK-03 phải xây luồng sản phẩm thực tế, không coi diagnostic screen là UI hoàn thành. Kiểm tra route, component, theme token và provider trước khi thay đổi; không xóa acceptance workflow nếu chưa có phương án thay thế.
+TASK-03 đã bổ sung các luồng sản phẩm Account, Category, Quick Expense, Quick Income, Transfer, Opening Balance, History và Dashboard. Các acceptance/diagnostic workflows hiện có vẫn phải được giữ lại; phần responsive, accessibility và Android offline acceptance cần được CLI/device kiểm chứng.
 
 ## 5. Hai điểm kiến trúc bắt buộc xử lý
 
@@ -306,7 +306,7 @@ Mọi command ghi dữ liệu phải có Domain/Application validation, idempote
 - **Done:** Domain/Application/SQLite repository cho Category tree, parent-kind validation, cycle protection và archive lifecycle.
 - **Done:** AccountService kiểm tra native Ledger balance trước khi Archive, có `restoreAccount()`; SQLite migration có trigger chặn Archive khi balance khác 0, chặn insert journal line vào archived Account và chặn post draft tham chiếu archived Account.
 - **Done:** Accounts UI hỗ trợ cập nhật Asset subtype và Restore; Categories UI hỗ trợ đổi parent kèm validation chống cycle/kind mismatch.
-- **Done:** Account create/list/rename/update metadata/archive; ASSET subtype được validate ở Application và database migration.
+- **Done:** Account create/list/rename/update metadata/archive/restore; ASSET subtype được validate ở Application và database migration.
 - **Done:** Income/Expense use cases dùng chung AccountingService; transfer, opening balance và reversal được phân loại theo transaction kind; reversal kế thừa Category.
 - **Done:** Loại bỏ archived-account settlement/adjustment/reversal exceptions khỏi Application, Domain, Repository, schema, UI và tests. Reversal của entry chạm archived Account bị từ chối cho đến khi restore tất cả Account liên quan.
 - **Done:** Dashboard query/service tổng hợp available balance, income, expense và net flow theo native currency; history query/service lọc occurredAt, Category và Account.
