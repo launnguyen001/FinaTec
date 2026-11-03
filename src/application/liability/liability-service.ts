@@ -712,6 +712,8 @@ export class LiabilityService {
   async reversePayment(paymentId: string, reason?: string | null): Promise<void> {
     const payment = await this.repository.findPaymentById(paymentId);
     if (!payment) throw new Error("Liability payment does not exist");
+    const liability = await this.requireLiability(payment.liabilityId);
+    if (liability.status === "ARCHIVED") throw new Error("Archived liabilities cannot receive payment reversals");
     const payments = await this.repository.listPayments(payment.liabilityId);
     if (await this.repository.findPaymentReversal(paymentId)) return;
     const laterPayments = payments.filter((item) => item.id !== paymentId && item.paidAt >= payment.paidAt);
