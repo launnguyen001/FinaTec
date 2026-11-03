@@ -208,6 +208,8 @@ export async function runLiabilityAcceptanceDiagnostic() {
       "Loan origination journal",
       initialCash.minorUnits === 100_000n &&
         initialLiability.differenceMinor === 0n &&
+        initialLiability.scheduleDifferenceMinor === 0n &&
+        initialLiability.paymentDifferenceMinor === 0n &&
         initialLiability.ledgerPrincipalMinor === 100_000n,
       "loan origination debited the receiving ASSET, credited the LIABILITY and balanced the subledger",
     );
@@ -416,8 +418,10 @@ export async function runLiabilityAcceptanceDiagnostic() {
     const finalReconciliation = await service.reconcile(loan.id);
     check(
       "Ledger/subledger reconciliation",
-      finalReconciliation.differenceMinor === 0n,
-      `recorded principal ${finalReconciliation.recordedPrincipalMinor} and posted LIABILITY balance ${finalReconciliation.ledgerPrincipalMinor} match`,
+      finalReconciliation.differenceMinor === 0n &&
+        finalReconciliation.scheduleDifferenceMinor === 0n &&
+        finalReconciliation.paymentDifferenceMinor === 0n,
+      `ledger difference ${finalReconciliation.differenceMinor}, schedule difference ${finalReconciliation.scheduleDifferenceMinor}, payment-history difference ${finalReconciliation.paymentDifferenceMinor}`,
     );
     check(
       "SQLCipher encrypted acceptance database",
