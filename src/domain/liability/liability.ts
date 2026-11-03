@@ -53,6 +53,7 @@ export interface LiabilityPayment {
   fxRateNumerator: string;
   fxRateDenominator: string;
   replacesPaymentId: string | null;
+  postingOrder: number;
   idempotencyKey: string;
   paidAt: string;
   principalPaidMinor: bigint;
