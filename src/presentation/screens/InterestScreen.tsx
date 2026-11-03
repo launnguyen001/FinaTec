@@ -213,6 +213,7 @@ export function InterestScreen() {
         maturityDate: maturityDate || null,
       });
       setSelectedPlanId(plan.id);
+      setKind(compounding === "SIMPLE" ? "PAYOUT" : "CAPITALIZATION");
       setName("");
       setMessage("Đã tạo InterestPlan.");
       await load();
