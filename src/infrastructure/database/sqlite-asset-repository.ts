@@ -77,6 +77,7 @@ export class SqliteAssetRepository {
         throw new Error("Purchase lot and transaction facts are inconsistent");
       }
 
+      if (this.hasExistingAssetPosting(tx, posting)) return { created: false };
       this.validateAssetAccounts(tx, transaction);
       if (!this.insertPostedJournal(tx, posting)) return { created: false };
       tx.insert(assetLots).values(lot).run();
@@ -98,10 +99,10 @@ export class SqliteAssetRepository {
       if (transaction.journalEntryId !== posting.entry.id) {
         throw new Error("Sale transaction must reference its posted Journal Entry");
       }
-      this.validateAssetAccounts(tx, transaction);
       if (this.hasExistingAssetPosting(tx, posting)) {
         return { created: false, calculation: null };
       }
+      this.validateAssetAccounts(tx, transaction);
 
       const lot = tx.select().from(assetLots).where(eq(assetLots.id, transaction.lotId)).get();
       if (!lot || lot.assetId !== transaction.assetId || lot.currencyCode !== transaction.currencyCode) {
