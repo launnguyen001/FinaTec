@@ -18,6 +18,7 @@ export interface CreateLiabilityRecord {
 export interface LiabilityRepository {
   createLiability(input: CreateLiabilityRecord): Promise<void>;
   findById(id: string): Promise<Liability | null>;
+  findPaymentById(id: string): Promise<LiabilityPayment | null>;
   list(includeArchived?: boolean): Promise<Liability[]>;
   listInstallments(liabilityId: string): Promise<LiabilityInstallment[]>;
   listPayments(liabilityId: string): Promise<LiabilityPayment[]>;
