@@ -2,6 +2,7 @@ import { Currency } from "../../domain/ledger/currency";
 import { calculateAccountBalance } from "../../domain/ledger/posting";
 import type { LedgerRepository } from "../../domain/ledger/repository";
 import {
+  addAccrualFractions,
   calculateSimpleInterest,
   countActualDays,
   roundHalfUp,
@@ -331,6 +332,167 @@ export class InterestService {
       postedAt: timestamp,
       amountMinor,
     });
+  }
+
+  /**
+   * Runs deterministic foreground catch-up. Periods are processed in order;
+   * each successful capitalization is committed before the next period reads
+   * its principal from Ledger. Missed sub-minor-unit periods are accumulated
+   * as exact fractions and posted once the combined amount reaches one minor
+   * unit, avoiding daily/monthly rounding drift.
+   */
+  async catchUp(
+    planId: string,
+    asOfDate: string,
+    kind: InterestAccrualKind,
+  ): Promise<InterestAccrual[]> {
+    const plan = await this.requirePlan(planId);
+    if (plan.status !== "ACTIVE") return [];
+    if (kind === "CAPITALIZATION" && plan.compounding !== "AFTER_CAPITALIZATION") {
+      throw new Error("Simple-interest plans cannot capitalize interest");
+    }
+    if (kind === "PAYOUT" && !plan.payoutAccountId) {
+      throw new Error("This plan has no payout destination account");
+    }
+    if (asOfDate <= plan.startDate) return [];
+    countActualDays(plan.startDate, asOfDate);
+
+    const completed: InterestAccrual[] = [];
+    let existing = await this.repository.listAccruals(planId);
+    for (const pending of existing.filter((item) => item.status === "ACCRUED")) {
+      completed.push(await this.postAccrual(pending.id));
+    }
+    existing = await this.repository.listAccruals(planId);
+    const settled = existing
+      .filter((item) => item.status === "POSTED" || item.status === "PAID")
+      .sort((a, b) => a.periodEnd.localeCompare(b.periodEnd));
+    let periodStart = settled.at(-1)?.periodEnd ?? plan.startDate;
+    if (plan.maturityDate && periodStart >= plan.maturityDate) return completed;
+
+    if (plan.postingFrequency === "AT_MATURITY") {
+      const maturity = plan.maturityDate;
+      if (!maturity || asOfDate < maturity) return completed;
+      const accrual = await this.accruePeriod({
+        planId,
+        periodStart,
+        periodEnd: maturity,
+        kind,
+      });
+      if (accrual.accrual) {
+        completed.push(await this.postAccrual(accrual.accrual.id));
+      }
+      return completed;
+    }
+
+    let monthOffset = 1;
+    while (this.addMonthsFromAnchor(plan.startDate, monthOffset) <= periodStart) {
+      monthOffset += 1;
+      if (monthOffset > 1200) throw new Error("Interest plan period history exceeds the supported range");
+    }
+
+    let carryStart = periodStart;
+    let carryPrincipal = 0n;
+    let carryNumerator = 0n;
+    const denominator = 365_000_000n;
+
+    while (true) {
+      let periodEnd = this.addMonthsFromAnchor(plan.startDate, monthOffset);
+      if (plan.maturityDate && periodEnd > plan.maturityDate) {
+        periodEnd = plan.maturityDate;
+      }
+      if (periodEnd > asOfDate || periodEnd <= periodStart) break;
+
+      const principalMinor = await this.readPrincipalBalance(plan);
+      const calculation = calculateSimpleInterest({
+        principalMinor,
+        annualRatePpm: plan.annualRatePpm,
+        startDate: periodStart,
+        endDate: periodEnd,
+      });
+      if (carryNumerator === 0n) {
+        carryStart = periodStart;
+        carryPrincipal = principalMinor;
+      } else if (carryPrincipal !== principalMinor) {
+        throw new Error("Principal changed while fractional interest was carried; reconcile the principal change before catch-up");
+      }
+      carryNumerator += calculation.numerator;
+      const rounded = roundHalfUp(carryNumerator, denominator);
+
+      if (rounded > 0n) {
+        const accrual = await this.persistAccrual({
+          plan,
+          periodStart: carryStart,
+          periodEnd,
+          kind,
+          principalMinor: carryPrincipal,
+          numerator: carryNumerator,
+          denominator,
+        });
+        completed.push(await this.postAccrual(accrual.id));
+        carryNumerator = 0n;
+        carryPrincipal = 0n;
+      }
+
+      periodStart = periodEnd;
+      monthOffset += 1;
+      if (plan.maturityDate && periodStart >= plan.maturityDate) break;
+    }
+    return completed;
+  }
+
+  private async persistAccrual(input: {
+    plan: InterestPlan;
+    periodStart: string;
+    periodEnd: string;
+    kind: InterestAccrualKind;
+    principalMinor: bigint;
+    numerator: bigint;
+    denominator: bigint;
+  }): Promise<InterestAccrual> {
+    const idempotencyKey = [
+      "interest",
+      input.plan.id,
+      input.periodStart,
+      input.periodEnd,
+      input.kind,
+    ].join(":");
+    const existing = await this.repository.findAccrualByIdempotencyKey(idempotencyKey);
+    if (existing) return existing;
+    const accrual: InterestAccrual = {
+      id: this.options.createId(),
+      planId: input.plan.id,
+      periodStart: input.periodStart,
+      periodEnd: input.periodEnd,
+      principalMinor: input.principalMinor,
+      accruedNumerator: input.numerator,
+      accruedDenominator: input.denominator,
+      amountMinor: 0n,
+      status: "ACCRUED",
+      accrualKind: input.kind,
+      journalEntryId: null,
+      idempotencyKey,
+      createdAt: this.now(),
+      postedAt: null,
+      paidAt: null,
+    };
+    try {
+      await this.repository.createAccrual(accrual);
+      return accrual;
+    } catch (error) {
+      const raced = await this.repository.findAccrualByIdempotencyKey(idempotencyKey);
+      if (raced) return raced;
+      throw error;
+    }
+  }
+
+  private addMonthsFromAnchor(anchor: string, months: number): string {
+    const [year, month, day] = anchor.split("-").map(Number);
+    const monthIndex = year * 12 + month - 1 + months;
+    const targetYear = Math.floor(monthIndex / 12);
+    const targetMonth = monthIndex % 12;
+    const lastDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+    const targetDay = Math.min(day, lastDay);
+    return `${targetYear.toString().padStart(4, "0")}-${(targetMonth + 1).toString().padStart(2, "0")}-${targetDay.toString().padStart(2, "0")}`;
   }
 
   private async readPrincipalBalance(plan: InterestPlan): Promise<bigint> {
