@@ -428,12 +428,9 @@ export class LiabilityService {
         existing.scheduleId === (input.scheduleId ?? null) &&
         existing.replacesPaymentId === (input.replacesPaymentId ?? null) &&
         (input.paidAt === undefined || existing.paidAt === input.paidAt) &&
-        (input.note === undefined ||
-          existing.note === (input.note?.trim() || null)) &&
-        ((input.fxRateNumerator === undefined &&
-          input.fxRateDenominator === undefined) ||
-          (existing.fxRateNumerator === input.fxRateNumerator &&
-            existing.fxRateDenominator === input.fxRateDenominator));
+        existing.note === (input.note?.trim() || null) &&
+        existing.fxRateNumerator === (input.fxRateNumerator ?? "1") &&
+        existing.fxRateDenominator === (input.fxRateDenominator ?? "1");
       if (!samePayload) {
         throw new Error(
           "Payment idempotency key was reused with a different payload",
