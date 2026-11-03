@@ -191,6 +191,7 @@ export class SqliteInterestRepository implements InterestRepository {
         .update(interestAccruals)
         .set({
           status: nextStatus,
+          amountMinor: toSqliteSafeInteger(input.amountMinor),
           journalEntryId: input.journalEntry.id,
           postedAt: input.postedAt,
           paidAt: nextStatus === "PAID" ? input.postedAt : null,
