@@ -5,6 +5,7 @@ import * as SQLite from "expo-sqlite";
 import { drizzle } from "drizzle-orm/expo-sqlite";
 import { migrate } from "drizzle-orm/expo-sqlite/migrator";
 
+import { AccountingService } from "../../application/ledger/accounting-service";
 import { InterestService } from "../../application/interest/interest-service";
 import { Currency } from "../../domain/ledger/currency";
 import { calculateAccountBalance } from "../../domain/ledger/posting";
@@ -58,7 +59,6 @@ export async function runInterestAcceptanceDiagnostic(): Promise<InterestAccepta
   const checks: InterestAcceptanceResult["checks"] = [];
   let client: SQLite.SQLiteDatabase | null = null;
   let cipherVersion = "unavailable";
-  let cleanup = "not completed";
   let currentTime = "2027-01-01T00:00:00.000Z";
   let sequence = 0;
   const now = () => currentTime;
@@ -145,10 +145,7 @@ export async function runInterestAcceptanceDiagnostic(): Promise<InterestAccepta
       await ledger.createAccount(account);
     }
 
-    const accounting = new (await import("../../application/ledger/accounting-service")).AccountingService(
-      ledger,
-      { createId, now },
-    );
+    const accounting = new AccountingService(ledger, { createId, now });
     await accounting.createOpeningBalance({
       idempotencyKey: `task05-${suffix}-opening-principal`,
       accountId: principal.id,
@@ -352,6 +349,5 @@ export async function runInterestAcceptanceDiagnostic(): Promise<InterestAccepta
     }
     if (file.exists) file.delete();
     await SecureStore.deleteItemAsync(secureStoreName);
-    cleanup = "isolated SQLCipher database and temporary SecureStore key cleaned up";
   }
 }
