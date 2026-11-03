@@ -13,6 +13,7 @@ import type {
   LiabilityInstallment,
   LiabilityPayment,
   LiabilityPaymentCommit,
+  LiabilityRateChange,
 } from "../../domain/liability/liability";
 import type {
   CreateLiabilityRecord,
@@ -29,6 +30,7 @@ import {
   liabilities,
   liabilityInstallments,
   liabilityPayments,
+  liabilityRateChanges,
 } from "./schema";
 
 type LiabilityTransaction = Parameters<
@@ -188,6 +190,61 @@ export class SqliteLiabilityRepository implements LiabilityRepository {
       .orderBy(asc(liabilityPayments.paidAt))
       .all();
     return rows.map(mapPayment);
+  }
+
+  async listRateChanges(liabilityId: string): Promise<LiabilityRateChange[]> {
+    const rows = await this.db
+      .select()
+      .from(liabilityRateChanges)
+      .where(eq(liabilityRateChanges.liabilityId, liabilityId))
+      .orderBy(asc(liabilityRateChanges.effectiveDate))
+      .all();
+    return rows.map((row) => ({ ...row, annualRatePpm: BigInt(row.annualRatePpm) }));
+  }
+
+  async addRateChange(
+    change: LiabilityRateChange,
+    installments: LiabilityInstallment[],
+  ): Promise<void> {
+    this.db.transaction((tx) => {
+      const liability = tx.select().from(liabilities)
+        .where(eq(liabilities.id, change.liabilityId)).get();
+      if (!liability || liability.status !== "ACTIVE") {
+        throw new Error("Only an ACTIVE liability can change APR");
+      }
+      const current = tx.select().from(liabilityRateChanges)
+        .where(eq(liabilityRateChanges.liabilityId, change.liabilityId)).all();
+      const latest = current
+        .filter((item) => item.effectiveDate <= change.effectiveDate)
+        .sort((a, b) => a.effectiveDate.localeCompare(b.effectiveDate))
+        .at(-1);
+      const currentApr = latest ? BigInt(latest.annualRatePpm) : BigInt(liability.annualRatePpm);
+      if (currentApr === change.annualRatePpm) {
+        throw new Error("New APR must differ from the currently effective APR");
+      }
+      const future = tx.select().from(liabilityInstallments)
+        .where(eq(liabilityInstallments.liabilityId, change.liabilityId)).all()
+        .filter((item) => item.dueDate >= change.effectiveDate && item.status !== "PAID" && item.status !== "CANCELLED");
+      if (future.length === 0) throw new Error("There is no future installment to apply the new APR");
+      if (future.some((item) => BigInt(item.principalPaidMinor) > 0n || BigInt(item.interestPaidMinor) > 0n)) {
+        throw new Error("APR change cannot rewrite an installment with recorded payments");
+      }
+      tx.insert(liabilityRateChanges).values({
+        ...change,
+        annualRatePpm: toSqliteSafeInteger(change.annualRatePpm),
+      }).run();
+      for (const item of future) {
+        const changed = tx.update(liabilityInstallments)
+          .set({ status: "CANCELLED", updatedAt: change.createdAt })
+          .where(eq(liabilityInstallments.id, item.id)).run();
+        if (changed.changes !== 1) throw new Error("Future installment changed during APR update");
+      }
+      if (installments.length) {
+        tx.insert(liabilityInstallments)
+          .values(installments.map((item) => this.installmentRow(item, change.createdAt)))
+          .run();
+      }
+    });
   }
 
   async commitPayment(
