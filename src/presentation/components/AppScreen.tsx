@@ -198,6 +198,14 @@ export function AppScreen() {
           </Link>
           {__DEV__ ? (
             <Link
+              href="/task06-liability-acceptance"
+              style={styles.navigationLink}
+            >
+              Task06 acceptance (DEV)
+            </Link>
+          ) : null}
+          {__DEV__ ? (
+            <Link
               href="/task05-interest-acceptance"
               style={styles.navigationLink}
             >
