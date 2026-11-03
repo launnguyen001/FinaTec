@@ -653,6 +653,7 @@ export class LiabilityService {
       fxRateNumerator,
       fxRateDenominator,
       replacesPaymentId: input.replacesPaymentId ?? null,
+      postingOrder: 0,
       idempotencyKey: key,
       paidAt,
       principalPaidMinor: principalPaid,
@@ -716,7 +717,7 @@ export class LiabilityService {
     if (liability.status === "ARCHIVED") throw new Error("Archived liabilities cannot receive payment reversals");
     const payments = await this.repository.listPayments(payment.liabilityId);
     if (await this.repository.findPaymentReversal(paymentId)) return;
-    const laterPayments = payments.filter((item) => item.id !== paymentId && item.paidAt >= payment.paidAt);
+    const laterPayments = payments.filter((item) => item.id !== paymentId && item.postingOrder > payment.postingOrder);
     for (const later of laterPayments) {
       if (!(await this.repository.findPaymentReversal(later.id))) {
         throw new Error("Reverse payments in reverse chronological order; a later payment is still active");
