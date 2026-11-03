@@ -35,19 +35,26 @@ export function normalBalanceOf(accountType: AccountType): NormalBalance {
 }
 
 /**
- * Validates a complete draft before it can transition to POSTED.
- * Each line's base amount is recomputed from its exact FX snapshot.
+ * Validates entry metadata and every line before the entry is persisted as
+ * POSTED. Each line's base amount is recomputed from its exact FX snapshot;
+ * a caller-supplied conversion is never trusted.
  */
-export function validateDraftForPosting(
+export function validateJournalEntry(
   entry: JournalEntry,
   lines: readonly JournalLine[],
   context: PostingContext,
 ): void {
-  if (entry.status !== "DRAFT" || entry.postedAt !== null) {
-    throw new Error("Only a DRAFT journal entry can be posted");
-  }
   if (!entry.id.trim() || !entry.baseCurrencyCode.trim()) {
     throw new Error("Journal entry identity and base currency are required");
+  }
+  if (entry.status !== "DRAFT" && entry.status !== "POSTED") {
+    throw new Error("Journal entry status must be DRAFT or POSTED");
+  }
+  if (
+    (entry.status === "DRAFT" && entry.postedAt !== null) ||
+    (entry.status === "POSTED" && entry.postedAt === null)
+  ) {
+    throw new Error("Journal entry posted timestamp does not match its status");
   }
   if (lines.length < 2) {
     throw new Error("A journal entry must contain at least two lines");
@@ -63,6 +70,7 @@ export function validateDraftForPosting(
   );
 
   const lineNumbers = new Set<number>();
+  const lineIds = new Set<string>();
   let debitTotal = 0n;
   let creditTotal = 0n;
   let hasDebit = false;
@@ -70,8 +78,14 @@ export function validateDraftForPosting(
 
   for (const line of lines) {
     if (line.entryId !== entry.id) {
-      throw new Error("Every journal line must belong to the entry being posted");
+      throw new Error(
+        "Every journal line must belong to the entry being posted",
+      );
     }
+    if (!line.id.trim() || lineIds.has(line.id)) {
+      throw new Error("Journal line identities must be non-empty and unique");
+    }
+    lineIds.add(line.id);
     if (
       !Number.isSafeInteger(line.lineNumber) ||
       line.lineNumber <= 0 ||
@@ -93,7 +107,9 @@ export function validateDraftForPosting(
       throw new Error(`Account does not exist: ${line.accountId}`);
     }
     if (account.isArchived) {
-      throw new Error(`Archived account cannot receive a new posting: ${line.accountId}`);
+      throw new Error(
+        `Archived account cannot receive a new posting: ${line.accountId}`,
+      );
     }
     if (account.currencyCode !== line.currencyCode) {
       throw new Error("Journal line currency must match its account currency");
@@ -101,28 +117,28 @@ export function validateDraftForPosting(
 
     const nativeCurrencyRecord = context.currencies.get(line.currencyCode);
     if (!nativeCurrencyRecord?.isActive) {
-      throw new Error(`Line currency is missing or inactive: ${line.currencyCode}`);
+      throw new Error(
+        `Line currency is missing or inactive: ${line.currencyCode}`,
+      );
     }
     const nativeCurrency = new Currency(
       nativeCurrencyRecord.code,
       nativeCurrencyRecord.minorUnit,
     );
 
-    if (line.currencyCode === entry.baseCurrencyCode) {
-      if (
-        line.fxRateNumerator !== "1" ||
-        line.fxRateDenominator !== "1" ||
-        line.baseAmountMinor !== line.amountMinor
-      ) {
-        throw new Error("Base-currency lines must use FX 1/1 and preserve the amount");
-      }
-    }
-
     if (
       !/^[1-9]\d*$/.test(line.fxRateNumerator) ||
       !/^[1-9]\d*$/.test(line.fxRateDenominator)
     ) {
-      throw new Error("FX snapshot must contain positive integer numerator and denominator");
+      throw new Error(
+        "FX snapshot must contain positive integer numerator and denominator",
+      );
+    }
+
+    if (line.currencyCode === entry.baseCurrencyCode) {
+      if (line.fxRateNumerator !== "1" || line.fxRateDenominator !== "1") {
+        throw new Error("Base-currency lines must use FX 1/1");
+      }
     }
 
     const rate = new FxRate(
@@ -138,7 +154,9 @@ export function validateDraftForPosting(
       throw new Error("Journal line rounds to zero in the entry base currency");
     }
     if (calculatedBaseAmount.minorUnits !== line.baseAmountMinor) {
-      throw new Error("Stored base amount does not match the FX snapshot calculation");
+      throw new Error(
+        "Stored base amount does not match the FX snapshot calculation",
+      );
     }
 
     if (line.side === "DEBIT") {
@@ -151,13 +169,31 @@ export function validateDraftForPosting(
   }
 
   if (!hasDebit || !hasCredit) {
-    throw new Error("A journal entry must contain at least one DEBIT and one CREDIT");
+    throw new Error(
+      "A journal entry must contain at least one DEBIT and one CREDIT",
+    );
   }
   if (debitTotal !== creditTotal) {
     throw new Error(
       `Journal entry is not balanced in ${entry.baseCurrencyCode}: debit=${debitTotal}, credit=${creditTotal}`,
     );
   }
+}
+
+/**
+ * Validates a complete draft before it can transition to POSTED.
+ * This is the draft lifecycle guard; balanced posted entries may also be
+ * checked directly with {@link validateJournalEntry}.
+ */
+export function validateDraftForPosting(
+  entry: JournalEntry,
+  lines: readonly JournalLine[],
+  context: PostingContext,
+): void {
+  if (entry.status !== "DRAFT" || entry.postedAt !== null) {
+    throw new Error("Only a DRAFT journal entry can be posted");
+  }
+  validateJournalEntry(entry, lines, context);
 }
 
 /**
@@ -178,10 +214,14 @@ export function calculateAccountBalance(
   for (const line of postedLines) {
     if (line.accountId !== account.id) continue;
     if (line.currencyCode !== account.currencyCode) {
-      throw new Error("Account balance contains a line in a different currency");
+      throw new Error(
+        "Account balance contains a line in a different currency",
+      );
     }
     if (line.amountMinor <= 0n) {
-      throw new Error("Account balance cannot include a non-positive journal line");
+      throw new Error(
+        "Account balance cannot include a non-positive journal line",
+      );
     }
     balance += line.side === normalSide ? line.amountMinor : -line.amountMinor;
   }

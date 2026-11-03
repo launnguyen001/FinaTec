@@ -2,7 +2,7 @@
 
 - **Giai đoạn:** 1 — Kiến trúc cơ sở dữ liệu & Accounting Engine
 - **Ưu tiên:** P0 / đường găng
-- **Trạng thái:** IN PROGRESS
+- **Trạng thái:** DONE — local verification and Android acceptance passed
 - **Phụ thuộc:** TASK-00, TASK-01 (TASK-01 merged into `main`)
 - **Nhánh thực hiện:** `task/02-accounting-engine`
 
@@ -42,12 +42,14 @@ Xây dựng domain kế toán độc lập với UI, có khả năng kiểm tra,
 ## 6. Kế hoạch triển khai
 1. [x] Định nghĩa normal balance và pure validator cho draft posting.
 2. [x] Tính số dư account từ posted lines theo native currency.
-3. [ ] Thêm Application use cases và repository contract cho post/reversal.
-4. [ ] Triển khai transaction nguyên tử và idempotency.
-5. [ ] Triển khai opening balance và internal transfer.
-6. [ ] Triển khai reversal/adjustment và truy vết.
-7. [ ] Bổ sung unit/integration tests cho invariant kế toán.
-8. [ ] Chạy lint, format, typecheck, Jest và Android acceptance.
+3. [x] Thêm Application use cases và repository contract cho post/reversal.
+4. [x] Triển khai transaction nguyên tử và idempotency.
+5. [x] Triển khai opening balance và internal transfer.
+6. [x] Triển khai reversal/adjustment và truy vết.
+7. [x] Bổ sung unit/integration tests cho invariant kế toán.
+8. [x] Chạy lint, format, typecheck, Jest và Android acceptance.
+   - [x] Lint, format, typecheck, Jest.
+   - [x] Android acceptance trên Huawei LYA-L29 / Android 10, SQLCipher 4.17.0 community.
 
 ## 7. Kế hoạch kiểm thử
 - Bút toán cân bằng và không cân bằng.
@@ -60,18 +62,24 @@ Xây dựng domain kế toán độc lập với UI, có khả năng kiểm tra,
 - Retry/idempotency và race khi gửi cùng command.
 
 ## 8. Tiêu chí nghiệm thu
-- [ ] Domain không phụ thuộc React Native hoặc SQLite.
-- [ ] Không thể ghi sổ bút toán không hợp lệ hoặc không cân bằng.
-- [ ] Ghi sổ và reversal có tính nguyên tử.
-- [ ] Lịch sử đã ghi sổ bất biến và truy vết được.
-- [ ] Các thao tác số dư đầu kỳ và chuyển tiền vượt qua kiểm thử.
-- [ ] Số dư tài khoản được tính từ ledger.
-- [ ] Bộ kiểm thử bất biến kế toán thành công.
+- [x] Domain không phụ thuộc React Native hoặc SQLite.
+- [x] Không thể ghi sổ bút toán không hợp lệ hoặc không cân bằng.
+- [x] Ghi sổ và reversal có tính nguyên tử.
+- [x] Lịch sử đã ghi sổ bất biến và truy vết được.
+- [x] Các thao tác số dư đầu kỳ và chuyển tiền vượt qua kiểm thử.
+- [x] Số dư tài khoản được tính từ ledger.
+- [x] Bộ kiểm thử bất biến kế toán thành công.
 
 ## 9. Nhật ký tiến độ
 - **Done:** TASK-01 merged to `main` at `f542c42` (PR #3).
 - **Done:** pure posting validator, FX snapshot verification, normal-balance rules and native-currency balance calculation added on this branch.
-- **Doing:** Application use cases and atomic repository posting.
-- **Next:** implement post transaction and idempotent command handling.
+- **Done:** repository contract for idempotency, posted-lines query, atomic draft posting and atomic posted-entry commit.
+- **Done:** `AccountingService` use cases for draft/post, opening balance, internal transfer, reversal and balance lookup.
+- **Done:** SQLite adapter revalidates inside the write transaction; posted-history triggers remain the final immutability boundary.
+- **Done:** 31 Jest tests pass across posting, values, draft lifecycle, opening balance, transfers, reversal, idempotency, rollback and router checks.
+- **Done:** Android acceptance passed on Huawei LYA-L29 / Android 10, SQLCipher 4.17.0 community via `src/app/task02-accounting-acceptance.tsx`. All 9 diagnostic checks passed: fixture, opening balance, idempotent retry, internal transfer, reversal, single-reversal guard, draft lifecycle, unbalanced rejection and cross-currency transfer.
+- **Verification:** Expo lint, Prettier, TypeScript and Expo Doctor (20/20) pass. Android export succeeds.
+- **Decision:** no schema migration. TASK-01 already provides idempotency, reversal uniqueness and posted-history triggers.
+- **Decision:** cross-currency transfers require an explicit destination amount; an implicit rounding policy between two sides was rejected.
 - **Known risks:** SQLite INTEGER persistence is bounded by JavaScript safe-integer range; FX conversion is rounded per line before base-currency balancing.
-- **Verification:** unit tests authored; execution pending.
+- **Docs:** `AgentDocs/accounting-rules.md`.
