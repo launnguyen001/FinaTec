@@ -35,7 +35,9 @@ export class AccountService {
     const subtype = input.subtype ?? null;
     const isInvestment = input.isInvestment ?? false;
     if (isInvestment && input.type !== "ASSET") {
-      throw new Error("Only ASSET accounts can be marked as investment accounts");
+      throw new Error(
+        "Only ASSET accounts can be marked as investment accounts",
+      );
     }
     if (input.type === "ASSET" && !subtype)
       throw new Error("ASSET account subtype is required");
