@@ -7,6 +7,8 @@ import type {
   LedgerRepository,
   PostingCommitInput,
   PostingResult,
+  ReplacementCommitInput,
+  ReplacementResult,
 } from "../../domain/ledger/repository";
 
 /**
@@ -65,6 +67,7 @@ export class InMemoryLedgerRepository implements LedgerRepository {
     if (input.lines.length === 0) {
       throw new Error("A draft journal entry must contain at least one line");
     }
+    this.assertNoArchivedAccounts(input.lines);
     this.assertIdempotencyUnused(input.entry);
     this.entries.set(input.entry.id, input.entry);
     this.linesByEntry.set(input.entry.id, [...input.lines]);
@@ -88,6 +91,14 @@ export class InMemoryLedgerRepository implements LedgerRepository {
     return (
       [...this.entries.values()].find(
         (entry) => entry.reversalOfId === entryId,
+      ) ?? null
+    );
+  }
+
+  async findReplacementOfEntry(entryId: string): Promise<JournalEntry | null> {
+    return (
+      [...this.entries.values()].find(
+        (entry) => entry.replacementOfId === entryId,
       ) ?? null
     );
   }
@@ -128,9 +139,21 @@ export class InMemoryLedgerRepository implements LedgerRepository {
         "A journal entry must contain at least two lines before posting",
       );
     }
+    this.assertNoArchivedAccounts(lines);
     const posted: JournalEntry = { ...entry, status: "POSTED", postedAt };
     this.entries.set(entry.id, posted);
     return { entry: posted, lines, created: true };
+  }
+
+  private assertNoArchivedAccounts(lines: readonly JournalLine[]): void {
+    const archivedLine = lines.find(
+      (line) => this.accounts.get(line.accountId)?.isArchived,
+    );
+    if (archivedLine) {
+      throw new Error(
+        `Archived account cannot receive a new posting: ${archivedLine.accountId}`,
+      );
+    }
   }
 
   async commitPostedEntry(input: PostingCommitInput): Promise<PostingResult> {
@@ -140,6 +163,40 @@ export class InMemoryLedgerRepository implements LedgerRepository {
       this.failNextCommit = null;
       throw failure;
     }
+    return this.persistPostedEntry(input);
+  }
+
+  async commitReplacement(
+    input: ReplacementCommitInput,
+  ): Promise<ReplacementResult> {
+    this.commitCount += 1;
+    if (this.failNextCommit) {
+      const failure = this.failNextCommit;
+      this.failNextCommit = null;
+      throw failure;
+    }
+
+    const entriesSnapshot = new Map(this.entries);
+    const linesSnapshot = new Map(
+      [...this.linesByEntry].map(([entryId, lines]) => [entryId, [...lines]]),
+    );
+    try {
+      return {
+        reversal: this.persistPostedEntry(input.reversal),
+        replacement: this.persistPostedEntry(input.replacement),
+      };
+    } catch (error) {
+      this.entries.clear();
+      for (const [entryId, entry] of entriesSnapshot)
+        this.entries.set(entryId, entry);
+      this.linesByEntry.clear();
+      for (const [entryId, lines] of linesSnapshot)
+        this.linesByEntry.set(entryId, lines);
+      throw error;
+    }
+  }
+
+  private persistPostedEntry(input: PostingCommitInput): PostingResult {
     if (input.entry.status !== "POSTED" || input.entry.postedAt === null) {
       throw new Error("Repository accepts posted entries only");
     }
@@ -147,12 +204,25 @@ export class InMemoryLedgerRepository implements LedgerRepository {
       throw new Error("A posted journal entry must contain at least two lines");
     }
 
+    this.assertNoArchivedAccounts(input.lines);
     this.assertIdempotencyUnused(input.entry);
     if (input.entry.reversalOfId !== null) {
-      const reversal = await this.findReversalOfEntry(input.entry.reversalOfId);
+      const reversal = [...this.entries.values()].find(
+        (entry) => entry.reversalOfId === input.entry.reversalOfId,
+      );
       if (reversal) {
         throw new Error(
           `Journal entry has already been reversed: ${input.entry.reversalOfId}`,
+        );
+      }
+    }
+    if (input.entry.replacementOfId !== null) {
+      const replacement = [...this.entries.values()].find(
+        (entry) => entry.replacementOfId === input.entry.replacementOfId,
+      );
+      if (replacement) {
+        throw new Error(
+          `Journal entry already has a replacement: ${input.entry.replacementOfId}`,
         );
       }
     }

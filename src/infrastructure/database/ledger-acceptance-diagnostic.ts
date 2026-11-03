@@ -131,6 +131,7 @@ export async function runLedgerAcceptanceDiagnostic(): Promise<AcceptanceResult>
       baseCurrencyCode: "VND",
       idempotencyKey: null,
       reversalOfId: null,
+      replacementOfId: null,
       createdAt: timestamp,
       postedAt: null,
     };

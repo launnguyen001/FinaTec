@@ -18,10 +18,13 @@ import type {
   LedgerRepository,
   PostingCommitInput,
   PostingResult,
+  ReplacementCommitInput,
+  ReplacementResult,
 } from "../../domain/ledger/repository";
 import type { LedgerDatabase } from "./database";
 import {
   accounts,
+  categories,
   currencies,
   journalEntries,
   journalLines,
@@ -89,7 +92,13 @@ export class SqliteLedgerRepository implements LedgerRepository {
       // Drizzle's Expo SQLite session is synchronous: an async callback would
       // return its Promise before the first await and commit the transaction
       // early. Use synchronous query execution so both writes remain atomic.
-      tx.insert(journalEntries).values(input.entry).run();
+      tx.insert(journalEntries)
+        .values({
+          ...input.entry,
+          transactionKind: input.entry.transactionKind ?? "LEGACY",
+          categoryId: input.entry.categoryId ?? null,
+        })
+        .run();
       tx.insert(journalLines).values(rows).run();
     });
   }
@@ -119,6 +128,15 @@ export class SqliteLedgerRepository implements LedgerRepository {
       .select()
       .from(journalEntries)
       .where(eq(journalEntries.reversalOfId, entryId))
+      .get();
+    return row ?? null;
+  }
+
+  async findReplacementOfEntry(entryId: string): Promise<JournalEntry | null> {
+    const row = await this.db
+      .select()
+      .from(journalEntries)
+      .where(eq(journalEntries.replacementOfId, entryId))
       .get();
     return row ?? null;
   }
@@ -185,6 +203,24 @@ export class SqliteLedgerRepository implements LedgerRepository {
   }
 
   async commitPostedEntry(input: PostingCommitInput): Promise<PostingResult> {
+    return this.db.transaction((tx) =>
+      this.commitPostedEntryInTransaction(tx, input),
+    );
+  }
+
+  async commitReplacement(
+    input: ReplacementCommitInput,
+  ): Promise<ReplacementResult> {
+    return this.db.transaction((tx) => ({
+      reversal: this.commitPostedEntryInTransaction(tx, input.reversal),
+      replacement: this.commitPostedEntryInTransaction(tx, input.replacement),
+    }));
+  }
+
+  private commitPostedEntryInTransaction(
+    tx: LedgerTransaction,
+    input: PostingCommitInput,
+  ): PostingResult {
     if (input.entry.status !== "POSTED" || input.entry.postedAt === null) {
       throw new Error("Repository accepts posted entries only");
     }
@@ -197,69 +233,79 @@ export class SqliteLedgerRepository implements LedgerRepository {
       ...input.entry,
       status: "DRAFT" as const,
       postedAt: null,
+      transactionKind: input.entry.transactionKind ?? "LEGACY",
+      categoryId: input.entry.categoryId ?? null,
+      replacementOfId: input.entry.replacementOfId ?? null,
     };
 
-    return this.db.transaction((tx) => {
-      if (input.entry.idempotencyKey !== null) {
-        const existing = tx
-          .select()
-          .from(journalEntries)
-          .where(eq(journalEntries.idempotencyKey, input.entry.idempotencyKey))
-          .get();
-        if (existing) {
-          if (existing.status !== "POSTED") {
-            throw new Error(
-              "Idempotency key is already used by a non-posted journal entry",
-            );
-          }
-          const existingLines = tx
-            .select()
-            .from(journalLines)
-            .where(eq(journalLines.entryId, existing.id))
-            .orderBy(asc(journalLines.lineNumber))
-            .all();
-          return {
-            entry: existing,
-            lines: this.toDomainLines(existingLines),
-            created: false,
-          };
-        }
-      }
-
-      if (input.entry.reversalOfId !== null) {
-        const existingReversal = tx
-          .select()
-          .from(journalEntries)
-          .where(eq(journalEntries.reversalOfId, input.entry.reversalOfId))
-          .get();
-        if (existingReversal) {
+    if (input.entry.idempotencyKey !== null) {
+      const existing = tx
+        .select()
+        .from(journalEntries)
+        .where(eq(journalEntries.idempotencyKey, input.entry.idempotencyKey))
+        .get();
+      if (existing) {
+        if (existing.status !== "POSTED") {
           throw new Error(
-            `Journal entry has already been reversed: ${input.entry.reversalOfId}`,
+            "Idempotency key is already used by a non-posted journal entry",
           );
         }
+        const existingLines = tx
+          .select()
+          .from(journalLines)
+          .where(eq(journalLines.entryId, existing.id))
+          .orderBy(asc(journalLines.lineNumber))
+          .all();
+        return {
+          entry: existing,
+          lines: this.toDomainLines(existingLines),
+          created: false,
+        };
       }
+    }
 
-      validateJournalEntry(
-        input.entry,
-        input.lines,
-        this.readPostingContext(tx),
-      );
-
-      // The schema forbids adding lines to an entry whose status is already
-      // POSTED. Insert the entry as DRAFT, insert all lines, then post it in
-      // the same transaction. Any failure rolls back the whole command.
-      tx.insert(journalEntries).values(draftRow).run();
-      tx.insert(journalLines).values(rows).run();
-      const updated = tx
-        .update(journalEntries)
-        .set({ status: "POSTED", postedAt })
-        .where(eq(journalEntries.id, input.entry.id))
-        .run();
-      if (updated.changes !== 1) {
-        throw new Error(`Journal entry could not be posted: ${input.entry.id}`);
+    if (input.entry.reversalOfId !== null) {
+      const existingReversal = tx
+        .select()
+        .from(journalEntries)
+        .where(eq(journalEntries.reversalOfId, input.entry.reversalOfId))
+        .get();
+      if (existingReversal) {
+        throw new Error(
+          `Journal entry has already been reversed: ${input.entry.reversalOfId}`,
+        );
       }
-      return { entry: input.entry, lines: input.lines, created: true };
-    });
+    }
+
+    if (input.entry.replacementOfId !== null) {
+      const existingReplacement = tx
+        .select()
+        .from(journalEntries)
+        .where(eq(journalEntries.replacementOfId, input.entry.replacementOfId))
+        .get();
+      if (existingReplacement) {
+        throw new Error(
+          `Journal entry already has a replacement: ${input.entry.replacementOfId}`,
+        );
+      }
+    }
+
+    validateJournalEntry(input.entry, input.lines, this.readPostingContext(tx));
+
+    // The schema forbids adding lines to an entry whose status is already
+    // POSTED. Insert the entry as DRAFT, insert all lines, then post it in
+    // the same transaction. Any failure rolls back the whole command.
+    tx.insert(journalEntries).values(draftRow).run();
+    tx.insert(journalLines).values(rows).run();
+    const updated = tx
+      .update(journalEntries)
+      .set({ status: "POSTED", postedAt })
+      .where(eq(journalEntries.id, input.entry.id))
+      .run();
+    if (updated.changes !== 1) {
+      throw new Error(`Journal entry could not be posted: ${input.entry.id}`);
+    }
+    return { entry: input.entry, lines: input.lines, created: true };
   }
 
   async listJournalLines(entryId: string): Promise<JournalLine[]> {
@@ -297,6 +343,7 @@ export class SqliteLedgerRepository implements LedgerRepository {
   private readPostingContext(tx: LedgerTransaction): PostingContext {
     const accountRows = tx.select().from(accounts).all();
     const currencyRows = tx.select().from(currencies).all();
+    const categoryRows = tx.select().from(categories).all();
     return {
       accounts: new Map(accountRows.map((account) => [account.id, account])),
       currencies: new Map(
@@ -306,6 +353,16 @@ export class SqliteLedgerRepository implements LedgerRepository {
             code: currency.code,
             minorUnit: currency.minorUnit,
             isActive: currency.isActive,
+          },
+        ]),
+      ),
+      categories: new Map(
+        categoryRows.map((category) => [
+          category.id,
+          {
+            id: category.id,
+            kind: category.kind,
+            isArchived: category.isArchived,
           },
         ]),
       ),

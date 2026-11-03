@@ -2,6 +2,15 @@ export type AccountType =
   "ASSET" | "LIABILITY" | "EQUITY" | "INCOME" | "EXPENSE";
 export type JournalStatus = "DRAFT" | "POSTED";
 export type JournalSide = "DEBIT" | "CREDIT";
+export type AccountSubtype = "CASH" | "BANK" | "EWALLET" | "SAVINGS" | "OTHER";
+export type TransactionKind =
+  | "INCOME"
+  | "EXPENSE"
+  | "TRANSFER"
+  | "OPENING_BALANCE"
+  | "ADJUSTMENT"
+  | "REVERSAL"
+  | "LEGACY";
 
 export interface CurrencyRecord {
   code: string;
@@ -18,6 +27,7 @@ export interface Account {
   currencyCode: string;
   isSystem: boolean;
   isArchived: boolean;
+  subtype?: AccountSubtype | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -30,6 +40,13 @@ export interface JournalEntry {
   baseCurrencyCode: string;
   idempotencyKey: string | null;
   reversalOfId: string | null;
+  /**
+   * Original entry this posting replaces. A replacement is always a new
+   * POSTED entry; the original is reversed in the same command.
+   */
+  replacementOfId: string | null;
+  transactionKind?: TransactionKind;
+  categoryId?: string | null;
   createdAt: string;
   postedAt: string | null;
 }
@@ -60,11 +77,22 @@ export interface PostingCommitInput {
   lines: JournalLine[];
 }
 
+/** Atomic reversal-plus-replacement command: both entries or neither. */
+export interface ReplacementCommitInput {
+  reversal: PostingCommitInput;
+  replacement: PostingCommitInput;
+}
+
 export interface PostingResult {
   entry: JournalEntry;
   lines: JournalLine[];
   /** False when an idempotent retry returned an already persisted result. */
   created: boolean;
+}
+
+export interface ReplacementResult {
+  reversal: PostingResult;
+  replacement: PostingResult;
 }
 
 /**
@@ -87,10 +115,12 @@ export interface LedgerRepository {
     idempotencyKey: string,
   ): Promise<JournalEntry | null>;
   findReversalOfEntry(entryId: string): Promise<JournalEntry | null>;
+  findReplacementOfEntry(entryId: string): Promise<JournalEntry | null>;
   listJournalLines(entryId: string): Promise<JournalLine[]>;
   listPostedJournalLinesForAccount(accountId: string): Promise<JournalLine[]>;
   postDraftEntry(entryId: string, postedAt: string): Promise<PostingResult>;
   commitPostedEntry(input: PostingCommitInput): Promise<PostingResult>;
+  commitReplacement(input: ReplacementCommitInput): Promise<ReplacementResult>;
   getBaseCurrencyCode(): Promise<string | null>;
   setBaseCurrencyCode(code: string, timestamp: string): Promise<void>;
 }

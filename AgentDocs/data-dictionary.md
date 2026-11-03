@@ -32,7 +32,7 @@ The row is absent until the user completes first-run currency setup.
 | type | TEXT | No | ASSET, LIABILITY, EQUITY, INCOME, EXPENSE |
 | currency_code | TEXT | No | Fixed currency; FK currencies.code |
 | is_system | INTEGER | No | Boolean; system account cannot be removed by normal UI |
-| is_archived | INTEGER | No | Boolean; archival preserves history |
+| is_archived | INTEGER | No | Boolean; Account can be archived only when the signed native-currency Ledger balance from POSTED lines is exactly zero; restore changes only this flag |
 | created_at | TEXT | No | Creation timestamp |
 | updated_at | TEXT | No | Last update timestamp |
 
@@ -70,3 +70,35 @@ The row is absent until the user completes first-run currency setup.
 ## Persistence limits
 
 The Domain `Money` value object uses `bigint`. Before writing to SQLite INTEGER through the JavaScript driver, the adapter validates `Number.isSafeInteger` range. Amounts outside this limit are rejected, never truncated or coerced.
+
+## TASK-03 — Schema version 2 additions
+
+### accounts (new column)
+| Column | Type | Null | Rule |
+|---|---|---:|---|
+| subtype | TEXT | Yes | ASSET only: CASH, BANK, EWALLET, SAVINGS, OTHER. Existing ASSET rows backfill to OTHER; other Account types must be null. |
+
+### categories (new table)
+| Column | Type | Null | Rule |
+|---|---|---:|---|
+| id | TEXT | No | PK |
+| name | TEXT | No | Non-empty |
+| kind | TEXT | No | INCOME or EXPENSE; immutable after referenced by a Journal Entry |
+| parent_id | TEXT | Yes | Self-FK; parent and child must have same kind; hierarchy must be acyclic |
+| is_archived | INTEGER | No | Boolean; archive preserves historical references |
+| created_at | TEXT | No | Creation timestamp |
+| updated_at | TEXT | No | Last update timestamp |
+
+### journal_entries (new columns)
+| Column | Type | Null | Rule |
+|---|---|---:|---|
+| transaction_kind | TEXT | No | INCOME, EXPENSE, TRANSFER, OPENING_BALANCE, ADJUSTMENT, REVERSAL, LEGACY; existing entries backfill to LEGACY |
+| category_id | TEXT | Yes | FK categories.id; at most one Category per entry; income/expense kind must match transaction kind |
+| replacement_of_id | TEXT | Yes | Self-FK to the corrected original; unique when present; a replacement cannot also be a reversal |
+
+TRANSFER and OPENING_BALANCE entries must not carry a Category. Historical entries whose kind cannot be inferred remain LEGACY and uncategorized.
+
+Additional `journal_entries` audit columns (TASK-03):
+
+| Column | Type | Null | Rule |
+|---|---|---:|---|

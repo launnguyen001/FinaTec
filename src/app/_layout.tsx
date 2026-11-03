@@ -2,7 +2,9 @@ import { Stack } from "expo-router";
 
 import { runSqlCipherFileDiagnostic } from "../infrastructure/database/spike/sqlcipher-file-diagnostic";
 import { runSqlCipherKeyLossDiagnostic } from "../infrastructure/database/spike/sqlcipher-key-loss-diagnostic";
+import { createFinanceRuntime } from "../infrastructure/finance-runtime";
 import { DatabaseSpikeProvider } from "../presentation/providers/DatabaseSpikeProvider";
+import { FinanceRuntimeProvider } from "../presentation/providers/FinanceRuntimeProvider";
 
 export default function RootLayout() {
   return (
@@ -11,7 +13,9 @@ export default function RootLayout() {
       runFileDiagnostic={runSqlCipherFileDiagnostic}
       runKeyLossDiagnostic={runSqlCipherKeyLossDiagnostic}
     >
-      <Stack screenOptions={{ headerShown: false }} />
+      <FinanceRuntimeProvider createRuntime={createFinanceRuntime}>
+        <Stack screenOptions={{ headerShown: false }} />
+      </FinanceRuntimeProvider>
     </DatabaseSpikeProvider>
   );
 }

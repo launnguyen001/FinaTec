@@ -14,9 +14,22 @@ export interface PostingCurrency {
   isActive: boolean;
 }
 
+/** The Category facts needed to validate Journal Entry metadata. */
+export interface PostingCategory {
+  id: string;
+  kind: "INCOME" | "EXPENSE";
+  isArchived: boolean;
+}
+
 export interface PostingContext {
   accounts: ReadonlyMap<string, Account>;
   currencies: ReadonlyMap<string, PostingCurrency>;
+  /**
+   * Categories are optional only for callers that do not post categorized
+   * entries. Any entry carrying a category is rejected when this context is
+   * absent, so a missing map can never silently bypass validation.
+   */
+  categories?: ReadonlyMap<string, PostingCategory>;
 }
 
 export type NormalBalance = "DEBIT" | "CREDIT";
@@ -56,6 +69,75 @@ export function validateJournalEntry(
   ) {
     throw new Error("Journal entry posted timestamp does not match its status");
   }
+
+  const transactionKind = entry.transactionKind ?? "LEGACY";
+  if (
+    ![
+      "INCOME",
+      "EXPENSE",
+      "TRANSFER",
+      "OPENING_BALANCE",
+      "ADJUSTMENT",
+      "REVERSAL",
+      "LEGACY",
+    ].includes(transactionKind)
+  ) {
+    throw new Error(`Unknown transaction kind: ${String(transactionKind)}`);
+  }
+
+  if (entry.reversalOfId !== null && entry.replacementOfId !== null) {
+    throw new Error(
+      "A journal entry cannot be both a reversal and a replacement",
+    );
+  }
+  if (entry.reversalOfId === entry.id) {
+    throw new Error("A journal entry cannot reverse itself");
+  }
+  if (entry.replacementOfId === entry.id) {
+    throw new Error("A journal entry cannot replace itself");
+  }
+  if (transactionKind === "REVERSAL" && entry.reversalOfId === null) {
+    throw new Error("A REVERSAL entry must link to its original entry");
+  }
+
+  const categoryId = entry.categoryId ?? null;
+  if (transactionKind === "INCOME" || transactionKind === "EXPENSE") {
+    if (!categoryId) {
+      throw new Error(
+        `${transactionKind} journal entries require an active ${transactionKind} category`,
+      );
+    }
+    const category = context.categories?.get(categoryId);
+    if (!category) {
+      throw new Error(`Category does not exist: ${categoryId}`);
+    }
+    if (category.kind !== transactionKind) {
+      throw new Error(
+        `Journal entry category kind must match its ${transactionKind} transaction kind`,
+      );
+    }
+    if (category.isArchived) {
+      throw new Error(
+        `Archived category cannot be used for a new ${transactionKind} posting: ${categoryId}`,
+      );
+    }
+  } else if (
+    transactionKind === "TRANSFER" ||
+    transactionKind === "OPENING_BALANCE"
+  ) {
+    if (categoryId !== null) {
+      throw new Error(
+        `${transactionKind} journal entries must not have a category`,
+      );
+    }
+  } else if (categoryId !== null) {
+    // REVERSAL inherits its original category for audit traceability. Other
+    // correction/legacy kinds may also carry one, but it must resolve.
+    if (!context.categories?.get(categoryId)) {
+      throw new Error(`Category does not exist: ${categoryId}`);
+    }
+  }
+
   if (lines.length < 2) {
     throw new Error("A journal entry must contain at least two lines");
   }

@@ -316,6 +316,9 @@ export async function runAccountingAcceptanceDiagnostic(): Promise<AccountingAcc
       "USD 50.00 -> VND 1,272,525 with equal base snapshots",
     );
 
+    const migrationDetail = await runVersionOneUpgradeAcceptance(suffix);
+    check("Schema v1 to v2 with ledger history", true, migrationDetail);
+
     fileSizeBytes = file.exists ? file.size : null;
     check(
       "Database file evidence",
@@ -329,6 +332,180 @@ export async function runAccountingAcceptanceDiagnostic(): Promise<AccountingAcc
       checks,
       cleanup: "test database and unique SecureStore key removed after result",
     };
+  } finally {
+    if (client) await client.closeAsync();
+    if (ownsFile) await SQLite.deleteDatabaseAsync(databaseName);
+    await SecureStore.deleteItemAsync(secureStoreName);
+  }
+}
+
+async function runVersionOneUpgradeAcceptance(suffix: string): Promise<string> {
+  const databaseName = `task03-upgrade-${suffix}.db`;
+  const secureStoreName = `ketso.task03.upgrade.${suffix}`;
+  const directory = SQLite.defaultDatabaseDirectory;
+  assert(directory, "SQLite database directory is unavailable");
+  const fileUri = directory.startsWith("file://")
+    ? directory
+    : `file://${directory}`;
+  const file = new FileSystem.File(fileUri, databaseName);
+  assert(!file.exists, "Refusing to open a pre-existing upgrade database");
+
+  const key = toHex(await Crypto.getRandomBytesAsync(32));
+  let client: SQLite.SQLiteDatabase | null = null;
+  let ownsFile = false;
+  try {
+    await SecureStore.setItemAsync(secureStoreName, key);
+    client = await SQLite.openDatabaseAsync(databaseName, {
+      useNewConnection: true,
+    });
+    ownsFile = true;
+    const cipher = await client.getFirstAsync<{ cipher_version: string }>(
+      "PRAGMA cipher_version",
+    );
+    assert(cipher?.cipher_version, "SQLCipher unavailable for upgrade test");
+    await client.execAsync(`PRAGMA key = "x'${key}'"`);
+    await client.execAsync("PRAGMA foreign_keys = ON");
+
+    const db = drizzle(client, { schema: ledgerSchema });
+    const v1Migrations = {
+      journal: { entries: [ledgerMigrations.journal.entries[0]!] },
+      migrations: { m0000: ledgerMigrations.migrations.m0000 },
+    };
+    await migrate(db, v1Migrations);
+
+    const timestamp = "2026-11-03T12:00:00.000Z";
+    const originalId = `legacy-original-${suffix}`;
+    const reversalId = `legacy-reversal-${suffix}`;
+    const cashId = `legacy-cash-${suffix}`;
+    const equityId = `legacy-equity-${suffix}`;
+    await client.runAsync(
+      "INSERT INTO ledger_settings (id, base_currency_code, created_at, updated_at) VALUES (1, 'VND', ?, ?)",
+      timestamp,
+      timestamp,
+    );
+    await client.runAsync(
+      "INSERT INTO accounts (id, name, type, currency_code, is_system, is_archived, created_at, updated_at) VALUES (?, 'Legacy cash', 'ASSET', 'VND', 0, 0, ?, ?), (?, 'Legacy equity', 'EQUITY', 'VND', 1, 0, ?, ?)",
+      cashId,
+      timestamp,
+      timestamp,
+      equityId,
+      timestamp,
+      timestamp,
+    );
+    await client.runAsync(
+      "INSERT INTO journal_entries (id, occurred_at, description, status, base_currency_code, idempotency_key, reversal_of_id, created_at, posted_at) VALUES (?, ?, 'Legacy opening balance', 'DRAFT', 'VND', 'legacy-opening-key', NULL, ?, NULL), (?, ?, 'Legacy reversal', 'DRAFT', 'VND', 'legacy-reversal-key', ?, ?, NULL)",
+      originalId,
+      timestamp,
+      timestamp,
+      reversalId,
+      timestamp,
+      originalId,
+      timestamp,
+    );
+    await client.runAsync(
+      "INSERT INTO journal_lines (id, entry_id, line_number, account_id, currency_code, side, amount_minor, fx_rate_numerator, fx_rate_denominator, base_amount_minor, memo, created_at) VALUES (?, ?, 1, ?, 'VND', 'DEBIT', 12345, '1', '1', 12345, NULL, ?), (?, ?, 2, ?, 'VND', 'CREDIT', 12345, '1', '1', 12345, NULL, ?), (?, ?, 1, ?, 'VND', 'CREDIT', 12345, '1', '1', 12345, NULL, ?), (?, ?, 2, ?, 'VND', 'DEBIT', 12345, '1', '1', 12345, NULL, ?)",
+      `legacy-line-original-cash-${suffix}`,
+      originalId,
+      cashId,
+      timestamp,
+      `legacy-line-original-equity-${suffix}`,
+      originalId,
+      equityId,
+      timestamp,
+      `legacy-line-reversal-cash-${suffix}`,
+      reversalId,
+      cashId,
+      timestamp,
+      `legacy-line-reversal-equity-${suffix}`,
+      reversalId,
+      equityId,
+      timestamp,
+    );
+    await client.runAsync(
+      "UPDATE journal_entries SET status = 'POSTED', posted_at = ? WHERE id IN (?, ?)",
+      timestamp,
+      originalId,
+      reversalId,
+    );
+
+    await migrate(db, ledgerMigrations);
+    const account = await client.getFirstAsync<{
+      subtype: string | null;
+    }>("SELECT subtype FROM accounts WHERE id = ?", cashId);
+    const entries = await client.getAllAsync<{
+      id: string;
+      status: string;
+      occurred_at: string;
+      created_at: string;
+      posted_at: string | null;
+      idempotency_key: string | null;
+      reversal_of_id: string | null;
+      transaction_kind: string;
+      category_id: string | null;
+      replacement_of_id: string | null;
+    }>("SELECT * FROM journal_entries WHERE id IN (?, ?) ORDER BY id", [
+      originalId,
+      reversalId,
+    ]);
+    const lineRows = await client.getAllAsync<{
+      id: string;
+      entry_id: string;
+      amount_minor: number;
+      base_amount_minor: number;
+      currency_code: string;
+      fx_rate_numerator: string;
+      fx_rate_denominator: string;
+    }>("SELECT * FROM journal_lines ORDER BY id");
+    const balance = await client.getFirstAsync<{ amount_minor: number }>(
+      "SELECT COALESCE(SUM(CASE WHEN jl.side = 'DEBIT' THEN jl.amount_minor ELSE -jl.amount_minor END), 0) AS amount_minor FROM journal_lines jl JOIN journal_entries je ON je.id = jl.entry_id WHERE jl.account_id = ? AND je.status = 'POSTED'",
+      cashId,
+    );
+    assert(
+      account?.subtype === "OTHER",
+      "Legacy ASSET subtype was not backfilled",
+    );
+    assert(
+      entries.length === 2,
+      "Legacy journal entry rows were not preserved",
+    );
+    const original = entries.find((entry) => entry.id === originalId);
+    const reversal = entries.find((entry) => entry.id === reversalId);
+    assert(
+      original?.status === "POSTED" &&
+        original.occurred_at === timestamp &&
+        original.created_at === timestamp &&
+        original.posted_at === timestamp &&
+        original.idempotency_key === "legacy-opening-key" &&
+        original.reversal_of_id === null &&
+        original.transaction_kind === "LEGACY" &&
+        original.category_id === null &&
+        original.replacement_of_id === null,
+      "Legacy original metadata changed during upgrade",
+    );
+    assert(
+      reversal?.status === "POSTED" &&
+        reversal.reversal_of_id === originalId &&
+        reversal.idempotency_key === "legacy-reversal-key" &&
+        reversal.transaction_kind === "LEGACY",
+      "Legacy reversal link or state changed during upgrade",
+    );
+    assert(
+      lineRows.length === 4 &&
+        lineRows.every(
+          (line) =>
+            line.amount_minor === 12345 &&
+            line.base_amount_minor === 12345 &&
+            line.currency_code === "VND" &&
+            line.fx_rate_numerator === "1" &&
+            line.fx_rate_denominator === "1",
+        ),
+      "Legacy journal line data changed during upgrade",
+    );
+    assert(
+      balance?.amount_minor === 0,
+      "Legacy native-currency Account balance changed during upgrade",
+    );
+    return "v1 posted entries, four lines, IDs, amounts, FX snapshots, native balance, timestamps, idempotency and reversal link preserved; ASSET subtype backfilled OTHER; old kinds backfilled LEGACY";
   } finally {
     if (client) await client.closeAsync();
     if (ownsFile) await SQLite.deleteDatabaseAsync(databaseName);

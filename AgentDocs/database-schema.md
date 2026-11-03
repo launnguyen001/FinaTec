@@ -28,6 +28,7 @@ erDiagram
   ACCOUNTS ||--o{ JOURNAL_LINES : owns
   JOURNAL_ENTRIES ||--|{ JOURNAL_LINES : contains
   JOURNAL_ENTRIES ||--o| JOURNAL_ENTRIES : reversal_of
+  JOURNAL_ENTRIES ||--o| JOURNAL_ENTRIES : replacement_of
 
   CURRENCIES {
     string code PK
@@ -60,6 +61,7 @@ erDiagram
     string base_currency_code FK
     string idempotency_key UK
     string reversal_of_id FK_UK
+    string replacement_of_id FK_UK
     string created_at
     string posted_at
   }
@@ -101,8 +103,8 @@ erDiagram
 - A journal line has a positive native amount, a DEBIT/CREDIT side, a positive FX rational, and a non-negative base amount.
 - `line_number` is unique within an entry.
 - Non-null idempotency keys are unique.
-- One original entry can have at most one linked reversal.
-- Posted entries and their lines cannot be updated or deleted. Corrections use a new linked reversal and a new adjustment entry.
+- One original entry can have at most one linked reversal and one linked replacement.
+- Posted entries and their lines cannot be updated or deleted. Corrections use a new linked reversal and, when needed, a new adjustment or replacement entry.
 - Currency codes and account currencies are immutable; currency precision cannot be changed after the currency is used by settings, accounts, entries, or lines; system accounts cannot be hard-deleted.
 - Foreign keys use RESTRICT; accounts/currencies are archived/deactivated rather than deleted once referenced.
 
@@ -140,3 +142,29 @@ Posted-history immutability, currency/account identity immutability, currency pr
 - TASK-01: `AgentDocs/roadmap/task/task-01-database-architecture.md`.
 - Expo SDK 58 SQLite documentation: https://docs.expo.dev/versions/v58.0.0/sdk/sqlite/
 - Drizzle Expo SQLite: https://orm.drizzle.team/docs/sqlite/connect-expo-sqlite
+
+## 9. Schema version 2 — TASK-03
+
+Schema v2 is introduced by `0001_core_finance.ts`; migration `0000_ledger_foundation.ts` remains immutable.
+
+Additions:
+- `accounts.subtype`: nullable source-of-funds subtype (`CASH`, `BANK`, `EWALLET`, `SAVINGS`, `OTHER`). Only ASSET accounts may have a subtype. Existing ASSET rows are backfilled to `OTHER`; non-ASSET rows remain null.
+- `categories`: independent INCOME/EXPENSE classification with optional self-referencing `parent_id`, archive state and timestamps.
+- `journal_entries.category_id`: optional FK to categories; one Category per entry.
+- `journal_entries.transaction_kind`: INCOME, EXPENSE, TRANSFER, OPENING_BALANCE, ADJUSTMENT, REVERSAL or LEGACY. Existing entries are safely backfilled to LEGACY.
+- `journal_entries.replacement_of_id`: nullable self-reference linking a replacement entry to the corrected original; unique when present. A replacement cannot also be a reversal.
+- Indexes support Category tree, archive/kind and occurredAt history queries.
+- Triggers prevent account hard deletion, mismatched Category kind, Category kind mutation after use, and invalid parent kind/cycles.
+
+Category is not an Account. Account subtype does not create a second balance or asset subledger. Ledger balances remain derived only from POSTED journal lines.
+
+Dashboard available balances and income/expense totals are grouped by native currency. Schema v2 does not provide current market FX conversion or revaluation.
+
+Archived Account lifecycle enforcement:
+- An Account can transition ACTIVE → ARCHIVED only when its current native-currency Ledger balance is exactly zero, computed from POSTED journal lines.
+- A SQLite trigger rejects archival when the signed normal-side balance is non-zero.
+- New journal lines cannot reference an archived Account; a second trigger rejects posting a pre-existing draft if it references an Account archived after draft creation.
+- Restore changes only `accounts.is_archived`; it creates no Journal Entry and preserves all history.
+- No archived-account posting-purpose or audit-reason columns exist.
+- Corrections that replace a posted entry are committed as a linked reversal and a new replacement in one repository transaction. The original entry remains immutable.
+- Category triggers also prevent an archived parent from being assigned, archiving a parent with active children, and changing a parent kind while its children would become inconsistent.

@@ -1,7 +1,7 @@
 # Két Số — Accounting Engine Rules (TASK-02)
 
-**Status:** Implemented on `task/02-accounting-engine`  
-**Schema:** TASK-01 schema version 1 (no migration required)  
+**Status:** TASK-02 engine extended for TASK-03 on `task/03-core-finance`
+**Schema:** TASK-03 schema version 2 (`0001_core_finance.ts`)
 **Layers:** pure Domain rules + Application use cases + SQLite repository adapter
 
 ## 1. Posting lifecycle
@@ -59,6 +59,7 @@ No rounding line is created. Rounding is half-up once per line, then the resulti
 - The original entry and lines remain untouched.
 - The unique partial index on `reversal_of_id` guarantees at most one reversal per original entry.
 - An adjustment is a new posting; it never mutates posted history.
+- `replaceEntry` commits a linked reversal of the original and a new entry with `replacement_of_id` in one repository transaction. An original can have at most one replacement; retrying the command returns both persisted results.
 
 ## 7. Idempotency and transactions
 
@@ -81,3 +82,33 @@ No rounding line is created. Rounding is half-up once per line, then the resulti
 - Jest covers posting validation, FX recomputation, rounding, balances, opening balance, same/cross-currency transfer, draft lifecycle, reversal, one-reversal rule, idempotency and failed-commit rollback.
 - TypeScript, Expo lint and Prettier must pass before merge.
 - Android acceptance must be run on a development build because the database uses SQLCipher.
+
+## 10. TASK-03 transaction classification
+
+Schema v2 adds `journal_entries.transaction_kind` and nullable `category_id`.
+
+- INCOME and EXPENSE are business classifications on the Journal Entry; they still post through the same balanced Ledger Engine.
+- INCOME means money enters the assets managed by the owner; EXPENSE means money leaves that managed-asset boundary, regardless of whether the user considers it personal spending, business cost, owner withdrawal or another purpose. The user supplies Category and description/note; no separate WITHDRAWAL or OWNER_DRAWING transaction kind is introduced.
+- TRANSFER is reserved for movement between ASSET Accounts inside the same managed-asset boundary. Category classifies the event but does not determine whether money crossed that boundary.
+- Income uses a DEBIT line on an ASSET account and a CREDIT line on an INCOME account.
+- Expense uses a CREDIT line on an ASSET account and a DEBIT line on an EXPENSE account.
+- TRANSFER and OPENING_BALANCE must have no Category and do not contribute to income/expense totals.
+- Category kind must match INCOME/EXPENSE transaction kind. A Journal Entry has at most one Category.
+- REVERSAL retains the original Category reference and swaps every original line side. Reporting must include the reversal's negative effect.
+- Existing v1 entries are LEGACY and remain uncategorized unless a future audited backfill can infer their meaning without guessing.
+
+## 11. Archived Account policy — strict lifecycle invariant
+
+TASK-03 does not extend or bypass the TASK-02 posting policy. The existing invariant remains: every posting rejects an archived Account.
+
+- An Account may be archived only when its current Ledger balance is exactly zero in its native currency, using the normal-side signed balance derived from POSTED lines.
+- Balance is derived only from lines belonging to POSTED Journal Entries. Do not trust a UI-provided balance or a separately persisted balance.
+- A non-zero balance, whether positive or negative, rejects archive. The user must bring the balance to zero through ordinary valid postings while the Account is ACTIVE.
+- The SQLite `accounts_archive_requires_zero_balance` trigger checks the signed Ledger balance in the same atomic UPDATE that changes the archive state. The `journal_lines_no_archived_account_insert` and `journal_entries_no_archived_account_posting` triggers prevent new lines and posting of pre-existing drafts against archived Accounts. This closes both orderings of an archive/post race.
+- `restoreAccount()` transitions ARCHIVED → ACTIVE without creating a Journal Entry or changing historical balances.
+- Every posting that references an archived Account is rejected, regardless of transaction kind or posting purpose. This includes income, expense, transfer, opening balance, adjustment and reversal.
+- To reverse a historical entry that references an archived Account, restore every affected Account first, then call the ordinary AccountingService reversal use case.
+- No `allowedArchivedAccountIds`, `allowArchived`, archived-account settlement/reversal exceptions, posting-purpose field or archive audit-reason field exists. Schema v2 is still unreleased on the feature branch, so its migration is defined without these obsolete fields.
+- Preserve balancing, atomicity, idempotency and posted-history immutability.
+
+Required tests: archive succeeds at exactly zero; archive rejects positive and negative balances; restore succeeds and preserves history; every posting kind rejects archived Accounts; reversal rejects until all referenced archived Accounts are restored; concurrent archive/post attempts cannot violate the invariant.

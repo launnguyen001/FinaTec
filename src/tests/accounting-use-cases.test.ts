@@ -1,4 +1,6 @@
 import { AccountingService } from "../application/ledger/accounting-service";
+import type { Category } from "../domain/category/category";
+import type { CategoryRepository } from "../domain/category/repository";
 import type { Account, CurrencyRecord } from "../domain/ledger/repository";
 import { InMemoryLedgerRepository } from "./helpers/in-memory-ledger-repository";
 
@@ -59,10 +61,28 @@ async function createFixture() {
   }
   await repository.setBaseCurrencyCode("VND");
 
+  const category: Category = {
+    id: "food-category",
+    name: "Food",
+    kind: "EXPENSE",
+    parentId: null,
+    isArchived: false,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+  const categories: CategoryRepository = {
+    create: async () => category,
+    findById: async (id) => (id === category.id ? category : null),
+    list: async () => [category],
+    update: async () => category,
+    archive: async () => undefined,
+  };
+
   let nextId = 0;
   const service = new AccountingService(repository, {
     createId: () => `id-${++nextId}`,
     now: () => timestamp,
+    categories,
   });
   return { repository, service };
 }
@@ -313,6 +333,57 @@ describe("accounting use cases", () => {
     expect(repository.entries.size).toBe(2);
   });
 
+  it("replaces a posted entry atomically and returns the linked pair on retry", async () => {
+    const { repository, service } = await createFixture();
+    const original = await service.createOpeningBalance({
+      idempotencyKey: "opening-replacement-original",
+      accountId: accounts.cash.id,
+      offsetAccountId: accounts.openingVnd.id,
+      amountMinor: 8_000_000n,
+    });
+    const commitCount = repository.commitCount;
+
+    const result = await service.replaceEntry({
+      idempotencyKey: "replace-opening",
+      originalEntryId: original.entry.id,
+      replacement: {
+        lines: [
+          {
+            accountId: accounts.cash.id,
+            side: "DEBIT",
+            amountMinor: 9_000_000n,
+            fxRateNumerator: "1",
+            fxRateDenominator: "1",
+          },
+          {
+            accountId: accounts.openingVnd.id,
+            side: "CREDIT",
+            amountMinor: 9_000_000n,
+            fxRateNumerator: "1",
+            fxRateDenominator: "1",
+          },
+        ],
+      },
+    });
+
+    expect(result.reversal.entry.reversalOfId).toBe(original.entry.id);
+    expect(result.replacement.entry.replacementOfId).toBe(original.entry.id);
+    expect(repository.commitCount).toBe(commitCount + 1);
+    expect((await service.getAccountBalance(accounts.cash.id)).minorUnits).toBe(
+      9_000_000n,
+    );
+
+    const retry = await service.replaceEntry({
+      idempotencyKey: "replace-opening",
+      originalEntryId: original.entry.id,
+      replacement: { lines: [] },
+    });
+    expect(retry.reversal.created).toBe(false);
+    expect(retry.replacement.created).toBe(false);
+    expect(retry.replacement.entry.id).toBe(result.replacement.entry.id);
+    expect(repository.commitCount).toBe(commitCount + 1);
+  });
+
   it("keeps drafts out of balances until they are posted", async () => {
     const { service } = await createFixture();
     const draft = await service.createDraft({
@@ -525,5 +596,72 @@ describe("accounting use cases", () => {
 
     expect(repository.commitCount).toBe(0);
     expect(repository.entries.size).toBe(0);
+  });
+  it("rejects reversal until every archived account in the original entry is restored", async () => {
+    const { repository, service } = await createFixture();
+    const original = await service.createOpeningBalance({
+      idempotencyKey: "archive-reverse-opening",
+      accountId: accounts.cash.id,
+      offsetAccountId: accounts.openingVnd.id,
+      amountMinor: 900_000n,
+    });
+    repository.accounts.set(accounts.cash.id, {
+      ...accounts.cash,
+      isArchived: true,
+    });
+
+    await expect(
+      service.reverseEntry({
+        idempotencyKey: "archive-reversal-blocked",
+        originalEntryId: original.entry.id,
+      }),
+    ).rejects.toThrow(/Archived account/);
+    expect(repository.entries.size).toBe(1);
+
+    repository.accounts.set(accounts.cash.id, {
+      ...accounts.cash,
+      isArchived: false,
+    });
+    const reversal = await service.reverseEntry({
+      idempotencyKey: "archive-reversal-after-restore",
+      originalEntryId: original.entry.id,
+    });
+    expect(reversal.entry.transactionKind).toBe("REVERSAL");
+    expect(reversal.entry.reversalOfId).toBe(original.entry.id);
+    expect((await service.getAccountBalance(accounts.cash.id)).minorUnits).toBe(
+      0n,
+    );
+  });
+
+  it("rejects a new posting that references an archived account", async () => {
+    const { repository, service } = await createFixture();
+    repository.accounts.set(accounts.cash.id, {
+      ...accounts.cash,
+      isArchived: true,
+    });
+
+    await expect(
+      service.postEntry({
+        idempotencyKey: "archived-direct-post",
+        transactionKind: "EXPENSE",
+        categoryId: "food-category",
+        lines: [
+          {
+            accountId: accounts.cash.id,
+            side: "CREDIT",
+            amountMinor: 100n,
+            fxRateNumerator: "1",
+            fxRateDenominator: "1",
+          },
+          {
+            accountId: accounts.food.id,
+            side: "DEBIT",
+            amountMinor: 100n,
+            fxRateNumerator: "1",
+            fxRateDenominator: "1",
+          },
+        ],
+      }),
+    ).rejects.toThrow(/Archived account/);
   });
 });

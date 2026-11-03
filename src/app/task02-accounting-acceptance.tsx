@@ -37,12 +37,12 @@ export default function Task02AccountingAcceptanceRoute() {
   return (
     <ScrollView contentContainerStyle={{ padding: 24, gap: 16 }}>
       <Text style={{ fontSize: 20, fontWeight: "700" }}>
-        TASK-02 Accounting Acceptance
+        TASK-02 / TASK-03 Accounting Acceptance
       </Text>
       <Text>
-        Creates an isolated encrypted database, runs opening balance, transfer,
-        draft, reversal and idempotency commands, then removes only its own file
-        and test key.
+        Checks accounting flows on an isolated encrypted database and upgrades a
+        schema v1 ledger with history to v2. Only diagnostic databases and keys
+        created by this run are removed.
       </Text>
       <Button
         title={running ? "Running…" : "Run accounting checks"}
