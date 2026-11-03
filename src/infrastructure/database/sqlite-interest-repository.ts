@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, gte } from "drizzle-orm";
 
 import { fromSqliteInteger, toSqliteSafeInteger } from "../../domain/ledger/money";
 import { validateJournalEntry, type PostingContext } from "../../domain/ledger/posting";
@@ -125,6 +125,35 @@ export class SqliteInterestRepository implements InterestRepository {
       .orderBy(asc(interestAccruals.periodStart), asc(interestAccruals.createdAt))
       .all();
     return rows.map(mapAccrual);
+  }
+
+  async hasExternalPrincipalMovements(plan: InterestPlan): Promise<boolean> {
+    const ownEntries = await this.db
+      .select({ journalEntryId: interestAccruals.journalEntryId })
+      .from(interestAccruals)
+      .where(eq(interestAccruals.planId, plan.id))
+      .all();
+    const ownIds = new Set(
+      ownEntries
+        .map((row) => row.journalEntryId)
+        .filter((id): id is string => id !== null),
+    );
+    const movements = await this.db
+      .select({
+        id: journalEntries.id,
+        occurredAt: journalEntries.occurredAt,
+      })
+      .from(journalEntries)
+      .innerJoin(journalLines, eq(journalLines.entryId, journalEntries.id))
+      .where(
+        and(
+          eq(journalLines.accountId, plan.principalAccountId),
+          eq(journalEntries.status, "POSTED"),
+          gte(journalEntries.occurredAt, `${plan.startDate}T00:00:00.000Z`),
+        ),
+      )
+      .all();
+    return movements.some((movement) => !ownIds.has(movement.id));
   }
 
   async commitPostedAccrual(
