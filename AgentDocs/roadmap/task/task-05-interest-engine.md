@@ -5,7 +5,7 @@
 - Trạng thái: IN PROGRESS — specification and cross-task audit
 - Phụ thuộc: TASK-02, TASK-04
 - Branch triển khai: `task/05-interest-engine`
-- Base: `main` sau khi TASK-04 merge tại `38b6453`; branch đã được đồng bộ cùng baseline Task04 và closeout docs
+- Base: `main` tại `14db998`; branch đã được đồng bộ với toàn bộ baseline Task04 và closeout docs
 
 ## 1. Mục tiêu
 
@@ -27,10 +27,10 @@ Không bao gồm cam kết lợi suất từ nhà cung cấp, tự động thao 
 
 - TASK-04 sở hữu asset catalog/profile, stable-value vs market-valued classification, asset lots, valuation, quote history và asset transaction.
 - TASK-05 sở hữu toàn bộ quy tắc InterestPlan, InterestAccrual, lịch tính lãi, catch-up, rounding, trạng thái accrued/posted/paid và journal posting của lãi.
-- TASK-04 chỉ tiêu thụ Interest Engine qua application contract; không tự tính lãi, không tạo accrual record hoặc journal entry lãi bằng logic riêng.
+- Không cần TASK-04 lưu interest-specific metadata hoặc gọi Interest Engine từ Asset domain. Task05 quản lý plan và accrual độc lập, dùng Ledger Account làm nguồn principal.
 - Term deposit được biểu diễn bằng một ASSET Account riêng trong Core Ledger (không lưu principal lần thứ hai trong Asset domain). InterestPlan của TASK-05 tham chiếu accountId; principal và currency được đọc từ Ledger balance/account, còn start date, maturity date, rate convention, accrual/posting schedule và capitalization/payout policy thuộc InterestPlan. Account có thể được đánh dấu INVESTMENT để không bị tính vào tiền khả dụng.
 - Lãi nhập gốc làm tăng principal/giá trị tiền gửi sau khi kỳ được POSTED; lãi trả về tài khoản tạo journal posting vào ACCOUNT được chỉ định. Không hiển thị accrued chưa đến hạn như số dư đã xác nhận.
-- TASK-05 phụ thuộc TASK-04 về asset contract và TASK-02 về journal posting. TASK-04 không phụ thuộc việc hoàn thành toàn bộ TASK-05; acceptance về tính và ghi nhận lãi được chuyển giao cho TASK-05. TASK-04 chỉ phải lưu/đọc metadata và không được hiển thị lãi dự kiến như lãi đã ghi nhận.
+- TASK-05 phụ thuộc TASK-02 về journal posting và TASK-04 về phân loại Account INVESTMENT. TASK-04 không phụ thuộc việc hoàn thành TASK-05; acceptance về tính và ghi nhận lãi thuộc TASK-05. Accrued chưa POSTED không được tính vào Ledger balance.
 
 ## 4. Bối cảnh và nguyên tắc
 
@@ -110,7 +110,7 @@ Không implement formula cho đến khi các quyết định liên quan được
 ## 10. Nhật ký tiến độ
 
 - 2026-11-04: Khởi động TASK-05 trên branch `task/05-interest-engine`, ban đầu tạo từ `task/04-asset-management` để giữ đúng dependency và đối chiếu chéo với implementation Asset.
-- 2026-11-04: TASK-04 đã merge vào `main` tại `38b6453`; đồng bộ baseline và closeout documentation của TASK-04 vào TASK-05 branch, không force-push và không bỏ commit.
+- 2026-11-04: TASK-04 đã merge vào `main` tại `38b6453`; Task04 closeout documentation được cập nhật trên `main` tại `8b2e44f` và ranh giới kiến trúc được finalized tại `14db998`. TASK-05 branch đã được sync bằng merge commit `90a8617`, không force-push và không bỏ commit.
 - 2026-11-04: Chốt ranh giới kiến trúc: term deposit dùng ASSET Account riêng làm nguồn principal; TASK-05 sở hữu InterestPlan và toàn bộ calculation/accrual/posting. TASK-04 không cần schema interest-specific và không được tự xây interest engine thứ hai.
 - Đã audit TASK-02 LedgerRepository/AccountingService: atomic commitPostedEntry, balance validation, native currency, idempotency và posted journal immutability là contract nền. TASK-05 phải mở rộng repository atomic command để commit accrual + Journal Entry cùng transaction, không gọi AccountingService rồi ghi accrual độc lập.
 - Đã audit TASK-04: Account ASSET và cờ INVESTMENT là nguồn phân loại sẵn có; term deposit sẽ dùng dedicated ASSET Account, InterestPlan giữ lịch/điều khoản và tham chiếu accountId; không duplicate principal.
