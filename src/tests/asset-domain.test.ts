@@ -245,5 +245,6 @@ describe("Task04 asset domain rules", () => {
     expect(getRefreshBackoffMs(0)).toBe(30_000);
     expect(getRefreshBackoffMs(20)).toBe(21_600_000);
     expect(getRefreshBackoffMs(1, 120_000)).toBe(120_000);
+    expect(getRefreshBackoffMs(1, 24 * 60 * 60 * 1000)).toBe(21_600_000);
   });
 });

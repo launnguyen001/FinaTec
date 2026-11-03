@@ -398,7 +398,7 @@ export function getRefreshBackoffMs(
     Number.isFinite(retryAfterMs) &&
     retryAfterMs > 0
   ) {
-    return retryAfterMs;
+    return Math.min(retryAfterMs, 6 * 60 * 60 * 1000);
   }
   const exponent = Math.max(0, Math.min(10, Math.floor(failureCount)));
   return Math.min(30_000 * 2 ** exponent, 6 * 60 * 60 * 1000);
