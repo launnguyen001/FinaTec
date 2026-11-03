@@ -593,13 +593,17 @@ export class LiabilityService {
       baseCurrencyCode,
     );
     const journalLines: JournalLine[] = [];
+    let debitBaseTotal = 0n;
     const add = (
       account: Account,
       side: "DEBIT" | "CREDIT",
       amount: bigint,
       memo: string,
+      baseAmountOverride?: bigint,
     ) => {
-      if (amount > 0n)
+      if (amount > 0n) {
+        const convertedBase = baseAmountOverride ?? baseAmount(amount);
+        if (side === "DEBIT") debitBaseTotal += convertedBase;
         journalLines.push(
           this.createLine(
             journalEntry.id,
@@ -611,9 +615,10 @@ export class LiabilityService {
             memo,
             fxRateNumerator,
             fxRateDenominator,
-            baseAmount(amount),
+            convertedBase,
           ),
         );
+      }
     };
     const liabilityAccount = await this.requireAccount(
       liability.liabilityAccountId,
@@ -625,7 +630,7 @@ export class LiabilityService {
     add(interestAccount, "DEBIT", interestPaid, "Interest expense");
     if (feeMinor > 0n && feeAccount)
       add(feeAccount, "DEBIT", feeMinor, "Early repayment fee");
-    add(source, "CREDIT", paymentTotal, "Payment source");
+    add(source, "CREDIT", paymentTotal, "Payment source", debitBaseTotal);
     const payment: LiabilityPayment = {
       id: paymentId,
       liabilityId: liability.id,
