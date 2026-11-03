@@ -796,6 +796,25 @@ export const liabilityPayments = sqliteTable(
   ],
 );
 
+export const liabilityRateChanges = sqliteTable(
+  "liability_rate_changes",
+  {
+    id: text("id").primaryKey(),
+    liabilityId: text("liability_id")
+      .notNull()
+      .references(() => liabilities.id, { onDelete: "restrict", onUpdate: "restrict" }),
+    annualRatePpm: integer("annual_rate_ppm").notNull(),
+    effectiveDate: text("effective_date").notNull(),
+    reason: text("reason"),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("liability_rate_changes_effective_unique").on(table.liabilityId, table.effectiveDate),
+    index("liability_rate_changes_effective_idx").on(table.liabilityId, table.effectiveDate),
+    check("liability_rate_changes_apr_range", sql`${table.annualRatePpm} BETWEEN 0 AND 10000000`),
+  ],
+);
+
 export const ledgerSchema = {
   currencies,
   ledgerSettings,
@@ -817,4 +836,5 @@ export const ledgerSchema = {
   liabilities,
   liabilityInstallments,
   liabilityPayments,
+  liabilityRateChanges,
 };
