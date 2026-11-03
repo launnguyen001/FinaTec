@@ -6,6 +6,7 @@ import { AssetCatalogService } from "../application/asset/asset-catalog-service"
 import { AssetValuationService } from "../application/asset/asset-valuation-service";
 import { AssetSettingsService } from "../application/asset/asset-settings-service";
 import { AssetPriceRefreshService } from "../application/asset/asset-price-refresh-service";
+import { InterestService } from "../application/interest/interest-service";
 import {
   CoinGeckoDemoProvider,
   CoinPaprikaProvider,
@@ -23,11 +24,13 @@ import { getLedgerDatabase } from "./database/database";
 import { SqliteFinanceReadRepository } from "./database/finance-read-repository";
 import { SqliteLedgerRepository } from "./database/sqlite-ledger-repository";
 import { SqliteAssetRepository } from "./database/sqlite-asset-repository";
+import { SqliteInterestRepository } from "./database/sqlite-interest-repository";
 
 export async function createFinanceRuntime() {
   const db = await getLedgerDatabase();
   const ledger = new SqliteLedgerRepository(db);
   const assetRepository = new SqliteAssetRepository(db);
+  const interestRepository = new SqliteInterestRepository(db);
   const accountRepository = new SqliteAccountRepository(db);
   const categoryRepository = new SqliteCategoryRepository(db);
   const readRepository = new SqliteFinanceReadRepository(db);
@@ -47,6 +50,12 @@ export async function createFinanceRuntime() {
     createId,
     ledger,
     assetRepository,
+    interest: new InterestService(interestRepository, ledger, {
+      createId,
+      now,
+      deviceTimeZone: () =>
+        Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+    }),
     assetCatalog: new AssetCatalogService(assetRepository, { now, createId }),
     assetTransactions: new AssetTransactionService(
       assetRepository,
