@@ -766,25 +766,26 @@ export class SqliteAssetRepository implements AssetRepository {
   async getRealizedPnl(assetId: string): Promise<AssetRealizedPnlRecord> {
     const facts = await this.findAssetForTransaction(assetId);
     if (!facts) throw new Error("Asset does not exist");
-    const rows = await this.db
+    const allTransactions = await this.db
       .select()
       .from(assetTransactions)
-      .where(
-        and(
-          eq(assetTransactions.assetId, assetId),
-          eq(assetTransactions.transactionKind, "SELL"),
-        ),
-      )
+      .where(eq(assetTransactions.assetId, assetId))
       .all();
-    const grossProceedsMinor = rows.reduce(
+    const sellRows = allTransactions.filter(
+      (row) => row.transactionKind === "SELL",
+    );
+    const purchaseFeeMinor = allTransactions
+      .filter((row) => row.transactionKind === "BUY")
+      .reduce((total, row) => total + BigInt(row.feeAmountMinor), 0n);
+    const grossProceedsMinor = sellRows.reduce(
       (total, row) => total + BigInt(row.grossAmountMinor),
       0n,
     );
-    const costBasisSoldMinor = rows.reduce(
+    const costBasisSoldMinor = sellRows.reduce(
       (total, row) => total + BigInt(row.costBasisMinor),
       0n,
     );
-    const feeMinor = rows.reduce(
+    const saleFeeMinor = sellRows.reduce(
       (total, row) => total + BigInt(row.feeAmountMinor),
       0n,
     );
@@ -793,13 +794,14 @@ export class SqliteAssetRepository implements AssetRepository {
     return {
       assetId,
       currencyCode: facts.asset.quoteCurrency,
-      transactionCount: rows.length,
+      transactionCount: sellRows.length,
       grossProceedsMinor,
       costBasisSoldMinor,
-      feeMinor,
+      saleFeeMinor,
+      purchaseFeeMinor,
       realizedPnlBeforeFeeMinor,
-      realizedPnlAfterFeeMinor:
-        realizedPnlBeforeFeeMinor - feeMinor,
+      realizedPnlAfterSaleFeeMinor:
+        realizedPnlBeforeFeeMinor - saleFeeMinor,
     };
   }
 

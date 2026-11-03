@@ -58,9 +58,10 @@ export function AssetHistoryScreen() {
     transactionCount: number;
     grossProceedsMinor: bigint;
     costBasisSoldMinor: bigint;
-    feeMinor: bigint;
+    saleFeeMinor: bigint;
+    purchaseFeeMinor: bigint;
     realizedPnlBeforeFeeMinor: bigint;
-    realizedPnlAfterFeeMinor: bigint;
+    realizedPnlAfterSaleFeeMinor: bigint;
   } | null>(null);
   const [precision, setPrecision] = useState(2);
   const [busy, setBusy] = useState(false);
@@ -232,17 +233,17 @@ export function AssetHistoryScreen() {
           <Text
             style={[
               styles.pnl,
-              realized.realizedPnlAfterFeeMinor < 0n && styles.loss,
+              realized.realizedPnlAfterSaleFeeMinor < 0n && styles.loss,
             ]}
           >
             {money(
-              realized.realizedPnlAfterFeeMinor,
+              realized.realizedPnlAfterSaleFeeMinor,
               precision,
               realized.currencyCode,
             )}
           </Text>
           <Text style={styles.muted}>
-            Net realized result after separately recorded trading fees ·{" "}
+            Realized result after sale fees ·{" "}
             {realized.transactionCount} lần bán
           </Text>
           <Text style={styles.muted}>
@@ -254,8 +255,12 @@ export function AssetHistoryScreen() {
             {money(realized.costBasisSoldMinor, precision, realized.currencyCode)}
           </Text>
           <Text style={styles.muted}>
-            Trading fees:{" "}
-            {money(realized.feeMinor, precision, realized.currencyCode)}
+            Sale fees:{" "}
+            {money(realized.saleFeeMinor, precision, realized.currencyCode)}
+          </Text>
+          <Text style={styles.muted}>
+            Purchase fees (separate Ledger expenses):{" "}
+            {money(realized.purchaseFeeMinor, precision, realized.currencyCode)}
           </Text>
           <Text style={styles.muted}>
             Realized P&L before fees:{" "}

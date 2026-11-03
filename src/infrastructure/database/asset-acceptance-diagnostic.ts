@@ -430,8 +430,10 @@ export async function runAssetAcceptanceDiagnostic(): Promise<AssetAcceptanceRes
       dcaSale.calculation.costBasisSoldMinor === 25_000_000n &&
         (await assetRepository.getCurrentQuantity(asset.id)) === "1" &&
         realizedAfterPartialSales.realizedPnlBeforeFeeMinor === 7_500_000n &&
-        realizedAfterPartialSales.realizedPnlAfterFeeMinor === 7_000_000n,
-      "realized proceeds minus disposed cost basis = 7.5 USDT; separately recorded 0.5 USDT fee gives 7.0 USDT net realized result",
+        realizedAfterPartialSales.realizedPnlAfterSaleFeeMinor === 7_000_000n &&
+        realizedAfterPartialSales.saleFeeMinor === 500_000n &&
+        realizedAfterPartialSales.purchaseFeeMinor === 1_000_000n,
+      "realized proceeds minus disposed cost basis = 7.5 USDT; 0.5 USDT sale fee and 1.0 USDT purchase fee remain separate Ledger expenses",
     );
 
     currentTime = "2026-11-03T13:00:00.000Z";

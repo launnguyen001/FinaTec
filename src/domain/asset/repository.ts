@@ -48,9 +48,10 @@ export interface AssetRealizedPnlRecord {
   transactionCount: number;
   grossProceedsMinor: bigint;
   costBasisSoldMinor: bigint;
-  feeMinor: bigint;
+  saleFeeMinor: bigint;
+  purchaseFeeMinor: bigint;
   realizedPnlBeforeFeeMinor: bigint;
-  realizedPnlAfterFeeMinor: bigint;
+  realizedPnlAfterSaleFeeMinor: bigint;
 }
 
 export interface AssetSettingsRecord {
