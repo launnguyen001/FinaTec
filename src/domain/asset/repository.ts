@@ -122,6 +122,7 @@ export interface AssetRepository {
   }): Promise<DcaAggregate>;
   getCurrentQuantity(assetId: string): Promise<string>;
   listLots(assetId: string): Promise<AssetLotRecord[]>;
+  listDailyValuations(assetId: string): Promise<DailyValuation[]>;
   recordQuoteAndSnapshot(input: {
     quoteId: string;
     snapshotId: string;

@@ -1,4 +1,6 @@
 import {
+  calculateUnrealizedPnl,
+  decimalToMinorUnits,
   getValuationDate,
   type DailyValuation,
   type MarketQuote,
@@ -17,6 +19,64 @@ export class AssetValuationService {
     private readonly ledger: LedgerRepository,
     private readonly options: AssetValuationServiceOptions,
   ) {}
+
+  async getHistory(assetId: string): Promise<DailyValuation[]> {
+    const facts = await this.assets.findAssetForTransaction(assetId);
+    if (!facts) throw new Error("Asset does not exist");
+    if (facts.assetType.valuationModel !== "MARKET_VALUED") {
+      return [];
+    }
+    return this.assets.listDailyValuations(assetId);
+  }
+
+  async getUnrealizedPnl(assetId: string) {
+    const facts = await this.assets.findAssetForTransaction(assetId);
+    if (!facts || facts.asset.isArchived || facts.assetType.isArchived) {
+      throw new Error("Asset does not exist or is archived");
+    }
+    if (facts.assetType.valuationModel !== "MARKET_VALUED") {
+      throw new Error("Unrealized P&L applies only to market-valued assets");
+    }
+    const [lots, history, currencies] = await Promise.all([
+      this.assets.listLots(assetId),
+      this.assets.listDailyValuations(assetId),
+      this.ledger.listCurrencies(false),
+    ]);
+    const currency = currencies.find(
+      (item) => item.code === facts.asset.quoteCurrency,
+    );
+    if (!currency) throw new Error("Asset quote currency is unavailable");
+    const remainingCostBasisMinor = lots.reduce(
+      (total, lot) => total + lot.remainingCostBasisMinor,
+      0n,
+    );
+    const latest = history[history.length - 1] ?? null;
+    if (!latest) {
+      return {
+        assetId,
+        currencyCode: facts.asset.quoteCurrency,
+        quantity: await this.assets.getCurrentQuantity(assetId),
+        remainingCostBasisMinor,
+        valuation: null,
+        calculation: null,
+      };
+    }
+    const currentValueMinor = decimalToMinorUnits(
+      latest.totalValue,
+      currency.minorUnit,
+    );
+    return {
+      assetId,
+      currencyCode: facts.asset.quoteCurrency,
+      quantity: latest.quantity,
+      remainingCostBasisMinor,
+      valuation: latest,
+      calculation: calculateUnrealizedPnl({
+        currentValueMinor,
+        remainingCostBasisMinor,
+      }),
+    };
+  }
 
   async recordQuote(
     quote: MarketQuote,

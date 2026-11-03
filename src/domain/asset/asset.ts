@@ -414,3 +414,36 @@ export function assertTransactionFee(
     );
   }
 }
+
+
+export interface UnrealizedPnlCalculation {
+  currentValueMinor: bigint;
+  remainingCostBasisMinor: bigint;
+  unrealizedPnlMinor: bigint;
+  returnBasisPoints: bigint | null;
+}
+
+/**
+ * Unrealized P&L is based on the latest saved valuation and the remaining
+ * acquisition cost of open lots. Realized proceeds and transaction fees are
+ * intentionally excluded from this calculation.
+ */
+export function calculateUnrealizedPnl(params: {
+  currentValueMinor: bigint;
+  remainingCostBasisMinor: bigint;
+}): UnrealizedPnlCalculation {
+  if (params.currentValueMinor < 0n || params.remainingCostBasisMinor < 0n) {
+    throw new Error("Valuation and remaining cost basis cannot be negative");
+  }
+  const unrealizedPnlMinor =
+    params.currentValueMinor - params.remainingCostBasisMinor;
+  return {
+    currentValueMinor: params.currentValueMinor,
+    remainingCostBasisMinor: params.remainingCostBasisMinor,
+    unrealizedPnlMinor,
+    returnBasisPoints:
+      params.remainingCostBasisMinor === 0n
+        ? null
+        : (unrealizedPnlMinor * 10_000n) / params.remainingCostBasisMinor,
+  };
+}

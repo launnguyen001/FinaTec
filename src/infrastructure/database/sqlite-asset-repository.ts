@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, isNull } from "drizzle-orm";
 
 import {
   aggregateDcaLots,
@@ -549,6 +549,28 @@ export class SqliteAssetRepository implements AssetRepository {
       })
       .map((row) => row.remainingQuantity);
     return sumDecimalQuantities(quantities, facts.assetType.quantityPrecision);
+  }
+
+  async listDailyValuations(assetId: string): Promise<DailyValuation[]> {
+    const rows = await this.db
+      .select()
+      .from(assetDailyValuations)
+      .where(eq(assetDailyValuations.assetId, assetId))
+      .orderBy(asc(assetDailyValuations.valuationDate));
+    return rows.map((row) => ({
+      id: row.id,
+      assetId: row.assetId,
+      valuationDate: row.valuationDate,
+      quantity: row.quantity,
+      unitPrice: row.unitPrice,
+      totalValue: row.totalValue,
+      currencyCode: row.currencyCode,
+      source: row.source,
+      quoteStatus: row.quoteStatus,
+      observedAt: row.observedAt,
+      capturedAt: row.capturedAt,
+      closedAt: row.closedAt,
+    }));
   }
 
   async recordQuoteAndSnapshot(input: {

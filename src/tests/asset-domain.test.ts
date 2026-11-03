@@ -1,5 +1,6 @@
 import {
   aggregateDcaLots,
+  calculateUnrealizedPnl,
   canManualRefresh,
   canRefreshPrice,
   calculatePurchase,
@@ -29,6 +30,30 @@ const lot = (overrides: Partial<AssetLot> = {}): AssetLot => ({
 });
 
 describe("Task04 asset domain rules", () => {
+  it("calculates unrealized P&L from remaining cost basis, not original acquisition cost", () => {
+    const result = calculateUnrealizedPnl({
+      currentValueMinor: 18_000n,
+      remainingCostBasisMinor: 12_000n,
+    });
+    expect(result.unrealizedPnlMinor).toBe(6_000n);
+    expect(result.returnBasisPoints).toBe(5_000n);
+  });
+
+  it("supports a loss and a zero-cost-basis position without division by zero", () => {
+    expect(
+      calculateUnrealizedPnl({
+        currentValueMinor: 8_000n,
+        remainingCostBasisMinor: 10_000n,
+      }).unrealizedPnlMinor,
+    ).toBe(-2_000n);
+    expect(
+      calculateUnrealizedPnl({
+        currentValueMinor: 100n,
+        remainingCostBasisMinor: 0n,
+      }).returnBasisPoints,
+    ).toBeNull();
+  });
+
   it("sums current quantities with exact decimal arithmetic", () => {
     expect(sumDecimalQuantities(["0.125", "1.2", "0.00000001"], 8)).toBe(
       "1.32500001",
