@@ -155,9 +155,18 @@ export async function runInterestAcceptanceDiagnostic(): Promise<InterestAccepta
     });
     const principal = makeAccount("principal", "ASSET", true);
     const payout = makeAccount("payout", "ASSET");
+    const monthlyPrincipal = makeAccount("monthly-principal", "ASSET", true);
+    const monthlyPayout = makeAccount("monthly-payout", "ASSET");
     const income = makeAccount("interest-income", "INCOME");
     const equity = makeAccount("opening-equity", "EQUITY");
-    for (const account of [principal, payout, income, equity]) {
+    for (const account of [
+      principal,
+      payout,
+      monthlyPrincipal,
+      monthlyPayout,
+      income,
+      equity,
+    ]) {
       await ledger.createAccount(account);
     }
 
@@ -177,6 +186,13 @@ export async function runInterestAcceptanceDiagnostic(): Promise<InterestAccepta
       offsetAccountId: equity.id,
       amountMinor: 100_000n,
       occurredAt: "2025-12-31T12:00:00.000Z",
+    });
+    await accounting.createOpeningBalance({
+      idempotencyKey: `task05-${suffix}-opening-monthly-principal`,
+      accountId: monthlyPrincipal.id,
+      offsetAccountId: equity.id,
+      amountMinor: 100_000n,
+      occurredAt: "2026-01-30T12:00:00.000Z",
     });
 
     const interestRepository = new SqliteInterestRepository(db);
@@ -208,6 +224,37 @@ export async function runInterestAcceptanceDiagnostic(): Promise<InterestAccepta
       true,
       "a 2025-12-31 20:00Z movement is after 2026-01-01 local midnight in Asia/Ho_Chi_Minh and is rejected",
     );
+
+    const monthlyPlan = await interest.createPlan({
+      name: "Month-end catch-up schedule",
+      principalAccountId: monthlyPrincipal.id,
+      interestIncomeAccountId: income.id,
+      payoutAccountId: monthlyPayout.id,
+      annualRatePpm: 55_000n,
+      compounding: "SIMPLE",
+      postingFrequency: "MONTHLY",
+      startDate: "2026-01-31",
+      maturityDate: "2026-03-31",
+      timezoneId: "UTC",
+    });
+    const monthlyPosted = await interest.catchUp(
+      monthlyPlan.id,
+      "2026-03-31",
+      "PAYOUT",
+    );
+    const monthlyPayoutBalance = calculateAccountBalance(
+      monthlyPayout,
+      await ledger.listPostedJournalLinesForAccount(monthlyPayout.id),
+      new Currency("USDT", 6),
+    );
+    check(
+      "Monthly catch-up and month-end anchoring",
+      monthlyPosted.length === 2 &&
+        monthlyPosted.every((item) => item.status === "PAID") &&
+        monthlyPayoutBalance.minorUnits === 889n,
+      "Jan 31 → Feb 28 (28 days) and Feb 28 → Mar 31 (31 days) posted in order with HALF_UP",
+    );
+    await interest.setPlanStatus(monthlyPlan.id, "CLOSED");
 
     const capitalizationPlan = await interest.createPlan({
       name: "One-year capitalization",
