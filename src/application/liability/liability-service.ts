@@ -1,3 +1,5 @@
+import { Currency } from "../../domain/ledger/currency";
+import { calculateAccountBalance } from "../../domain/ledger/posting";
 import type { Account, JournalEntry, JournalLine, LedgerRepository } from "../../domain/ledger/repository";
 import type {
   EarlyPaymentPolicy,
@@ -107,6 +109,14 @@ export class LiabilityService {
     if (receivingAccount.type !== "ASSET") throw new Error("Loan proceeds must be received by an ASSET account");
     if (interestAccount.type !== "EXPENSE") throw new Error("Interest counterpart must have EXPENSE type");
     const currencyCode = liabilityAccount.currencyCode;
+    const currencyRecord = (await this.ledger.listCurrencies(false)).find((item) => item.code === currencyCode);
+    if (!currencyRecord) throw new Error("Liability account currency is unavailable");
+    const liabilityBalance = calculateAccountBalance(
+      liabilityAccount,
+      await this.ledger.listPostedJournalLinesForAccount(liabilityAccount.id),
+      new Currency(currencyRecord.code, currencyRecord.minorUnit),
+    ).minorUnits;
+    if (liabilityBalance !== 0n) throw new Error("A new liability must use an account with zero Ledger balance");
     if ([receivingAccount, interestAccount].some((account) => account.currencyCode !== currencyCode)) {
       throw new Error("Loan, receiving and interest accounts must use the same currency");
     }
