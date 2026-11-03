@@ -412,10 +412,34 @@ export class LiabilityService {
   ): Promise<LiabilityPayment> {
     const key = input.idempotencyKey.trim();
     if (!key) throw new Error("Payment idempotency key is required");
+    if (input.amountMinor <= 0n)
+      throw new Error("Payment amount must be positive");
+    const feeMinor = input.feeMinor ?? 0n;
+    if (feeMinor < 0n) throw new Error("Fee cannot be negative");
     const existing = (
       await this.repository.listPayments(input.liabilityId)
     ).find((item) => item.idempotencyKey === key);
-    if (existing) return existing;
+    if (existing) {
+      const samePayload =
+        existing.sourceAccountId === input.sourceAccountId &&
+        existing.principalPaidMinor + existing.interestPaidMinor ===
+          input.amountMinor &&
+        existing.feePaidMinor === feeMinor &&
+        existing.scheduleId === (input.scheduleId ?? null) &&
+        existing.replacesPaymentId === (input.replacesPaymentId ?? null) &&
+        (input.paidAt === undefined || existing.paidAt === input.paidAt) &&
+        (input.note === undefined ||
+          existing.note === (input.note?.trim() || null)) &&
+        (input.fxRateNumerator === undefined ||
+          (existing.fxRateNumerator === input.fxRateNumerator &&
+            existing.fxRateDenominator === input.fxRateDenominator));
+      if (!samePayload) {
+        throw new Error(
+          "Payment idempotency key was reused with a different payload",
+        );
+      }
+      return existing;
+    }
     if (input.replacesPaymentId) {
       const replacedPayment = await this.repository.findPaymentById(
         input.replacesPaymentId,
@@ -430,11 +454,6 @@ export class LiabilityService {
         );
       }
     }
-    if (input.amountMinor <= 0n)
-      throw new Error("Payment amount must be positive");
-    const feeMinor = input.feeMinor ?? 0n;
-    if (feeMinor < 0n) throw new Error("Fee cannot be negative");
-
     const liability = await this.requireLiability(input.liabilityId);
     if (liability.status !== "ACTIVE")
       throw new Error("Only an ACTIVE liability can be paid");
