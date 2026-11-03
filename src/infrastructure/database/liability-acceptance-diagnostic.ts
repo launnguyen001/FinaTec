@@ -325,7 +325,7 @@ export async function runLiabilityAcceptanceDiagnostic(): Promise<LiabilityAccep
     );
     stage = "record early principal repayment and recalculate schedule";
     await service.recordPayment({
-      liabilityId: earlyLoan.id, 1
+      liabilityId: earlyLoan.id,
       sourceAccountId: cashOut.id,
       amountMinor: 20_000n,
       paidAt: currentTime,
