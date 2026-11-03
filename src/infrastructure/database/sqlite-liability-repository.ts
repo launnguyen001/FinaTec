@@ -425,7 +425,10 @@ export class SqliteLiabilityRepository implements LiabilityRepository {
         .run();
       if (changedLiability.changes !== 1)
         throw new Error("Liability balance could not be updated");
-      return input.payment;
+      const persistedPayment = tx.select().from(liabilityPayments)
+        .where(eq(liabilityPayments.id, input.payment.id)).get();
+      if (!persistedPayment) throw new Error("Committed payment could not be reloaded");
+      return mapPayment(persistedPayment);
     });
   }
 
