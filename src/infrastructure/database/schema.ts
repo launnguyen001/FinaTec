@@ -637,6 +637,74 @@ export const interestAccruals = sqliteTable(
   ],
 );
 
+
+export const liabilities = sqliteTable("liabilities", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  liabilityAccountId: text("liability_account_id").notNull().unique().references(() => accounts.id, { onDelete: "restrict", onUpdate: "restrict" }),
+  interestExpenseAccountId: text("interest_expense_account_id").notNull().references(() => accounts.id, { onDelete: "restrict", onUpdate: "restrict" }),
+  currencyCode: text("currency_code").notNull().references(() => currencies.code, { onDelete: "restrict", onUpdate: "restrict" }),
+  originalPrincipalMinor: integer("original_principal_minor").notNull(),
+  outstandingPrincipalMinor: integer("outstanding_principal_minor").notNull(),
+  annualRatePpm: integer("annual_rate_ppm").notNull(),
+  repaymentMethod: text("repayment_method", { enum: ["DECLINING", "EQUAL_PRINCIPAL", "ANNUITY", "INTEREST_ONLY"] }).notNull(),
+  termMonths: integer("term_months").notNull(),
+  startDate: text("start_date").notNull(),
+  firstDueDate: text("first_due_date").notNull(),
+  timezoneId: text("timezone_id").notNull(),
+  earlyPaymentPolicy: text("early_payment_policy", { enum: ["KEEP_MATURITY_REDUCE_INSTALLMENT", "KEEP_INSTALLMENT_SHORTEN_TERM"] }).notNull(),
+  status: text("status", { enum: ["ACTIVE", "PAID_OFF", "ARCHIVED"] }).notNull(),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+  paidOffAt: text("paid_off_at"),
+}, (table) => [
+  index("liabilities_status_idx").on(table.status, table.updatedAt),
+  check("liabilities_principal_range", sql`${table.originalPrincipalMinor} > 0 AND ${table.originalPrincipalMinor} <= 9007199254740991 AND ${table.outstandingPrincipalMinor} >= 0 AND ${table.outstandingPrincipalMinor} <= 9007199254740991`),
+  check("liabilities_rate_range", sql`${table.annualRatePpm} BETWEEN 0 AND 10000000`),
+  check("liabilities_term_range", sql`${table.termMonths} BETWEEN 1 AND 600`),
+]);
+
+export const liabilityInstallments = sqliteTable("liability_installments", {
+  id: text("id").primaryKey(),
+  liabilityId: text("liability_id").notNull().references(() => liabilities.id, { onDelete: "restrict", onUpdate: "restrict" }),
+  sequence: integer("sequence").notNull(),
+  periodStart: text("period_start").notNull(),
+  dueDate: text("due_date").notNull(),
+  openingPrincipalMinor: integer("opening_principal_minor").notNull(),
+  principalDueMinor: integer("principal_due_minor").notNull(),
+  interestDueMinor: integer("interest_due_minor").notNull(),
+  totalDueMinor: integer("total_due_minor").notNull(),
+  closingPrincipalMinor: integer("closing_principal_minor").notNull(),
+  annualRatePpm: integer("annual_rate_ppm").notNull(),
+  principalPaidMinor: integer("principal_paid_minor").notNull().default(0),
+  interestPaidMinor: integer("interest_paid_minor").notNull().default(0),
+  status: text("status", { enum: ["UPCOMING", "DUE", "PARTIALLY_PAID", "PAID", "OVERDUE", "CANCELLED"] }).notNull(),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+}, (table) => [
+  uniqueIndex("liability_installments_liability_sequence_unique").on(table.liabilityId, table.sequence),
+  index("liability_installments_due_idx").on(table.liabilityId, table.dueDate, table.sequence),
+  check("liability_installments_total_check", sql`${table.totalDueMinor} = ${table.principalDueMinor} + ${table.interestDueMinor}`),
+]);
+
+export const liabilityPayments = sqliteTable("liability_payments", {
+  id: text("id").primaryKey(),
+  liabilityId: text("liability_id").notNull().references(() => liabilities.id, { onDelete: "restrict", onUpdate: "restrict" }),
+  scheduleId: text("schedule_id").references(() => liabilityInstallments.id, { onDelete: "restrict", onUpdate: "restrict" }),
+  sourceAccountId: text("source_account_id").notNull().references(() => accounts.id, { onDelete: "restrict", onUpdate: "restrict" }),
+  journalEntryId: text("journal_entry_id").notNull().unique().references(() => journalEntries.id, { onDelete: "restrict", onUpdate: "restrict" }),
+  idempotencyKey: text("idempotency_key").notNull().unique(),
+  paidAt: text("paid_at").notNull(),
+  principalPaidMinor: integer("principal_paid_minor").notNull(),
+  interestPaidMinor: integer("interest_paid_minor").notNull(),
+  feePaidMinor: integer("fee_paid_minor").notNull().default(0),
+  note: text("note"),
+  createdAt: text("created_at").notNull(),
+}, (table) => [
+  index("liability_payments_liability_paid_idx").on(table.liabilityId, table.paidAt),
+  check("liability_payments_amount_check", sql`${table.principalPaidMinor} >= 0 AND ${table.interestPaidMinor} >= 0 AND ${table.feePaidMinor} >= 0 AND ${table.principalPaidMinor} + ${table.interestPaidMinor} + ${table.feePaidMinor} > 0`),
+]);
+
 export const ledgerSchema = {
   currencies,
   ledgerSettings,
@@ -655,4 +723,7 @@ export const ledgerSchema = {
   assetDailyValuations,
   interestPlans,
   interestAccruals,
+  liabilities,
+  liabilityInstallments,
+  liabilityPayments,
 };
