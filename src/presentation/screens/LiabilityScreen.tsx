@@ -115,6 +115,7 @@ export function LiabilityScreen() {
   const [selectedId, setSelectedId] = useState("");
   const [installments, setInstallments] = useState<LiabilityInstallment[]>([]);
   const [payments, setPayments] = useState<LiabilityPayment[]>([]);
+  const [rateChanges, setRateChanges] = useState<{ id: string; annualRatePpm: bigint; effectiveDate: string; reason: string | null }[]>([]);
   const [name, setName] = useState("");
   const [principal, setPrincipal] = useState("");
   const [apr, setApr] = useState("12");
@@ -206,11 +207,13 @@ export function LiabilityScreen() {
     if (!runtime || !selectedId) {
       setInstallments([]);
       setPayments([]);
+      setRateChanges([]);
       return;
     }
     const detail = await runtime.liabilities.getDetail(selectedId);
     setInstallments(detail.installments);
     setPayments(detail.payments);
+    setRateChanges(detail.rateChanges);
     setReconciliation(detail.reconciliation.differenceMinor.toString());
   }, [runtime, selectedId]);
 
