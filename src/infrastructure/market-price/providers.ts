@@ -91,10 +91,13 @@ export class CoinGeckoDemoProvider implements PriceProvider {
       + encodeURIComponent(request.providerSymbol)
       + "&vs_currencies=usd&include_last_updated_at=true";
     const data = await readJson(url, { "x-cg-demo-api-key": this.apiKey });
-    if (!isRecord(data) || !isRecord(data[request.providerSymbol])) {
+    if (!isRecord(data)) {
       throw new Error("CoinGecko response does not contain the requested asset");
     }
     const item = data[request.providerSymbol];
+    if (!isRecord(item)) {
+      throw new Error("CoinGecko response does not contain the requested asset");
+    }
     return quote(
       request,
       this.source,
