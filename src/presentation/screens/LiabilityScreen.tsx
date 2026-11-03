@@ -128,6 +128,8 @@ export function LiabilityScreen() {
   const [installments, setInstallments] = useState<LiabilityInstallment[]>([]);
   const [payments, setPayments] = useState<LiabilityPayment[]>([]);
   const [rateChanges, setRateChanges] = useState<{ id: string; annualRatePpm: bigint; effectiveDate: string; reason: string | null }[]>([]);
+  const [reversals, setReversals] = useState<{ id: string; paymentId: string; reason: string | null; createdAt: string }[]>([]);
+  const [replacementPaymentId, setReplacementPaymentId] = useState("");
   const [name, setName] = useState("");
   const [principal, setPrincipal] = useState("");
   const [apr, setApr] = useState("12");
@@ -223,12 +225,14 @@ export function LiabilityScreen() {
       setInstallments([]);
       setPayments([]);
       setRateChanges([]);
+      setReversals([]);
       return;
     }
     const detail = await runtime.liabilities.getDetail(selectedId);
     setInstallments(detail.installments);
     setPayments(detail.payments);
     setRateChanges(detail.rateChanges);
+    setReversals(detail.reversals);
     setReconciliation(detail.reconciliation.differenceMinor.toString());
   }, [runtime, selectedId]);
 
@@ -340,11 +344,13 @@ export function LiabilityScreen() {
         feeExpenseAccountId: feeAccountId || undefined,
         fxRateNumerator: fx.numerator,
         fxRateDenominator: fx.denominator,
+        replacesPaymentId: replacementPaymentId.trim() || undefined,
         idempotencyKey,
       });
       setPaymentAmount("");
       setFeeAmount("0");
       setPaymentIdempotencyKey("");
+      setReplacementPaymentId("");
       setMessage("Đã ghi nhận thanh toán và hạch toán Journal Entry.");
     });
 
@@ -356,6 +362,14 @@ export function LiabilityScreen() {
       setNewApr("");
       setAprReason("");
       setMessage("Đã lưu lịch sử APR và tính lại các kỳ chưa đến hạn.");
+    });
+
+  const reversePayment = (paymentId: string) =>
+    run(async () => {
+      if (!runtime) return;
+      await runtime.liabilities.reversePayment(paymentId, "Điều chỉnh thanh toán theo yêu cầu người dùng");
+      setReplacementPaymentId(paymentId);
+      setMessage("Đã đảo bút toán thanh toán; có thể tạo khoản thanh toán thay thế liên kết với giao dịch này.");
     });
 
   const archive = () =>
@@ -427,6 +441,17 @@ export function LiabilityScreen() {
                   <Text key={change.id} style={styles.rowText}>
                     {change.effectiveDate} · {(Number(change.annualRatePpm) / 10000).toFixed(4)}% · {change.reason || "Không có ghi chú"}
                   </Text>
+                  <Text style={styles.muted}>
+                    {reversals.some((item) => item.paymentId === payment.id)
+                      ? "Đã đảo bút toán"
+                      : "Đang hiệu lực"}
+                    {!reversals.some((item) => item.paymentId === payment.id) ? " · " : ""}
+                  </Text>
+                  {!reversals.some((item) => item.paymentId === payment.id) ? (
+                    <Pressable disabled={busy} onPress={() => void reversePayment(payment.id)} style={styles.choice}>
+                      <Text style={styles.choiceText}>Đảo thanh toán này</Text>
+                    </Pressable>
+                  ) : null}
                 ))
               )}
               {activeLiability.status === "ACTIVE" ? (
@@ -654,6 +679,13 @@ export function LiabilityScreen() {
               )}
               selectedId={sourceAccountId}
               onSelect={setSourceAccountId}
+            />
+            <TextInput
+              accessibilityLabel="ID thanh toán được thay thế"
+              placeholder="ID payment bị đảo (nếu là payment thay thế)"
+              value={replacementPaymentId}
+              onChangeText={setReplacementPaymentId}
+              style={styles.input}
             />
             <TextInput
               accessibilityLabel="Số tiền thanh toán"
