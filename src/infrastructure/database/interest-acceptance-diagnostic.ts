@@ -348,14 +348,13 @@ export async function runInterestAcceptanceDiagnostic(): Promise<InterestAccepta
       timezoneId: "UTC",
     });
     currentTime = "2028-01-01T00:00:00.000Z";
-    const payoutAccrual = await interest.accruePeriod({
-      planId: payoutPlan.id,
-      periodStart: "2027-01-01",
-      periodEnd: "2028-01-01",
-      kind: "PAYOUT",
-    });
-    assert(payoutAccrual.accrual, "Expected a payout accrual record");
-    const paid = await interest.postAccrual(payoutAccrual.accrual.id);
+    const catchUpResults = await interest.catchUp(
+      payoutPlan.id,
+      "2028-01-01",
+      "PAYOUT",
+    );
+    const paid = catchUpResults[0];
+    assert(paid, "Expected at-maturity catch-up to post the payout accrual");
     const principalAfterPayout = calculateAccountBalance(
       principal,
       await ledger.listPostedJournalLinesForAccount(principal.id),
