@@ -1,6 +1,6 @@
 # Két Số — Database Schema (TASK-01)
 
-**Status:** Initial schema proposal implemented on `task/01-database-architecture`; pending verification/review.  
+**Status:** TASK-01 DONE — merged to `main` via PR #3 (`f542c42`).  
 **Schema version:** 1  
 **Database:** local SQLite + SQLCipher  
 **ORM:** Drizzle ORM / Expo SQLite
