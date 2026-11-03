@@ -178,6 +178,15 @@ export class InterestService {
 
   async preview(planId: string, startDate: string, endDate: string) {
     const plan = await this.requirePlan(planId);
+    if (startDate < plan.startDate) {
+      throw new Error("Preview period cannot start before the plan start date");
+    }
+    if (plan.maturityDate && endDate > plan.maturityDate) {
+      throw new Error("Preview period cannot end after plan maturity");
+    }
+    if (await this.repository.hasExternalPrincipalMovements(plan)) {
+      throw new Error("Principal changed outside this InterestPlan after its start date; preview is not reliable in this MVP");
+    }
     const principalMinor = await this.readPrincipalBalance(plan);
     return calculateSimpleInterest({
       principalMinor,
