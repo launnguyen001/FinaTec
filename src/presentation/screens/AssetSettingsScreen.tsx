@@ -90,7 +90,7 @@ export function AssetSettingsScreen() {
     setMessage(null);
     try {
       if (
-        (primary === "COINGECKO" || fallback === "COINGECKO") &&
+        primary === "COINGECKO" &&
         !apiKey.trim()
       ) {
         throw new Error(
@@ -236,7 +236,8 @@ export function AssetSettingsScreen() {
         />
         <Text style={styles.hint}>
           API key chỉ được lưu trong SecureStore, không nằm trong SQLite hoặc
-          Git. Provider symbol cần đúng định danh của provider tương ứng.
+          Git. CoinGecko chỉ bị bỏ qua nếu không có key và đang là fallback.
+          Provider symbol cần đúng định danh của provider tương ứng.
         </Text>
       </View>
 

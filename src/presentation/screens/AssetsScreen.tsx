@@ -332,6 +332,57 @@ export function AssetsScreen() {
       </View>
 
       <View style={styles.card}>
+        <Text style={styles.sectionTitle}>Quản lý loại tài sản</Text>
+        {assetTypes.length === 0 ? (
+          <Text style={styles.muted}>Chưa có loại tài sản.</Text>
+        ) : (
+          assetTypes.map((type) => {
+            const profileCount = assets.filter(
+              (asset) => asset.assetTypeId === type.id,
+            ).length;
+            return (
+              <View key={type.id} style={styles.assetRow}>
+                <View style={styles.assetIdentity}>
+                  <Text style={styles.assetSymbol}>{type.name}</Text>
+                  <Text style={styles.muted}>
+                    {type.assetClass} · {type.valuationModel} · {profileCount} hồ sơ đang hoạt động
+                  </Text>
+                </View>
+                {profileCount === 0 ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={busy}
+                    onPress={async () => {
+                      if (!runtime) return;
+                      setBusy(true);
+                      setFailure(null);
+                      setMessage(null);
+                      try {
+                        await runtime.assetCatalog.archiveAssetType(type.id);
+                        setMessage("Đã archive loại tài sản.");
+                        await refresh();
+                      } catch (cause) {
+                        setFailure(
+                          cause instanceof Error
+                            ? cause.message
+                            : "Không thể archive loại tài sản.",
+                        );
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
+                    style={styles.archiveButton}
+                  >
+                    <Text style={styles.archiveButtonText}>Archive type</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            );
+          })
+        )}
+      </View>
+
+      <View style={styles.card}>
         <Text style={styles.sectionTitle}>Tạo loại tài sản</Text>
         <TextInput
           accessibilityLabel="Tên loại tài sản"
