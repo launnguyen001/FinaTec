@@ -233,7 +233,8 @@ export class AssetTransactionService {
   }> {
     const key = this.requireKey(input.idempotencyKey);
     const entryId = "asset:sell:" + key;
-    const existing = await this.ledger.findJournalEntryByIdempotencyKey(entryId);
+    const existing =
+      await this.ledger.findJournalEntryByIdempotencyKey(entryId);
     if (existing) {
       if (existing.status !== "POSTED") {
         throw new Error(
