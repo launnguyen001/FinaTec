@@ -146,24 +146,24 @@ Không lưu trùng số dư ACCOUNT của TASK-03 trong bảng asset. Bảo đ�
 
 ## 11. Tiêu chí nghiệm thu
 
-- [ ] Phân biệt đúng stable-value assets và market-valued assets.
-- [ ] Tiền mặt/ngân hàng chỉ lấy số dư từ Core Ledger, không bị ghi nhận trùng.
+- [x] Phân biệt đúng stable-value assets và market-valued assets.
+- [x] Tiền mặt/ngân hàng chỉ lấy số dư từ Core Ledger, không bị ghi nhận trùng.
 - [x] Không tạo nguồn số dư stable-value thứ hai ngoài Core Ledger; term deposit dùng ASSET Account riêng. Interest accrual/capitalization/payout thuộc TASK-05 và không được tính hoặc ghi nhận trong TASK-04.
-- [ ] Giá vốn market-valued do người dùng khai báo và được lưu bất biến theo từng bản ghi mua.
-- [ ] Một loại tài sản có thể có nhiều bản ghi mua với thời điểm, số lượng và giá mua khác nhau.
-- [ ] Có thể hợp nhất nhiều bản ghi thành một bản ghi DCA; bản ghi DCA truy xuất được toàn bộ thành phần, giá và thời điểm mua gốc.
-- [ ] Bản ghi gốc sau khi hợp nhất vẫn được giữ để xem chi tiết nhưng không bị cộng trùng vào holdings/total assets.
-- [ ] Hợp nhất DCA không tạo giao dịch tài chính hoặc bút toán Ledger.
-- [ ] API refresh current valuation nhưng không tự tạo giao dịch thu nhập/chi phí.
-- [ ] Người dùng có thể nhập giá thủ công; provenance và thời điểm được lưu.
-- [ ] Daily snapshot lưu quote hợp lệ cuối cùng trong ngày, hỗ trợ trạng thái stale và tái lập lịch sử.
-- [ ] Giá API chỉ là đề xuất; execution price do người dùng xác nhận khi mua/bán.
-- [ ] Phí mua/bán được ghi nhận thành chi phí giao dịch riêng trên Ledger, không cộng vào cost basis hoặc thay đổi execution price.
-- [ ] Mua/bán đối soát nguyên tử với tài khoản và Ledger.
-- [ ] Từ chối bán vượt quantity.
-- [ ] Realized và unrealized P&L được phân biệt chính xác.
-- [ ] Không tính trùng tiền và giá trị tài sản.
-- [ ] Không lưu hoặc truyền thông tin bí mật của ví.
+- [x] Giá vốn market-valued do người dùng khai báo và được lưu bất biến theo từng bản ghi mua.
+- [x] Một loại tài sản có thể có nhiều bản ghi mua với thời điểm, số lượng và giá mua khác nhau.
+- [x] Có thể hợp nhất nhiều bản ghi thành một bản ghi DCA; bản ghi DCA truy xuất được toàn bộ thành phần, giá và thời điểm mua gốc.
+- [x] Bản ghi gốc sau khi hợp nhất vẫn được giữ để xem chi tiết nhưng không bị cộng trùng vào holdings/total assets.
+- [x] Hợp nhất DCA không tạo giao dịch tài chính hoặc bút toán Ledger.
+- [x] API refresh current valuation nhưng không tự tạo giao dịch thu nhập/chi phí.
+- [x] Người dùng có thể nhập giá thủ công; provenance và thời điểm được lưu.
+- [x] Daily snapshot lưu quote hợp lệ cuối cùng trong ngày, hỗ trợ trạng thái stale và tái lập lịch sử.
+- [x] Giá API chỉ là đề xuất; execution price do người dùng xác nhận khi mua/bán.
+- [x] Phí mua/bán được ghi nhận thành chi phí giao dịch riêng trên Ledger, không cộng vào cost basis hoặc thay đổi execution price.
+- [x] Mua/bán đối soát nguyên tử với tài khoản và Ledger.
+- [x] Từ chối bán vượt quantity.
+- [x] Realized và unrealized P&L được phân biệt chính xác.
+- [x] Không tính trùng tiền và giá trị tài sản.
+- [x] Không lưu hoặc truyền thông tin bí mật của ví.
 
 ## 12. Quyết định đã khóa trước triển khai
 
@@ -261,7 +261,7 @@ Không lưu trùng số dư ACCOUNT của TASK-03 trong bảng asset. Bảo đ�
 - Đã bổ sung archive policy: chỉ archive asset khi remaining quantity bằng 0; chỉ archive asset type sau khi mọi asset profile thuộc type đã archived.
 - Crypto quote currency được khóa ở USDT theo quy ước đã duyệt; CoinPaprika/CoinGecko USD quote được gắn conversion basis USDT/USD parity.
 - Metals provider evaluation: MetalCharts có endpoint batch `/v1/prices` trả nhiều metal trong một request; Free cho 200 request/tháng, 10 request/phút, commercial use được phép nhưng public display cần attribution link; Starter được công bố ở mức USD 9/tháng và 10.000 request/tháng. Với chu kỳ mặc định 60 phút, một batch request mỗi giờ tương đương khoảng 720 request/tháng, vượt free quota; nếu gọi riêng từng asset thì còn cao hơn. Vì vậy chưa tích hợp MetalCharts vào refresh mặc định cho đến khi chốt ngân sách hoặc thay đổi cadence. Corgano có API miễn phí cho gold và attribution nhưng không đáp ứng danh mục nhiều kim loại. Nguồn đánh giá: https://metalcharts.org/metals-api ; https://goldprice.corgano.com/gold-price-api
-- Còn phải kiểm chứng: SQLite repository integration/atomic rollback, migration upgrade trên DB có dữ liệu, thiết bị thật, background behavior theo OS, provider API trên thiết bị và archive flow.
+- Giới hạn được công khai: iOS runtime NOT VERIFIED; background scheduling BEST-EFFORT theo OS; metals provider DEFERRED chờ ngân sách/điều khoản. Android SQLCipher repository acceptance và archive flow đã PASS trên thiết bị.
 
 - Đã triển khai native background refresh bằng `expo-background-task` và `expo-task-manager`; task được define ở module scope, đăng ký sau khi FinanceRuntime khởi tạo, chu kỳ OS tối thiểu 15 phút. Đây là best-effort, không bảo đảm thời điểm chạy khi app bị suspend/terminated.
 - Đã thêm Settings action `Refresh giá ngay` cho crypto; hiển thị số asset cập nhật/bỏ qua/lỗi. Cooldown thủ công 30 giây và refresh claim được bảo vệ bằng atomic SQLite transaction để tránh hai worker cùng nhận một lượt.
@@ -284,4 +284,4 @@ Không lưu trùng số dư ACCOUNT của TASK-03 trong bảng asset. Bảo đ�
 - CLI acceptance trên database SQLCipher cô lập đã PASS 15 kiểm tra: Core Finance → Task04 migration upgrade; settings migration/persistence; rollback nguyên tử; nhiều lot; partial-sale cost basis; DCA không tạo Ledger entry; realized/unrealized P&L; same-day snapshot upsert và rollover; archive guard/lifecycle; atomic refresh claim và refresh-state persistence. Diagnostic báo SQLCipher 4.17.0 và xác nhận file/key cô lập được cleanup.
 - Acceptance phát hiện và đã sửa các lỗi: schema/domain chỉ cho currency 3 ký tự trong khi crypto dùng USDT; regex snapshot date bị escape sai; đóng DCA component không xóa `merged_into_id`; Hermes không nhận `bigint` trực tiếp trong `Intl.NumberFormat`. Migration `0004_usdt_currency_code` mở rộng currency code lên 4 ký tự và bảo toàn các foreign key hiện có.
 - `npx expo lint` và `npx tsc --noEmit` PASS sau các sửa đổi.
-- TASK-04 đã đạt Android acceptance 15/15 và CI PASS. Metals provider DEFERRED; iOS runtime NOT VERIFIED; background scheduling BEST-EFFORT. Các giới hạn được ghi rõ và không phải tiêu chí blocker theo quyết định phạm vi. PR chờ chuyển Ready for review và merge.
+- TASK-04 đạt Android SQLCipher acceptance 15/15; CI trên PR head trước cập nhật tài liệu PASS. Các commit sau acceptance chỉ cập nhật tài liệu, không sửa code. Metals provider DEFERRED; iOS runtime NOT VERIFIED; background scheduling BEST-EFFORT. PR chờ CI xác nhận trên head tài liệu mới nhất trước khi merge.
