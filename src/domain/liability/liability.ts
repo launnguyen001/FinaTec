@@ -69,6 +69,8 @@ export interface LiabilityJournalCommit {
 
 export interface LiabilityPaymentCommit extends LiabilityJournalCommit {
   payment: LiabilityPayment;
+  allocations: LiabilityPaymentAllocation[];
+  scheduleChanges: LiabilityPaymentScheduleChange[];
   outstandingPrincipalMinor: bigint;
   installmentUpdates: LiabilityInstallment[];
   newInstallments: LiabilityInstallment[];
