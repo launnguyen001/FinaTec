@@ -261,13 +261,6 @@ export class SqliteInterestRepository implements InterestRepository {
     });
   }
 
-  private nextDate(date: string): string {
-    const [year, month, day] = date.split("-").map(Number);
-    return new Date(Date.UTC(year, month - 1, day + 1))
-      .toISOString()
-      .slice(0, 10);
-  }
-
   private readPostingContext(tx: InterestTransaction): PostingContext {
     const accountRows = tx.select().from(accounts).all();
     const currencyRows = tx.select().from(currencies).all();
