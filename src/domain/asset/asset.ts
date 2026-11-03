@@ -354,11 +354,7 @@ export function getMinimumRefreshIntervalMs(
   const selected = configuredMinutes ?? defaults[assetClass];
   if (!Number.isFinite(selected) || selected < minimum || selected > maximum) {
     throw new Error(
-      "Price refresh interval must be between " +
-        minimum +
-        " and " +
-        maximum +
-        " minutes",
+      `Price refresh interval must be at least ${minimum} minutes and no more than ${maximum} minutes`,
     );
   }
   return selected * 60_000;
