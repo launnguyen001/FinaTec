@@ -60,6 +60,10 @@ export class InterestService {
     if (input.postingFrequency === "AT_MATURITY" && !maturityDate) {
       throw new Error("At-maturity posting requires a maturity date");
     }
+    const compounding = input.compounding ?? "SIMPLE";
+    if (compounding === "SIMPLE" && !input.payoutAccountId) {
+      throw new Error("Simple-interest plans require a payout destination; capitalization would compound interest");
+    }
 
     const principal = await this.requireAccount(input.principalAccountId);
     const income = await this.requireAccount(input.interestIncomeAccountId);
@@ -106,7 +110,7 @@ export class InterestService {
       annualRatePpm: input.annualRatePpm,
       rateConvention: "NOMINAL_APR",
       dayCount: "ACT_365_FIXED",
-      compounding: input.compounding ?? "SIMPLE",
+      compounding,
       postingFrequency: input.postingFrequency,
       startDate: input.startDate,
       maturityDate,
@@ -180,6 +184,9 @@ export class InterestService {
     }
     if (input.kind === "PAYOUT" && !plan.payoutAccountId) {
       throw new Error("This plan has no payout destination account");
+    }
+    if (input.kind === "CAPITALIZATION" && plan.compounding !== "AFTER_CAPITALIZATION") {
+      throw new Error("Simple-interest plans cannot capitalize interest; use payout instead");
     }
 
     const existing = (await this.repository.listAccruals(plan.id)).find(
