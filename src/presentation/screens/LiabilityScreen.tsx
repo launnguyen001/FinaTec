@@ -10,8 +10,10 @@ import {
 } from "react-native";
 import type { Account, CurrencyRecord } from "../../domain/ledger/repository";
 import type {
+  EarlyPaymentPolicy,
   Liability,
   LiabilityInstallment,
+  LiabilityPayment,
 } from "../../domain/liability/liability";
 import type { RepaymentMethod } from "../../domain/liability/repayment-schedule";
 import { formatBigIntVi } from "../../shared/formatting/format-bigint";
@@ -112,6 +114,7 @@ export function LiabilityScreen() {
   const [liabilities, setLiabilities] = useState<Liability[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [installments, setInstallments] = useState<LiabilityInstallment[]>([]);
+  const [payments, setPayments] = useState<LiabilityPayment[]>([]);
   const [name, setName] = useState("");
   const [principal, setPrincipal] = useState("");
   const [apr, setApr] = useState("12");
@@ -121,6 +124,7 @@ export function LiabilityScreen() {
   );
   const [firstDueDate, setFirstDueDate] = useState("");
   const [method, setMethod] = useState<RepaymentMethod>("EQUAL_PRINCIPAL");
+  const [earlyPaymentPolicy, setEarlyPaymentPolicy] = useState<EarlyPaymentPolicy>("KEEP_MATURITY_REDUCE_INSTALLMENT");
   const [liabilityAccountId, setLiabilityAccountId] = useState("");
   const [receivingAccountId, setReceivingAccountId] = useState("");
   const [interestAccountId, setInterestAccountId] = useState("");
@@ -198,10 +202,12 @@ export function LiabilityScreen() {
   const loadDetail = useCallback(async () => {
     if (!runtime || !selectedId) {
       setInstallments([]);
+      setPayments([]);
       return;
     }
     const detail = await runtime.liabilities.getDetail(selectedId);
     setInstallments(detail.installments);
+    setPayments(detail.payments);
     setReconciliation(detail.reconciliation.differenceMinor.toString());
   }, [runtime, selectedId]);
 
@@ -274,6 +280,7 @@ export function LiabilityScreen() {
         termMonths: months,
         startDate,
         firstDueDate: dueDate,
+        earlyPaymentPolicy,
         decliningPrincipalMinor:
           method === "DECLINING" ? principalParts : undefined,
       });
@@ -369,6 +376,31 @@ export function LiabilityScreen() {
                     ? "Đang kiểm tra"
                     : `Chênh lệch ${reconciliation} minor units`}
               </Text>
+              <Text style={styles.label}>Lịch sử thanh toán</Text>
+              {payments.length === 0 ? (
+                <Text style={styles.muted}>Chưa có giao dịch thanh toán.</Text>
+              ) : (
+                payments.map((payment) => (
+                  <Text key={payment.id} style={styles.rowText}>
+                    {payment.paidAt.slice(0, 10)} · gốc{" "}
+                    {formatMoney(
+                      payment.principalPaidMinor,
+                      currencies.find((c) => c.code === activeLiability.currencyCode),
+                    )}{" "}
+                    · lãi{" "}
+                    {formatMoney(
+                      payment.interestPaidMinor,
+                      currencies.find((c) => c.code === activeLiability.currencyCode),
+                    )}{" "}
+                    · phí{" "}
+                    {formatMoney(
+                      payment.feePaidMinor,
+                      currencies.find((c) => c.code === activeLiability.currencyCode),
+                    )}
+                  </Text>
+                ))
+              )}
+              <Text style={styles.label}>Lịch trả nợ</Text>
               {installments.map((item) => (
                 <Text key={item.id} style={styles.rowText}>
                   #{item.sequence} · {item.dueDate} · {item.status} · gốc{" "}
@@ -466,6 +498,19 @@ export function LiabilityScreen() {
             onChangeText={setFirstDueDate}
             style={styles.input}
           />
+          <Text style={styles.label}>Chính sách trả gốc trước hạn</Text>
+          <View style={styles.wrap}>
+            <Choice
+              label="Giữ ngày đáo hạn · giảm kỳ trả"
+              selected={earlyPaymentPolicy === "KEEP_MATURITY_REDUCE_INSTALLMENT"}
+              onPress={() => setEarlyPaymentPolicy("KEEP_MATURITY_REDUCE_INSTALLMENT")}
+            />
+            <Choice
+              label="Giữ mức trả · rút ngắn kỳ hạn"
+              selected={earlyPaymentPolicy === "KEEP_INSTALLMENT_SHORTEN_TERM"}
+              onPress={() => setEarlyPaymentPolicy("KEEP_INSTALLMENT_SHORTEN_TERM")}
+            />
+          </View>
           <View style={styles.wrap}>
             {(
               [
