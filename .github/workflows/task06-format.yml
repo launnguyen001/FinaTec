@@ -1,4 +1,4 @@
-name: Temporary Task06 formatting pass
+name: Task06 Prettier formatting pass
 
 on:
   push:
