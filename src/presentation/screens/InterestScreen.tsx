@@ -177,7 +177,7 @@ export function InterestScreen() {
     setPeriodStart(
       settled.length > 0
         ? settled[settled.length - 1]!.periodEnd
-        : selectedPlan?.startDate ?? "",
+        : (selectedPlan?.startDate ?? ""),
     );
   }, [runtime, selectedPlanId, plans]);
 

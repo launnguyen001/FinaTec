@@ -421,12 +421,17 @@ export class InterestService {
           : "PAYOUT";
       try {
         const posted = await this.catchUp(plan.id, asOfDate, kind);
-        outcomes.push({ planId: plan.id, processed: posted.length, error: null });
+        outcomes.push({
+          planId: plan.id,
+          processed: posted.length,
+          error: null,
+        });
       } catch (error) {
         outcomes.push({
           planId: plan.id,
           processed: 0,
-          error: error instanceof Error ? error.message : "Unknown catch-up failure",
+          error:
+            error instanceof Error ? error.message : "Unknown catch-up failure",
         });
       }
     }
