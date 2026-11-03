@@ -236,7 +236,8 @@ Không lưu trùng số dư ACCOUNT của TASK-03 trong bảng asset. Bảo đ�
 - Đã triển khai domain rules: decimal arithmetic bằng BigInt, tính gross purchase/fee/net outflow, DCA aggregation, partial-sale cost basis, stale quote fallback, timezone resolution, refresh interval/cooldown và exponential backoff.
 - Đã triển khai provider adapters: CoinPaprika, CoinGecko Demo và Frankfurter; có FallbackPriceProvider.
 - Đã bổ sung unit tests cho domain rules và test Dashboard không cộng investment account vào available cash.
-- Đã sửa invariant giá vốn còn lại sau bán một phần: mỗi lot lưu `remaining_cost_basis_minor`; DCA và tính giá vốn bán tiếp theo sử dụng giá vốn còn lại thay vì giá vốn gốc. Migration `0003_asset_remaining_cost_basis` backfill giá vốn hiện tại cho các lot đã tồn tại; đã bổ sung test DCA từ lot đã bán một phần.
+- Đã sửa invariant giá vốn còn lại sau bán một phần: mỗi lot lưu `remaining_cost_basis_minor`; DCA và tính giá vốn bán tiếp theo sử dụng giá vốn còn lại thay vì giá vốn gốc. Migration `0003_asset_remaining_cost_basis` backfill giá vốn hiện tại cho các lot đã tồn tại; đã bổ sung regression test.
+- Đã mở rộng domain sale để hỗ trợ bán từ lot `MERGED` chỉ khi application/repository xác minh lot đó là component của DCA aggregate đang hoạt động; lot MERGED không có quan hệ component hợp lệ vẫn bị từ chối. Đã bổ sung test cho hai trường hợp.
 - Chưa hoàn tất: atomic repository/use cases cho mua/bán/DCA/quote/snapshot; UI tài sản và Settings; background refresh integration; metals provider; migration/integration acceptance trên thiết bị.
 - Tiếp theo: hoàn thiện atomic AssetRepository gắn cùng Journal Entry, sau đó use cases và UI; chạy `npx tsc --noEmit`, `npx expo lint`, `npm run format:check`, `npm test` và kiểm tra migration trên DB mới/nâng cấp.
 - Kiểm chứng: Các commit bổ sung đã được đẩy lên branch; chưa chạy CLI/device checks trong môi trường hiện tại; không đánh dấu Task04 DONE cho đến khi các tiêu chí nghiệm thu pass.
