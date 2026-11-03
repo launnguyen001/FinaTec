@@ -10,10 +10,12 @@ import { SqliteCategoryRepository } from "./database/category-repository";
 import { getLedgerDatabase } from "./database/database";
 import { SqliteFinanceReadRepository } from "./database/finance-read-repository";
 import { SqliteLedgerRepository } from "./database/sqlite-ledger-repository";
+import { SqliteAssetRepository } from "./database/sqlite-asset-repository";
 
 export async function createFinanceRuntime() {
   const db = await getLedgerDatabase();
   const ledger = new SqliteLedgerRepository(db);
+  const assetRepository = new SqliteAssetRepository(db);
   const accountRepository = new SqliteAccountRepository(db);
   const categoryRepository = new SqliteCategoryRepository(db);
   const readRepository = new SqliteFinanceReadRepository(db);
@@ -23,6 +25,7 @@ export async function createFinanceRuntime() {
   return {
     createId,
     ledger,
+    assetRepository,
     accounts: new AccountService(accountRepository, ledger, { createId, now }),
     categories: new CategoryService(categoryRepository, { createId, now }),
     transactions: new FinanceTransactionService(
