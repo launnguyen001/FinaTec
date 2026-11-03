@@ -87,22 +87,40 @@ export class SqliteAssetRepository implements AssetRepository {
     createdAt: string;
     updatedAt: string;
   }) {
-    const currency = await this.db.select().from(currencies)
-      .where(eq(currencies.code, input.quoteCurrency)).get();
-    if (!currency?.isActive) throw new Error("Asset quote currency is missing or inactive");
+    const currency = await this.db
+      .select()
+      .from(currencies)
+      .where(eq(currencies.code, input.quoteCurrency))
+      .get();
+    if (!currency?.isActive)
+      throw new Error("Asset quote currency is missing or inactive");
     if (!input.name.trim() || !input.unitCode.trim()) {
       throw new Error("Asset type name and unit code are required");
     }
-    if (!Number.isInteger(input.quantityPrecision) || input.quantityPrecision < 0 || input.quantityPrecision > 12 ||
-        !Number.isInteger(input.pricePrecision) || input.pricePrecision < 0 || input.pricePrecision > 12) {
+    if (
+      !Number.isInteger(input.quantityPrecision) ||
+      input.quantityPrecision < 0 ||
+      input.quantityPrecision > 12 ||
+      !Number.isInteger(input.pricePrecision) ||
+      input.pricePrecision < 0 ||
+      input.pricePrecision > 12
+    ) {
       throw new Error("Asset precision must be an integer between 0 and 12");
     }
-    await this.db.insert(assetTypes).values({
+    await this.db
+      .insert(assetTypes)
+      .values({
+        ...input,
+        name: input.name.trim(),
+        unitCode: input.unitCode.trim().toUpperCase(),
+      })
+      .run();
+    return {
       ...input,
       name: input.name.trim(),
       unitCode: input.unitCode.trim().toUpperCase(),
-    }).run();
-    return { ...input, name: input.name.trim(), unitCode: input.unitCode.trim().toUpperCase(), isArchived: false };
+      isArchived: false,
+    };
   }
 
   async createAsset(input: {
@@ -115,21 +133,28 @@ export class SqliteAssetRepository implements AssetRepository {
     createdAt: string;
     updatedAt: string;
   }) {
-    const assetType = await this.db.select().from(assetTypes)
-      .where(eq(assetTypes.id, input.assetTypeId)).get();
-    if (!assetType || assetType.isArchived) throw new Error("Asset type does not exist or is archived");
+    const assetType = await this.db
+      .select()
+      .from(assetTypes)
+      .where(eq(assetTypes.id, input.assetTypeId))
+      .get();
+    if (!assetType || assetType.isArchived)
+      throw new Error("Asset type does not exist or is archived");
     if (assetType.quoteCurrency !== input.quoteCurrency) {
       throw new Error("Asset quote currency must match its asset type");
     }
     if (!input.name.trim() || !input.symbol.trim()) {
       throw new Error("Asset name and symbol are required");
     }
-    await this.db.insert(assets).values({
-      ...input,
-      name: input.name.trim(),
-      symbol: input.symbol.trim().toUpperCase(),
-      providerSymbol: input.providerSymbol?.trim() || null,
-    }).run();
+    await this.db
+      .insert(assets)
+      .values({
+        ...input,
+        name: input.name.trim(),
+        symbol: input.symbol.trim().toUpperCase(),
+        providerSymbol: input.providerSymbol?.trim() || null,
+      })
+      .run();
     return {
       id: input.id,
       assetTypeId: input.assetTypeId,
@@ -144,8 +169,11 @@ export class SqliteAssetRepository implements AssetRepository {
   async listAssetTypes(includeArchived = false) {
     const rows = includeArchived
       ? await this.db.select().from(assetTypes).all()
-      : await this.db.select().from(assetTypes)
-          .where(eq(assetTypes.isArchived, false)).all();
+      : await this.db
+          .select()
+          .from(assetTypes)
+          .where(eq(assetTypes.isArchived, false))
+          .all();
     return rows.map((row) => ({
       id: row.id,
       name: row.name,
@@ -162,8 +190,11 @@ export class SqliteAssetRepository implements AssetRepository {
   async listAssets(includeArchived = false) {
     const rows = includeArchived
       ? await this.db.select().from(assets).all()
-      : await this.db.select().from(assets)
-          .where(eq(assets.isArchived, false)).all();
+      : await this.db
+          .select()
+          .from(assets)
+          .where(eq(assets.isArchived, false))
+          .all();
     return rows.map((row) => ({
       id: row.id,
       assetTypeId: row.assetTypeId,
@@ -447,8 +478,11 @@ export class SqliteAssetRepository implements AssetRepository {
   async listLots(assetId: string) {
     const facts = await this.findAssetForTransaction(assetId);
     if (!facts) throw new Error("Asset does not exist");
-    const rows = await this.db.select().from(assetLots)
-      .where(eq(assetLots.assetId, assetId)).all();
+    const rows = await this.db
+      .select()
+      .from(assetLots)
+      .where(eq(assetLots.assetId, assetId))
+      .all();
     const activeAggregateIds = new Set(
       rows.filter((row) => row.status === "ACTIVE").map((row) => row.id),
     );
@@ -460,13 +494,18 @@ export class SqliteAssetRepository implements AssetRepository {
     return rows
       .filter((row) => {
         const hasQuantity =
-          normalizeDecimal(row.remainingQuantity, facts.assetType.quantityPrecision) !== "0";
+          normalizeDecimal(
+            row.remainingQuantity,
+            facts.assetType.quantityPrecision,
+          ) !== "0";
         if (!hasQuantity) return false;
         if (row.status === "ACTIVE" && row.mergedIntoId === null) return true;
-        return row.status === "MERGED" &&
+        return (
+          row.status === "MERGED" &&
           row.mergedIntoId !== null &&
           activeAggregateIds.has(row.mergedIntoId) &&
-          componentIds.has(row.id);
+          componentIds.has(row.id)
+        );
       })
       .map((row) => ({
         id: row.id,
@@ -485,8 +524,11 @@ export class SqliteAssetRepository implements AssetRepository {
   async getCurrentQuantity(assetId: string): Promise<string> {
     const facts = await this.findAssetForTransaction(assetId);
     if (!facts) throw new Error("Asset does not exist");
-    const rows = await this.db.select().from(assetLots)
-      .where(eq(assetLots.assetId, assetId)).all();
+    const rows = await this.db
+      .select()
+      .from(assetLots)
+      .where(eq(assetLots.assetId, assetId))
+      .all();
     const activeAggregateIds = new Set(
       rows.filter((row) => row.status === "ACTIVE").map((row) => row.id),
     );
@@ -498,10 +540,12 @@ export class SqliteAssetRepository implements AssetRepository {
     const quantities = rows
       .filter((row) => {
         if (row.status === "ACTIVE" && row.mergedIntoId === null) return true;
-        return row.status === "MERGED" &&
+        return (
+          row.status === "MERGED" &&
           row.mergedIntoId !== null &&
           activeAggregateIds.has(row.mergedIntoId) &&
-          componentIds.has(row.id);
+          componentIds.has(row.id)
+        );
       })
       .map((row) => row.remainingQuantity);
     return sumDecimalQuantities(quantities, facts.assetType.quantityPrecision);
@@ -520,76 +564,109 @@ export class SqliteAssetRepository implements AssetRepository {
   }): Promise<DailyValuation | null> {
     return this.db.transaction((tx) => {
       const { quote } = input;
-      const asset = tx.select().from(assets)
-        .where(eq(assets.id, quote.assetId)).get();
-      if (!asset || asset.isArchived || asset.quoteCurrency !== quote.currencyCode) {
+      const asset = tx
+        .select()
+        .from(assets)
+        .where(eq(assets.id, quote.assetId))
+        .get();
+      if (
+        !asset ||
+        asset.isArchived ||
+        asset.quoteCurrency !== quote.currencyCode
+      ) {
         throw new Error("Quote asset or quote currency is invalid");
       }
       if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(input.valuationDate)) {
         throw new Error("Valuation date must use YYYY-MM-DD");
       }
-      if (!Number.isFinite(Date.parse(quote.observedAt)) ||
-          !Number.isFinite(Date.parse(quote.capturedAt)) ||
-          !Number.isFinite(Date.parse(input.snapshotCapturedAt))) {
-        throw new Error("Quote and snapshot timestamps must be valid ISO dates");
+      if (
+        !Number.isFinite(Date.parse(quote.observedAt)) ||
+        !Number.isFinite(Date.parse(quote.capturedAt)) ||
+        !Number.isFinite(Date.parse(input.snapshotCapturedAt))
+      ) {
+        throw new Error(
+          "Quote and snapshot timestamps must be valid ISO dates",
+        );
       }
 
-      tx.insert(assetPriceQuotes).values({
-        id: input.quoteId,
-        assetId: quote.assetId,
-        priceDecimal: quote.price,
-        currencyCode: quote.currencyCode,
-        source: quote.source,
-        quoteStatus: quote.status,
-        observedAt: quote.observedAt,
-        capturedAt: quote.capturedAt,
-        conversionBasis: quote.conversionBasis ?? null,
-        createdAt: input.snapshotCapturedAt,
-      }).run();
+      tx.insert(assetPriceQuotes)
+        .values({
+          id: input.quoteId,
+          assetId: quote.assetId,
+          priceDecimal: quote.price,
+          currencyCode: quote.currencyCode,
+          source: quote.source,
+          quoteStatus: quote.status,
+          observedAt: quote.observedAt,
+          capturedAt: quote.capturedAt,
+          conversionBasis: quote.conversionBasis ?? null,
+          createdAt: input.snapshotCapturedAt,
+        })
+        .run();
 
       if (quote.status === "REJECTED") return null;
-      const normalizedQuantity = normalizeDecimal(input.quantity, input.quantityPrecision);
-      const normalizedPrice = normalizeDecimal(quote.price, input.pricePrecision);
-      const totalMinor = normalizedQuantity === "0"
-        ? 0n
-        : multiplyDecimalToMinor({
-            quantity: normalizedQuantity,
-            quantityPrecision: input.quantityPrecision,
-            unitPrice: normalizedPrice,
-            pricePrecision: input.pricePrecision,
-            currencyMinorUnit: input.currencyMinorUnit,
-          });
+      const normalizedQuantity = normalizeDecimal(
+        input.quantity,
+        input.quantityPrecision,
+      );
+      const normalizedPrice = normalizeDecimal(
+        quote.price,
+        input.pricePrecision,
+      );
+      const totalMinor =
+        normalizedQuantity === "0"
+          ? 0n
+          : multiplyDecimalToMinor({
+              quantity: normalizedQuantity,
+              quantityPrecision: input.quantityPrecision,
+              unitPrice: normalizedPrice,
+              pricePrecision: input.pricePrecision,
+              currencyMinorUnit: input.currencyMinorUnit,
+            });
       const totalValue = formatMinorAmount(totalMinor, input.currencyMinorUnit);
 
-      const latest = tx.select().from(assetDailyValuations)
+      const latest = tx
+        .select()
+        .from(assetDailyValuations)
         .where(eq(assetDailyValuations.assetId, quote.assetId))
         .orderBy(desc(assetDailyValuations.valuationDate))
         .limit(1)
         .get();
       if (latest && input.valuationDate < latest.valuationDate) return null;
 
-      const sameDay = tx.select().from(assetDailyValuations)
-        .where(and(
-          eq(assetDailyValuations.assetId, quote.assetId),
-          eq(assetDailyValuations.valuationDate, input.valuationDate),
-        ))
+      const sameDay = tx
+        .select()
+        .from(assetDailyValuations)
+        .where(
+          and(
+            eq(assetDailyValuations.assetId, quote.assetId),
+            eq(assetDailyValuations.valuationDate, input.valuationDate),
+          ),
+        )
         .get();
       if (sameDay) {
         if (sameDay.closedAt !== null) return null;
-        const updated = tx.update(assetDailyValuations).set({
-          quantity: normalizedQuantity,
-          unitPrice: normalizedPrice,
-          totalValue,
-          currencyCode: quote.currencyCode,
-          source: quote.source,
-          quoteStatus: quote.status,
-          observedAt: quote.observedAt,
-          capturedAt: input.snapshotCapturedAt,
-        }).where(and(
-          eq(assetDailyValuations.id, sameDay.id),
-          isNull(assetDailyValuations.closedAt),
-        )).run();
-        if (updated.changes !== 1) throw new Error("Open daily valuation changed during quote capture");
+        const updated = tx
+          .update(assetDailyValuations)
+          .set({
+            quantity: normalizedQuantity,
+            unitPrice: normalizedPrice,
+            totalValue,
+            currencyCode: quote.currencyCode,
+            source: quote.source,
+            quoteStatus: quote.status,
+            observedAt: quote.observedAt,
+            capturedAt: input.snapshotCapturedAt,
+          })
+          .where(
+            and(
+              eq(assetDailyValuations.id, sameDay.id),
+              isNull(assetDailyValuations.closedAt),
+            ),
+          )
+          .run();
+        if (updated.changes !== 1)
+          throw new Error("Open daily valuation changed during quote capture");
         return {
           id: sameDay.id,
           assetId: quote.assetId,
@@ -609,28 +686,32 @@ export class SqliteAssetRepository implements AssetRepository {
       if (latest && latest.closedAt === null) {
         tx.update(assetDailyValuations)
           .set({ closedAt: input.snapshotCapturedAt })
-          .where(and(
-            eq(assetDailyValuations.id, latest.id),
-            isNull(assetDailyValuations.closedAt),
-          ))
+          .where(
+            and(
+              eq(assetDailyValuations.id, latest.id),
+              isNull(assetDailyValuations.closedAt),
+            ),
+          )
           .run();
       }
 
-      tx.insert(assetDailyValuations).values({
-        id: input.snapshotId,
-        assetId: quote.assetId,
-        valuationDate: input.valuationDate,
-        quantity: normalizedQuantity,
-        unitPrice: normalizedPrice,
-        totalValue,
-        currencyCode: quote.currencyCode,
-        source: quote.source,
-        quoteStatus: quote.status,
-        observedAt: quote.observedAt,
-        capturedAt: input.snapshotCapturedAt,
-        closedAt: null,
-        createdAt: input.snapshotCapturedAt,
-      }).run();
+      tx.insert(assetDailyValuations)
+        .values({
+          id: input.snapshotId,
+          assetId: quote.assetId,
+          valuationDate: input.valuationDate,
+          quantity: normalizedQuantity,
+          unitPrice: normalizedPrice,
+          totalValue,
+          currencyCode: quote.currencyCode,
+          source: quote.source,
+          quoteStatus: quote.status,
+          observedAt: quote.observedAt,
+          capturedAt: input.snapshotCapturedAt,
+          closedAt: null,
+          createdAt: input.snapshotCapturedAt,
+        })
+        .run();
       return {
         id: input.snapshotId,
         assetId: quote.assetId,
