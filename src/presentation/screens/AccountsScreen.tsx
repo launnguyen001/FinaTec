@@ -60,7 +60,7 @@ export function AccountsScreen() {
   async function restoreAccount(id: string) {
     if (!runtime || busy) return;
     setBusy(true); setFailure(null); setMessage(null);
-    try { await runtime.accounts.restore(id); setMessage("Đã khôi phục tài khoản."); await refresh(); }
+    try { await runtime.accounts.restoreAccount(id); setMessage("Đã khôi phục tài khoản."); await refresh(); }
     catch (cause) { setFailure(cause instanceof Error ? cause.message : "Không thể khôi phục tài khoản."); }
     finally { setBusy(false); }
   }
