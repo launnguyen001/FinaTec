@@ -63,7 +63,7 @@ export interface InterestCalculation {
 const RATE_SCALE = 1_000_000n;
 const DAYS_PER_YEAR = 365n;
 const ACT_365_DENOMINATOR = RATE_SCALE * DAYS_PER_YEAR;
-const MAX_ANNUAL_RATE_PPM = 1_000_000_000n;
+const MAX_ANNUAL_RATE_PPM = 10_000_000n;
 
 function parseDateOnly(value: string): number {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
