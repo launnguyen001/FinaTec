@@ -57,6 +57,14 @@ export function AccountsScreen() {
     finally { setBusy(false); }
   }
 
+  async function restoreAccount(id: string) {
+    if (!runtime || busy) return;
+    setBusy(true); setFailure(null); setMessage(null);
+    try { await runtime.accounts.restore(id); setMessage("Đã khôi phục tài khoản."); await refresh(); }
+    catch (cause) { setFailure(cause instanceof Error ? cause.message : "Không thể khôi phục tài khoản."); }
+    finally { setBusy(false); }
+  }
+
   return <ScrollView contentContainerStyle={styles.content}>
     <ScreenBackLink />
     <Text style={styles.eyebrow}>QUẢN LÝ</Text>
@@ -79,9 +87,9 @@ export function AccountsScreen() {
     <Text style={styles.sectionTitle}>Danh sách tài khoản</Text>
     {items.length === 0 ? <Text style={styles.empty}>Chưa có tài khoản nào.</Text> : items.map((item) => <View key={item.id} style={styles.accountRow}>
       <View style={styles.accountBody}>{editingId === item.id ? <TextInput accessibilityLabel={`Tên mới cho ${item.name}`} value={editingName} onChangeText={setEditingName} style={styles.input} maxLength={80} /> : <><Text style={styles.accountName}>{item.name}</Text><Text style={styles.accountMeta}>{item.type}{item.subtype ? ` · ${item.subtype}` : ""} · {item.currencyCode}{item.isArchived ? " · Đã archive" : ""}</Text></>}</View>
-      {!item.isArchived && !item.isSystem ? <>{editingId === item.id ? <Pressable accessibilityRole="button" disabled={busy || !editingName.trim()} onPress={() => void saveRename(item.id)} style={styles.archiveButton}><Text style={styles.archiveText}>Lưu</Text></Pressable> : <Pressable accessibilityRole="button" onPress={() => { setEditingId(item.id); setEditingName(item.name); }} style={styles.archiveButton}><Text style={styles.archiveText}>Sửa</Text></Pressable>}<Pressable accessibilityRole="button" accessibilityLabel={`Archive ${item.name}`} disabled={busy} onPress={() => void archiveAccount(item.id)} style={styles.archiveButton}><Text style={styles.archiveText}>Archive</Text></Pressable></> : null}
+      {!item.isArchived && !item.isSystem ? <>{editingId === item.id ? <Pressable accessibilityRole="button" disabled={busy || !editingName.trim()} onPress={() => void saveRename(item.id)} style={styles.archiveButton}><Text style={styles.archiveText}>Lưu</Text></Pressable> : <Pressable accessibilityRole="button" onPress={() => { setEditingId(item.id); setEditingName(item.name); }} style={styles.archiveButton}><Text style={styles.archiveText}>Sửa</Text></Pressable>}<Pressable accessibilityRole="button" accessibilityLabel={`Archive ${item.name}`} disabled={busy} onPress={() => void archiveAccount(item.id)} style={styles.archiveButton}><Text style={styles.archiveText}>Archive</Text></Pressable></> : item.isArchived && !item.isSystem ? <Pressable accessibilityRole="button" accessibilityLabel={`Restore ${item.name}`} disabled={busy} onPress={() => void restoreAccount(item.id)} style={styles.archiveButton}><Text style={styles.archiveText}>Khôi phục</Text></Pressable> : null}
     </View>)}
-    <Text style={styles.note}>Tài khoản đã archive vẫn giữ lịch sử. Không hỗ trợ xóa vĩnh viễn.</Text>
+    <Text style={styles.note}>Chỉ archive tài khoản khi số dư Ledger bằng 0. Tài khoản đã archive giữ nguyên lịch sử; cần khôi phục trước khi giao dịch hoặc đảo bút toán.</Text>
   </ScrollView>;
 }
 
