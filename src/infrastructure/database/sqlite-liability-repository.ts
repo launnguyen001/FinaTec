@@ -13,6 +13,7 @@ import type {
   LiabilityInstallment,
   LiabilityPayment,
   LiabilityPaymentCommit,
+  LiabilityJournalCommit,
   LiabilityRateChange,
   LiabilityPaymentReversal,
 } from "../../domain/liability/liability";
@@ -410,7 +411,7 @@ export class SqliteLiabilityRepository implements LiabilityRepository {
 
   async reversePayment(input: {
     paymentId: string;
-    reversal: LiabilityPaymentCommit["journal"];
+    reversal: LiabilityJournalCommit;
     record: LiabilityPaymentReversal;
   }): Promise<void> {
     this.db.transaction((tx) => {
