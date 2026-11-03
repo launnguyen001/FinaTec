@@ -5,6 +5,7 @@ import { migration0003 } from "./0003_asset_remaining_cost_basis";
 import { migration0004 } from "./0004_usdt_currency_code";
 import { migration0005 } from "./0005_interest_engine";
 import { migration0006 } from "./0006_liability_management";
+import { migration0007 } from "./0007_liability_rate_history";
 
 const migrationTime = 1_793_520_000_000;
 const coreFinanceMigrationTime = 1_793_700_000_000;
@@ -13,6 +14,7 @@ const assetRemainingCostBasisMigrationTime = 1_793_900_000_000;
 const usdtCurrencyMigrationTime = 1_794_000_000_000;
 const interestEngineMigrationTime = 1_794_100_000_000;
 const liabilityManagementMigrationTime = 1_794_200_000_000;
+const liabilityRateHistoryMigrationTime = 1_794_300_000_000;
 
 export const ledgerMigrations = {
   journal: {
@@ -59,6 +61,12 @@ export const ledgerMigrations = {
         tag: "0006_liability_management",
         breakpoints: true,
       },
+      {
+        idx: 7,
+        when: liabilityRateHistoryMigrationTime,
+        tag: "0007_liability_rate_history",
+        breakpoints: true,
+      },
     ],
   },
   migrations: {
@@ -69,5 +77,6 @@ export const ledgerMigrations = {
     m0004: migration0004,
     m0005: migration0005,
     m0006: migration0006,
+    m0007: migration0007,
   },
 };
