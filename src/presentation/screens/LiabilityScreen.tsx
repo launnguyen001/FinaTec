@@ -58,6 +58,7 @@ export function LiabilityScreen() {
   const [interestAccountId, setInterestAccountId] = useState("");
   const [sourceAccountId, setSourceAccountId] = useState("");
   const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentIdempotencyKey, setPaymentIdempotencyKey] = useState("");
   const [feeAmount, setFeeAmount] = useState("0");
   const [feeAccountId, setFeeAccountId] = useState("");
   const [reconciliation, setReconciliation] = useState<string | null>(null);
@@ -138,12 +139,14 @@ export function LiabilityScreen() {
     if (!selectedCurrency) throw new Error("Không tìm thấy loại tiền của khoản nợ");
     const amount = parseMinorUnits(paymentAmount, selectedCurrency.minorUnit);
     const fee = parseMinorUnits(feeAmount || "0", selectedCurrency.minorUnit);
+    const idempotencyKey = paymentIdempotencyKey || `liability-payment:${runtime.createId()}`;
+    setPaymentIdempotencyKey(idempotencyKey);
     await runtime.liabilities.recordPayment({
       liabilityId: activeLiability.id, sourceAccountId, amountMinor: amount,
       feeMinor: fee, feeExpenseAccountId: feeAccountId || undefined,
-      idempotencyKey: `liability-payment:${activeLiability.id}:${Date.now()}`,
+      idempotencyKey,
     });
-    setPaymentAmount(""); setFeeAmount("0"); setMessage("Đã ghi nhận thanh toán và hạch toán Journal Entry.");
+    setPaymentAmount(""); setFeeAmount("0"); setPaymentIdempotencyKey(""); setMessage("Đã ghi nhận thanh toán và hạch toán Journal Entry.");
   });
 
   const archive = () => run(async () => {
