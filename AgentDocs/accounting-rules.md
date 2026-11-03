@@ -98,14 +98,14 @@ Schema v2 adds `journal_entries.transaction_kind` and nullable `category_id`.
 
 TASK-03 does not extend or bypass the TASK-02 posting policy. The existing invariant remains: every posting rejects an archived Account.
 
-- An Account may be archived only when its current Ledger balance is exactly zero in its native currency.
+- An Account may be archived only when its current Ledger balance is exactly zero in its native currency, using the normal-side signed balance derived from POSTED lines.
 - Balance is derived only from lines belonging to POSTED Journal Entries. Do not trust a UI-provided balance or a separately persisted balance.
 - A non-zero balance, whether positive or negative, rejects archive. The user must bring the balance to zero through ordinary valid postings while the Account is ACTIVE.
-- The zero-balance check and archive-state update must be atomic with posting operations. The repository must prevent a posting from being committed between the balance check and the archive update.
+- The SQLite `accounts_archive_requires_zero_balance` trigger checks the signed Ledger balance in the same atomic UPDATE that changes the archive state. The `journal_lines_no_archived_account_insert` and `journal_entries_no_archived_account_posting` triggers prevent new lines and posting of pre-existing drafts against archived Accounts. This closes both orderings of an archive/post race.
 - `restoreAccount()` transitions ARCHIVED → ACTIVE without creating a Journal Entry or changing historical balances.
 - Every posting that references an archived Account is rejected, regardless of transaction kind or posting purpose. This includes income, expense, transfer, opening balance, adjustment and reversal.
 - To reverse a historical entry that references an archived Account, restore every affected Account first, then call the ordinary AccountingService reversal use case.
-- Do not use `allowedArchivedAccountIds`, `allowArchived`, `ARCHIVED_ACCOUNT_SETTLEMENT`, `ARCHIVED_ACCOUNT_ADJUSTMENT` or `ARCHIVED_ACCOUNT_REVERSAL` as bypasses. Remove TASK-03-only archived posting exceptions and their UI/use cases. Because schema v2 exists only on the unmerged TASK-03 branch, remove archived-exception-only persisted purpose/reason fields from that unreleased migration rather than adding an unnecessary compatibility migration. Never rewrite a migration after it has been released to users.
+- No `allowedArchivedAccountIds`, `allowArchived`, archived-account settlement/reversal exceptions, posting-purpose field or archive audit-reason field exists. Schema v2 is still unreleased on the feature branch, so its migration is defined without these obsolete fields.
 - Preserve balancing, atomicity, idempotency and posted-history immutability.
 
 Required tests: archive succeeds at exactly zero; archive rejects positive and negative balances; restore succeeds and preserves history; every posting kind rejects archived Accounts; reversal rejects until all referenced archived Accounts are restored; concurrent archive/post attempts cannot violate the invariant.
