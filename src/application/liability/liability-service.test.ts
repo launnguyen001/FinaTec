@@ -554,4 +554,37 @@ describe("LiabilityService", () => {
     ).resolves.toBe(existing);
     expect(repository.commitPayment).not.toHaveBeenCalled();
   });
+
+  it("rejects reuse of an idempotency key with a different amount", async () => {
+    const current = baseLiability();
+    const existing: LiabilityPayment = {
+      id: "payment-existing",
+      liabilityId: current.id,
+      scheduleId: null,
+      sourceAccountId: "cash-out",
+      journalEntryId: "journal-existing",
+      fxRateNumerator: "1",
+      fxRateDenominator: "1",
+      replacesPaymentId: null,
+      postingOrder: 1,
+      idempotencyKey: "payment-retry",
+      paidAt: timestamp,
+      principalPaidMinor: 5_000n,
+      interestPaidMinor: 0n,
+      feePaidMinor: 0n,
+      note: null,
+      createdAt: timestamp,
+    };
+    const { service, repository } = createHarness(current);
+    (repository.listPayments as jest.Mock).mockResolvedValue([existing]);
+
+    await expect(
+      service.recordPayment({
+        liabilityId: current.id,
+        sourceAccountId: "cash-out",
+        amountMinor: 6_000n,
+        idempotencyKey: "payment-retry",
+      }),
+    ).rejects.toThrow("Payment idempotency key was reused with a different payload");
+  });
 });
