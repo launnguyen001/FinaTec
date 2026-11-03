@@ -164,6 +164,7 @@ export class FallbackPriceProvider implements PriceProvider {
 
   async getPrice(request: PriceRequest): Promise<MarketQuote> {
     const failures: string[] = [];
+    let retryAfter: string | null | undefined;
     for (const provider of this.providers) {
       try {
         return await provider.getPrice(request);
@@ -173,8 +174,20 @@ export class FallbackPriceProvider implements PriceProvider {
             ": " +
             (error instanceof Error ? error.message : "unknown error"),
         );
+        if (
+          error &&
+          typeof error === "object" &&
+          "retryAfter" in error &&
+          typeof error.retryAfter === "string"
+        ) {
+          retryAfter = error.retryAfter;
+        }
       }
     }
-    throw new Error("All price providers failed. " + failures.join(" | "));
+    const failure = new Error(
+      "All price providers failed. " + failures.join(" | "),
+    ) as Error & { retryAfter?: string | null };
+    if (retryAfter !== undefined) failure.retryAfter = retryAfter;
+    throw failure;
   }
 }
