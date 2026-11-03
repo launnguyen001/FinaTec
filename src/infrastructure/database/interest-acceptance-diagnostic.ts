@@ -187,6 +187,23 @@ export async function runInterestAcceptanceDiagnostic(): Promise<InterestAccepta
       maturityDate: "2027-01-01",
       timezoneId: "UTC",
     });
+    await expectFailure(
+      () =>
+        interest.createPlan({
+          name: "Duplicate active principal",
+          principalAccountId: principal.id,
+          interestIncomeAccountId: income.id,
+          annualRatePpm: 55_000n,
+          compounding: "AFTER_CAPITALIZATION",
+          postingFrequency: "AT_MATURITY",
+          startDate: "2026-01-01",
+          maturityDate: "2027-01-01",
+          timezoneId: "UTC",
+        }),
+      /already has an active interest plan/i,
+      "One active plan per principal account",
+    );
+
     const accrued = await interest.accruePeriod({
       planId: capitalizationPlan.id,
       periodStart: "2026-01-01",
