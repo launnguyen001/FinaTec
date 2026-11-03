@@ -149,12 +149,12 @@ Rates are represented as parts per million: 5.5% = 55,000 ppm; 100% = 1,000,000 
 
 ## 9. Tiêu chí nghiệm thu
 
-- [ ] Công thức và convention được hỗ trợ có tài liệu và ví dụ tham chiếu đã duyệt.
-- [ ] Kết quả bộ tính khớp toàn bộ ví dụ tham chiếu.
+- [x] Công thức và convention MVP được owner duyệt; ACT/365 Fixed reference vectors đã được ghi trong mục 5.2.
+- [x] Pure calculator unit tests khớp reference vectors, bao gồm leap-year, HALF_UP, 365-day fractional carry và APR ceiling.
 - [ ] Accrued / posted / paid tách biệt và truy vết được.
 - [ ] Lãi phát sinh truy vết được tới Journal Entry.
 - [ ] Xử lý lại không tạo trùng kỳ hoặc trùng bút toán.
-- [ ] Lãi tài sản và lãi khoản nợ được hạch toán đúng.
+- [ ] Asset-interest posting được SQLCipher acceptance xác nhận; liability interest deferred sang TASK-06.
 - [ ] Capitalization/payout đúng và không double-count.
 - [ ] Kiểm thử bao phủ ranh giới ngày, timezone, năm nhuận và rounding.
 - [ ] Catch-up hoạt động khi app mở lại sau thời gian offline.
@@ -174,5 +174,7 @@ Rates are represented as parts per million: 5.5% = 55,000 ppm; 100% = 1,000,000 
 - Đã implement InterestService: funded INVESTMENT ASSET validation, timezone-aware principal movement guard, APR preview, accrued record, capitalization/payout, monthly/at-maturity catch-up, fractional carry across sub-minor periods, idempotent accrual/posting và plan pause/resume/close lifecycle.
 - Đã implement foreground catch-up khi app khởi chạy/resume; UI route `/interest` (create/list/preview/accrue/post/catch-up/pause/resume/close); development SQLCipher acceptance route `/task05-interest-acceptance`.
 - MVP limitation: posting chỉ hỗ trợ account cùng Ledger base currency; liability interest (TASK-06), staking rewards, APY, early-withdrawal penalty và variable-principal schedules chưa hỗ trợ. Principal phải được funding trước ngày bắt đầu theo timezone của plan; mọi external movement từ ngày bắt đầu trở đi khiến preview/accrual/catch-up bị từ chối để không tính sai lịch sử.
-- CI đã PASS trên baseline trước các bổ sung acceptance gần nhất; phải chạy lại CI trên latest head. SQLCipher device acceptance và Ledger reconciliation acceptance vẫn PENDING.
-- Branch sync: `task/05-interest-engine` hiện ahead 9 / behind 0 so với `main`; baseline Task04 đã được merge vào branch bằng merge commit `90a8617`, không force-push và không bỏ commit.
+- CI PASS trên latest PR head `35391f6` (workflow run `41695236759`): dependency install, TypeScript, ESLint, Prettier format check và unit tests đều SUCCESS.
+- Đã bổ sung development route `/task05-interest-acceptance`: migration upgrade, timezone-aware funding cutoff, duplicate active plan, monthly month-end catch-up, at-maturity payout, capitalization, exact rounding, atomic rollback, journal idempotency và cleanup isolated SQLCipher DB/key. Chưa chạy trên Android Development Build; CLI/device acceptance vẫn PENDING.
+- PR #7 đang Draft; chưa merge. Branch `task/05-interest-engine` ahead 98 / behind 0 so với `main`; 16 files changed. Khi hoàn tất nghiệm thu, squash merge để giữ main history gọn.
+- Branch sync: `task/05-interest-engine` đã chứa baseline Task04; compare hiện ahead 98 / behind 0 so với `main`. Không force-push và không sửa trực tiếp `main` trong quá trình triển khai Task05.
