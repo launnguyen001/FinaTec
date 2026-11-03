@@ -348,6 +348,11 @@ export class SqliteLiabilityRepository implements LiabilityRepository {
         if (
           existing.liabilityId !== input.payment.liabilityId ||
           existing.sourceAccountId !== input.payment.sourceAccountId ||
+          existing.scheduleId !== input.payment.scheduleId ||
+          existing.fxRateNumerator !== input.payment.fxRateNumerator ||
+          existing.fxRateDenominator !== input.payment.fxRateDenominator ||
+          existing.replacesPaymentId !== input.payment.replacesPaymentId ||
+          existing.note !== input.payment.note ||
           fromSqliteInteger(existing.principalPaidMinor) !==
             input.payment.principalPaidMinor ||
           fromSqliteInteger(existing.interestPaidMinor) !==
