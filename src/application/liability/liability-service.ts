@@ -1,4 +1,4 @@
-import type { Account, JournalEntry, JournalLine } from "../../domain/ledger/repository";
+import type { Account, JournalEntry, JournalLine, LedgerRepository } from "../../domain/ledger/repository";
 import type {
   EarlyPaymentPolicy,
   Liability,
@@ -12,7 +12,6 @@ import {
   calculateRepaymentSchedule,
   type RepaymentMethod,
 } from "../../domain/liability/repayment-schedule";
-import type { LedgerRepository } from "../../domain/ledger/repository";
 
 export interface CreateLiabilityInput {
   name: string;
