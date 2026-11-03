@@ -182,6 +182,9 @@ export function AppScreen() {
           <Link href="/assets" style={styles.navigationLink}>
             Tài sản
           </Link>
+          <Link href="/asset-transactions" style={styles.navigationLink}>
+            Giao dịch tài sản
+          </Link>
           <Link href="/categories" style={styles.navigationLink}>
             Danh mục
           </Link>
