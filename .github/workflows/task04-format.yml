@@ -1,0 +1,50 @@
+name: Task04 Background Task install and verification
+
+on:
+  push:
+    branches:
+      - task/04-asset-management
+
+permissions:
+  contents: write
+
+jobs:
+  install-and-verify:
+    if: ${{ !contains(github.event.head_commit.message, '[skip task04 format]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout task branch
+        uses: actions/checkout@v4
+        with:
+          ref: task/04-asset-management
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install current dependencies
+        run: npm ci
+      - name: Install Expo SDK 58 background task modules
+        run: npx expo install expo-background-task expo-task-manager
+      - name: Validate native Expo configuration
+        run: npx expo prebuild --no-install --platform android --clean
+      - name: Apply repository formatter
+        run: npm run format
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Unit tests
+        run: npm test
+      - name: Commit verified source and lockfile
+        run: |
+          if git diff --quiet; then
+            echo "No dependency or formatting changes."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.json package.json package-lock.json src
+          git commit -m "build(task04): install background task modules and format [skip task04 format]"
+          git push origin HEAD:task/04-asset-management

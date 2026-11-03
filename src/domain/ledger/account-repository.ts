@@ -5,6 +5,7 @@ export interface CreateAccountInput {
   name: string;
   type: AccountType;
   subtype: AccountSubtype | null;
+  isInvestment?: boolean;
   currencyCode: string;
   createdAt: string;
   updatedAt: string;

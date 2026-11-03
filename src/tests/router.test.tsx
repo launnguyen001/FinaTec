@@ -56,4 +56,16 @@ describe("Expo Router routes", () => {
     expect(screen).toHavePathname("/history");
     expect(screen.getByText("Lịch sử giao dịch")).toBeTruthy();
   });
+
+  it("renders the asset history screen", async () => {
+    await renderRouter("./src/app", { initialUrl: "/asset-history" });
+    expect(screen).toHavePathname("/asset-history");
+    expect(screen.getByText("Lịch sử định giá")).toBeTruthy();
+  });
+
+  it("renders the asset settings screen", async () => {
+    await renderRouter("./src/app", { initialUrl: "/asset-settings" });
+    expect(screen).toHavePathname("/asset-settings");
+    expect(screen.getByText("Cài đặt định giá")).toBeTruthy();
+  });
 });

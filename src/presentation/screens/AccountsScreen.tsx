@@ -4,6 +4,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -43,6 +44,7 @@ export function AccountsScreen() {
   const [editingSubtype, setEditingSubtype] = useState<AccountSubtype>("CASH");
   const [type, setType] = useState<AccountType>("ASSET");
   const [subtype, setSubtype] = useState<AccountSubtype>("CASH");
+  const [isInvestment, setIsInvestment] = useState(false);
   const [currencyCode, setCurrencyCode] = useState("VND");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -88,6 +90,7 @@ export function AccountsScreen() {
         type,
         subtype: type === "ASSET" ? subtype : null,
         currencyCode,
+        isInvestment: type === "ASSET" && isInvestment,
       });
       setName("");
       setMessage("Đã tạo tài khoản.");
@@ -193,7 +196,10 @@ export function AccountsScreen() {
               key={value}
               label={value}
               selected={type === value}
-              onPress={() => setType(value)}
+              onPress={() => {
+                setType(value);
+                if (value !== "ASSET") setIsInvestment(false);
+              }}
             />
           ))}
         </View>
@@ -209,6 +215,21 @@ export function AccountsScreen() {
                   onPress={() => setSubtype(value)}
                 />
               ))}
+            </View>
+            <View style={styles.investmentToggle}>
+              <View style={styles.investmentCopy}>
+                <Text style={styles.label}>Tài khoản đầu tư</Text>
+                <Text style={styles.helper}>
+                  Dùng để ghi nhận giá trị sổ sách của tài sản market-valued;
+                  không tính vào tiền khả dụng.
+                </Text>
+              </View>
+              <Switch
+                accessibilityLabel="Đánh dấu tài khoản đầu tư"
+                value={isInvestment}
+                onValueChange={setIsInvestment}
+                trackColor={{ true: colors.primary }}
+              />
             </View>
           </>
         ) : null}
@@ -486,6 +507,22 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   note: {
+    color: colors.mutedText,
+    fontSize: typography.caption,
+    lineHeight: 18,
+  },
+  investmentToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  investmentCopy: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  helper: {
     color: colors.mutedText,
     fontSize: typography.caption,
     lineHeight: 18,

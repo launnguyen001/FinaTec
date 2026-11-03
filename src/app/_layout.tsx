@@ -1,3 +1,4 @@
+import "../infrastructure/background/asset-refresh-task";
 import { Stack } from "expo-router";
 
 import { runSqlCipherFileDiagnostic } from "../infrastructure/database/spike/sqlcipher-file-diagnostic";

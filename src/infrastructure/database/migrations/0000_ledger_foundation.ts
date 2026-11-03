@@ -5,7 +5,7 @@ CREATE TABLE currencies (
   minor_unit INTEGER NOT NULL CHECK (minor_unit BETWEEN 0 AND 6),
   is_active INTEGER NOT NULL CHECK (is_active IN (0, 1)),
   created_at TEXT NOT NULL,
-  CHECK (length(code) = 3 AND code = upper(code))
+  CHECK (length(code) BETWEEN 3 AND 4 AND code = upper(code))
 );
 --> statement-breakpoint
 

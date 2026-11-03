@@ -16,6 +16,7 @@ import type { TransactionHistoryItem } from "../../application/finance/transacti
 import type { Account, CurrencyRecord } from "../../domain/ledger/repository";
 import { useFinanceRuntime } from "../providers/FinanceRuntimeProvider";
 import { colors, spacing, typography } from "../../shared/theme/tokens";
+import { formatBigIntVi } from "../../shared/formatting/format-bigint";
 
 function formatMoney(
   amountMinor: bigint,
@@ -30,9 +31,7 @@ function formatMoney(
     precision > 0
       ? `,${(absolute % scale).toString().padStart(precision, "0")}`
       : "";
-  const formattedMajor = new Intl.NumberFormat("vi-VN", {
-    maximumFractionDigits: 0,
-  }).format(major);
+  const formattedMajor = formatBigIntVi(major);
   return `${amountMinor < 0n ? "−" : ""}${formattedMajor}${fraction} ${code}`.trim();
 }
 
@@ -178,6 +177,18 @@ export function AppScreen() {
           </Link>
           <Link href="/accounts" style={styles.navigationLink}>
             Tài khoản
+          </Link>
+          <Link href="/assets" style={styles.navigationLink}>
+            Tài sản
+          </Link>
+          <Link href="/asset-transactions" style={styles.navigationLink}>
+            Giao dịch tài sản
+          </Link>
+          <Link href="/asset-history" style={styles.navigationLink}>
+            Lịch sử định giá
+          </Link>
+          <Link href="/asset-settings" style={styles.navigationLink}>
+            Cài đặt tài sản
           </Link>
           <Link href="/categories" style={styles.navigationLink}>
             Danh mục
@@ -347,6 +358,11 @@ export function AppScreen() {
           </>
         ) : null}
 
+        {__DEV__ && Platform.OS !== "web" ? (
+          <Link href="/task04-asset-acceptance" style={styles.devLink}>
+            Task04 Asset Acceptance
+          </Link>
+        ) : null}
         {__DEV__ && Platform.OS !== "web" ? (
           <Link href="/database-file-diagnostic" style={styles.devLink}>
             Chẩn đoán file SQLCipher (development)

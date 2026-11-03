@@ -31,7 +31,7 @@ export class DashboardService {
       throw new Error("Dashboard date range is invalid");
     const available = new Map<string, bigint>();
     const activeAccounts = (await this.ledger.listAccounts(false)).filter(
-      (account) => account.type === "ASSET",
+      (account) => account.type === "ASSET" && !account.isInvestment,
     );
     for (const account of activeAccounts) {
       const balance = await this.accounting.getAccountBalance(account.id);

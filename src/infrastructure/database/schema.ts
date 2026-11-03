@@ -7,6 +7,7 @@ import {
   sqliteTable,
   text,
   uniqueIndex,
+  primaryKey,
   type AnySQLiteColumn,
 } from "drizzle-orm/sqlite-core";
 
@@ -22,7 +23,7 @@ export const currencies = sqliteTable(
   (table) => [
     check(
       "currencies_code_format",
-      sql`length(${table.code}) = 3 AND ${table.code} = upper(${table.code})`,
+      sql`length(${table.code}) BETWEEN 3 AND 4 AND ${table.code} = upper(${table.code})`,
     ),
     check(
       "currencies_minor_unit_range",
@@ -66,6 +67,9 @@ export const accounts = sqliteTable(
     subtype: text("subtype", {
       enum: ["CASH", "BANK", "EWALLET", "SAVINGS", "OTHER"],
     }),
+    isInvestment: integer("is_investment", { mode: "boolean" })
+      .notNull()
+      .default(false),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
@@ -76,6 +80,10 @@ export const accounts = sqliteTable(
     check(
       "accounts_subtype_by_type",
       sql`(${table.type} = 'ASSET' AND (${table.subtype} IS NULL OR ${table.subtype} IN ('CASH', 'BANK', 'EWALLET', 'SAVINGS', 'OTHER'))) OR (${table.type} <> 'ASSET' AND ${table.subtype} IS NULL)`,
+    ),
+    check(
+      "accounts_investment_by_type",
+      sql`${table.isInvestment} = 0 OR ${table.type} = 'ASSET'`,
     ),
     check(
       "accounts_type_check",
@@ -248,6 +256,257 @@ export const journalLines = sqliteTable(
   ],
 );
 
+export const assetSettings = sqliteTable("asset_settings", {
+  id: integer("id").primaryKey(),
+  timezoneMode: text("timezone_mode", { enum: ["DEVICE", "CUSTOM"] })
+    .notNull()
+    .default("DEVICE"),
+  timezoneId: text("timezone_id").notNull().default("UTC"),
+  cryptoRefreshMinutes: integer("crypto_refresh_minutes").notNull().default(15),
+  metalRefreshMinutes: integer("metal_refresh_minutes").notNull().default(60),
+  fiatRefreshMinutes: integer("fiat_refresh_minutes").notNull().default(1440),
+  primaryCryptoProvider: text("primary_crypto_provider")
+    .notNull()
+    .default("COINPAPRIKA"),
+  fallbackCryptoProvider: text("fallback_crypto_provider")
+    .notNull()
+    .default("COINGECKO"),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const assetRefreshStates = sqliteTable("asset_refresh_states", {
+  providerKey: text("provider_key").primaryKey(),
+  lastAttemptAt: text("last_attempt_at"),
+  lastSuccessAt: text("last_success_at"),
+  failureCount: integer("failure_count").notNull().default(0),
+  nextAttemptAt: text("next_attempt_at"),
+  lastError: text("last_error"),
+});
+
+export const assetTypes = sqliteTable("asset_types", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  assetClass: text("asset_class", {
+    enum: ["CRYPTO", "METAL", "STOCK", "OTHER"],
+  }).notNull(),
+  valuationModel: text("valuation_model", {
+    enum: ["STABLE_VALUE", "MARKET_VALUED"],
+  }).notNull(),
+  unitCode: text("unit_code").notNull(),
+  quantityPrecision: integer("quantity_precision").notNull(),
+  pricePrecision: integer("price_precision").notNull(),
+  quoteCurrency: text("quote_currency")
+    .notNull()
+    .references(() => currencies.code, {
+      onDelete: "restrict",
+      onUpdate: "restrict",
+    }),
+  isArchived: integer("is_archived", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const assets = sqliteTable("assets", {
+  id: text("id").primaryKey(),
+  assetTypeId: text("asset_type_id")
+    .notNull()
+    .references(() => assetTypes.id, {
+      onDelete: "restrict",
+      onUpdate: "restrict",
+    }),
+  name: text("name").notNull(),
+  symbol: text("symbol").notNull(),
+  providerSymbol: text("provider_symbol"),
+  quoteCurrency: text("quote_currency")
+    .notNull()
+    .references(() => currencies.code, {
+      onDelete: "restrict",
+      onUpdate: "restrict",
+    }),
+  isArchived: integer("is_archived", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const assetLots = sqliteTable("asset_lots", {
+  id: text("id").primaryKey(),
+  assetId: text("asset_id")
+    .notNull()
+    .references(() => assets.id, {
+      onDelete: "restrict",
+      onUpdate: "restrict",
+    }),
+  currencyCode: text("currency_code")
+    .notNull()
+    .references(() => currencies.code, {
+      onDelete: "restrict",
+      onUpdate: "restrict",
+    }),
+  quantity: text("quantity").notNull(),
+  remainingQuantity: text("remaining_quantity").notNull(),
+  costBasisMinor: integer("cost_basis_minor").notNull(),
+  remainingCostBasisMinor: integer("remaining_cost_basis_minor").notNull(),
+  acquiredAt: text("acquired_at").notNull(),
+  status: text("status", { enum: ["ACTIVE", "MERGED", "CLOSED"] }).notNull(),
+  mergedIntoId: text("merged_into_id").references(
+    (): AnySQLiteColumn => assetLots.id,
+    { onDelete: "restrict", onUpdate: "restrict" },
+  ),
+  createdAt: text("created_at").notNull(),
+});
+
+export const assetDcaComponents = sqliteTable(
+  "asset_dca_components",
+  {
+    aggregateLotId: text("aggregate_lot_id")
+      .notNull()
+      .references(() => assetLots.id, {
+        onDelete: "restrict",
+        onUpdate: "restrict",
+      }),
+    componentLotId: text("component_lot_id")
+      .notNull()
+      .unique()
+      .references(() => assetLots.id, {
+        onDelete: "restrict",
+        onUpdate: "restrict",
+      }),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.aggregateLotId, table.componentLotId] }),
+  ],
+);
+
+export const assetTransactions = sqliteTable("asset_transactions", {
+  id: text("id").primaryKey(),
+  assetId: text("asset_id")
+    .notNull()
+    .references(() => assets.id, {
+      onDelete: "restrict",
+      onUpdate: "restrict",
+    }),
+  transactionKind: text("transaction_kind", {
+    enum: ["BUY", "SELL"],
+  }).notNull(),
+  lotId: text("lot_id")
+    .notNull()
+    .references(() => assetLots.id, {
+      onDelete: "restrict",
+      onUpdate: "restrict",
+    }),
+  quantity: text("quantity").notNull(),
+  executionPrice: text("execution_price").notNull(),
+  currencyCode: text("currency_code")
+    .notNull()
+    .references(() => currencies.code, {
+      onDelete: "restrict",
+      onUpdate: "restrict",
+    }),
+  grossAmountMinor: integer("gross_amount_minor").notNull(),
+  netCashAmountMinor: integer("net_cash_amount_minor").notNull(),
+  costBasisMinor: integer("cost_basis_minor").notNull(),
+  feeAmountMinor: integer("fee_amount_minor").notNull().default(0),
+  feeCategoryId: text("fee_category_id").references(() => categories.id, {
+    onDelete: "restrict",
+    onUpdate: "restrict",
+  }),
+  cashAccountId: text("cash_account_id")
+    .notNull()
+    .references(() => accounts.id, {
+      onDelete: "restrict",
+      onUpdate: "restrict",
+    }),
+  investmentAccountId: text("investment_account_id")
+    .notNull()
+    .references(() => accounts.id, {
+      onDelete: "restrict",
+      onUpdate: "restrict",
+    }),
+  journalEntryId: text("journal_entry_id")
+    .notNull()
+    .unique()
+    .references(() => journalEntries.id, {
+      onDelete: "restrict",
+      onUpdate: "restrict",
+    }),
+  priceQuoteId: text("price_quote_id"),
+  occurredAt: text("occurred_at").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+export const assetPriceQuotes = sqliteTable("asset_price_quotes", {
+  id: text("id").primaryKey(),
+  assetId: text("asset_id")
+    .notNull()
+    .references(() => assets.id, {
+      onDelete: "restrict",
+      onUpdate: "restrict",
+    }),
+  priceDecimal: text("price_decimal").notNull(),
+  currencyCode: text("currency_code")
+    .notNull()
+    .references(() => currencies.code, {
+      onDelete: "restrict",
+      onUpdate: "restrict",
+    }),
+  source: text("source", {
+    enum: [
+      "COINPAPRIKA",
+      "COINGECKO",
+      "FRANKFURTER",
+      "METALS_PROVIDER",
+      "MANUAL",
+    ],
+  }).notNull(),
+  quoteStatus: text("quote_status", {
+    enum: ["FRESH", "STALE", "REJECTED"],
+  }).notNull(),
+  observedAt: text("observed_at").notNull(),
+  capturedAt: text("captured_at").notNull(),
+  conversionBasis: text("conversion_basis"),
+  createdAt: text("created_at").notNull(),
+});
+
+export const assetDailyValuations = sqliteTable("asset_daily_valuations", {
+  id: text("id").primaryKey(),
+  assetId: text("asset_id")
+    .notNull()
+    .references(() => assets.id, {
+      onDelete: "restrict",
+      onUpdate: "restrict",
+    }),
+  valuationDate: text("valuation_date").notNull(),
+  quantity: text("quantity").notNull(),
+  unitPrice: text("unit_price").notNull(),
+  totalValue: text("total_value").notNull(),
+  currencyCode: text("currency_code")
+    .notNull()
+    .references(() => currencies.code, {
+      onDelete: "restrict",
+      onUpdate: "restrict",
+    }),
+  source: text("source", {
+    enum: [
+      "COINPAPRIKA",
+      "COINGECKO",
+      "FRANKFURTER",
+      "METALS_PROVIDER",
+      "MANUAL",
+    ],
+  }).notNull(),
+  quoteStatus: text("quote_status", {
+    enum: ["FRESH", "STALE", "REJECTED"],
+  }).notNull(),
+  observedAt: text("observed_at").notNull(),
+  capturedAt: text("captured_at").notNull(),
+  closedAt: text("closed_at"),
+  createdAt: text("created_at").notNull(),
+});
 export const ledgerSchema = {
   currencies,
   ledgerSettings,
@@ -255,4 +514,13 @@ export const ledgerSchema = {
   categories,
   journalEntries,
   journalLines,
+  assetSettings,
+  assetRefreshStates,
+  assetTypes,
+  assets,
+  assetLots,
+  assetDcaComponents,
+  assetTransactions,
+  assetPriceQuotes,
+  assetDailyValuations,
 };

@@ -28,6 +28,7 @@ export interface Account {
   isSystem: boolean;
   isArchived: boolean;
   subtype?: AccountSubtype | null;
+  isInvestment?: boolean;
   createdAt: string;
   updatedAt: string;
 }
