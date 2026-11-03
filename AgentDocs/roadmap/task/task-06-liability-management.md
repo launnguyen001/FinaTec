@@ -2,7 +2,7 @@
 
 - Giai đoạn: 4 — MVP 3: Khoản nợ, định kỳ và ngân sách
 - Ưu tiên: P1
-- Trạng thái: IMPLEMENTATION_REVIEW_IN_PROGRESS — đã mở rộng reconciliation Ledger/schedule/payment history; cần CI và CLI acceptance trên HEAD mới
+- Trạng thái: BLOCKED_DEVICE_ACCEPTANCE — diagnostic trên Development Build gặp lỗi FOREIGN KEY khi ghi nhận trả gốc trước hạn; xem biên bản nghiệm thu bên dưới
 - Phụ thuộc: TASK-02, TASK-03, TASK-05
 
 ## 1. Mục tiêu
@@ -99,4 +99,17 @@ Liability, RepaymentSchedule, LiabilityPayment (hoặc tên tương ứng theo n
 - Bàn giao CLI: chạy route `Task06 acceptance (DEV)` trên Development Build có SQLCipher. Diagnostic tạo database và SecureStore key ngẫu nhiên riêng, không đọc/ghi database tài chính production; phải trả đủ PASS cho migration 0007–0010, origination, partial allocation/idempotency, payment reversal/replacement, APR reset, early principal, full payoff, archive, fee posting, reconciliation và SQLCipher.
 - Giới hạn đã chủ động bảo vệ: với foreign-currency posting, nếu FX snapshot khiến các line sau HALF_UP không cân bằng base currency thì payment bị reject, không tự sinh journal mất cân bằng. Cần CLI xác nhận luồng FX trên thiết bị.
 - Chưa tuyên bố device acceptance; PR #8 vẫn Draft và chưa merge cho đến khi CLI trả báo cáo diagnostic và regression pass.
+
+## 12. Biên bản nghiệm thu độc lập trên thiết bị
+
+- Kết luận: **BLOCKED**. Không chạy tiếp regression sau lỗi đầu tiên ảnh hưởng tính toàn vẹn dữ liệu.
+- Commit bắt buộc: `eb4e9b7034d08a08d69b8fd270fccfb72cd638da`; detached worktree tại `android/.task06-acceptance-eb4e9b7`, `git rev-parse HEAD` khớp SHA và working tree sạch trước khi build. Checkout chính giữ nguyên branch `task/06-liability-management`, SHA `86adf4a735ad385c5d9e49816974cdfc3f1c5a94`; không đổi branch.
+- CI trên SHA bắt buộc: PASS (2 checks completed/success).
+- Thiết bị/build: Huawei LYA-L29, Android 10 / API 29; `com.anonymous.fintech`, version 1.0.0 (versionCode 1). `npm ci`, typecheck, lint, format check, unit tests (17 suites/116 tests), Android build và install đều PASS.
+- Diagnostic chạy đúng một lần trên route `Task06 acceptance (DEV)`. PASS trước lỗi: Task06 migration; loan origination journal; partial payment interest-first allocation; payment idempotent retry; payment reversal; replacement payment linkage; archive guard; APR history and forward-only recalculation.
+- **FAIL** tại stage `record early principal repayment and recalculate schedule`: `Error code 19: FOREIGN KEY constraint failed`; `PRAGMA foreign_key_check: []`. Stack đi qua `commitPayment` → `recordPayment`. Kỳ vọng ghi nhận payment trả gốc trước hạn và tính lại schedule; thực tế transaction không hoàn tất.
+- Chưa chạy/được xác minh sau stage lỗi: chính sách `KEEP_INSTALLMENT_SHORTEN_TERM`, full payoff, archive sau tất toán, fee EXPENSE, các đối soát schedule/payment/ledger còn lại, SQLCipher version check cuối diagnostic và regression Task05. SQLCipher runtime version không được diagnostic trả ra trước khi dừng.
+- Cleanup: diagnostic đi qua `finally` theo mã nguồn, nơi đóng database, xóa file database cô lập và SecureStore key. Việc cleanup thành công không được xác minh độc lập trên thiết bị; không khẳng định đã xóa.
+- Bằng chứng lưu tại `/tmp/task06-eb4e9b7-diagnostic.png`, `/tmp/task06-eb4e9b7-ui.xml`, `/tmp/task06-eb4e9b7-logcat.txt` và `/tmp/task06-eb4e9b7-screen.png`.
+- Không sửa source/test/schema/migration/business logic; không commit, push hoặc merge. Cần Implementation Owner điều tra lỗi FOREIGN KEY tại thao tác commit payment trả gốc trước hạn.
 
