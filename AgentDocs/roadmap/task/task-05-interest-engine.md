@@ -5,7 +5,7 @@
 - Trạng thái: IN PROGRESS — specification and cross-task audit
 - Phụ thuộc: TASK-02, TASK-04
 - Branch triển khai: `task/05-interest-engine`
-- Base: `task/04-asset-management` (phải đồng bộ/rebase sau khi TASK-04 được merge vào main)
+- Base: `main` sau khi TASK-04 merge tại `38b6453`; branch đã được đồng bộ cùng baseline Task04 và closeout docs
 
 ## 1. Mục tiêu
 
@@ -109,7 +109,8 @@ Không implement formula cho đến khi các quyết định liên quan được
 
 ## 10. Nhật ký tiến độ
 
-- 2026-11-04: Khởi động TASK-05 trên branch `task/05-interest-engine`, tạo từ `task/04-asset-management` để giữ đúng dependency và đối chiếu chéo với implementation Asset.
+- 2026-11-04: Khởi động TASK-05 trên branch `task/05-interest-engine`, ban đầu tạo từ `task/04-asset-management` để giữ đúng dependency và đối chiếu chéo với implementation Asset.
+- 2026-11-04: TASK-04 đã merge vào `main` tại `38b6453`; đồng bộ baseline và closeout documentation của TASK-04 vào TASK-05 branch, không force-push và không bỏ commit.
 - 2026-11-04: Chốt ranh giới kiến trúc: term deposit dùng ASSET Account riêng làm nguồn principal; TASK-05 sở hữu InterestPlan và toàn bộ calculation/accrual/posting. TASK-04 không cần schema interest-specific và không được tự xây interest engine thứ hai.
 - Đã audit TASK-02 LedgerRepository/AccountingService: atomic commitPostedEntry, balance validation, native currency, idempotency và posted journal immutability là contract nền. TASK-05 phải mở rộng repository atomic command để commit accrual + Journal Entry cùng transaction, không gọi AccountingService rồi ghi accrual độc lập.
 - Đã audit TASK-04: Account ASSET và cờ INVESTMENT là nguồn phân loại sẵn có; term deposit sẽ dùng dedicated ASSET Account, InterestPlan giữ lịch/điều khoản và tham chiếu accountId; không duplicate principal.
