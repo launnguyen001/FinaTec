@@ -21,6 +21,7 @@ const lot = (overrides: Partial<AssetLot> = {}): AssetLot => ({
   quantity: "1",
   remainingQuantity: "1",
   costBasisMinor: 10_000n,
+  remainingCostBasisMinor: 10_000n,
   acquiredAt: "2026-11-01T00:00:00.000Z",
   status: "ACTIVE",
   ...overrides,
@@ -33,6 +34,7 @@ describe("Task04 asset domain rules", () => {
       quantity: "2",
       remainingQuantity: "2",
       costBasisMinor: 30_000n,
+      remainingCostBasisMinor: 30_000n,
     })];
     const aggregate = aggregateDcaLots(source, 8);
     expect(aggregate.quantity).toBe("3");
@@ -54,7 +56,7 @@ describe("Task04 asset domain rules", () => {
 
   it("sells only the explicitly selected lot quantity and preserves residual basis", () => {
     const result = calculateSale({
-      lot: lot({ remainingQuantity: "2", costBasisMinor: 20_000n }),
+      lot: lot({ remainingQuantity: "2", costBasisMinor: 20_000n, remainingCostBasisMinor: 20_000n }),
       quantitySold: "0.5",
       quantityPrecision: 8,
       grossProceedsMinor: 15_000n,
@@ -65,6 +67,15 @@ describe("Task04 asset domain rules", () => {
     expect(result.remainingCostBasisMinor).toBe(15_000n);
     expect(result.netCashReceivedMinor).toBe(14_900n);
     expect(result.realizedGainLossAfterFeeMinor).toBe(9_900n);
+  });
+
+  it("uses remaining cost basis when aggregating a partially sold lot into DCA", () => {
+    const aggregate = aggregateDcaLots([
+      lot({ remainingQuantity: "0.5", remainingCostBasisMinor: 5_000n }),
+      lot({ id: "lot-2", remainingQuantity: "2", costBasisMinor: 30_000n, remainingCostBasisMinor: 30_000n }),
+    ], 8);
+    expect(aggregate.quantity).toBe("2.5");
+    expect(aggregate.costBasisMinor).toBe(35_000n);
   });
 
   it("keeps purchase fee outside the asset cost basis", () => {
