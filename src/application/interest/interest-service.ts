@@ -184,7 +184,9 @@ export class InterestService {
       throw new Error("Preview period cannot end after plan maturity");
     }
     if (await this.repository.hasExternalPrincipalMovements(plan)) {
-      throw new Error("Principal changed outside this InterestPlan after its start date; preview is not reliable in this MVP");
+      throw new Error(
+        "Principal changed outside this InterestPlan after its start date; preview is not reliable in this MVP",
+      );
     }
     const principalMinor = await this.readPrincipalBalance(plan);
     return calculateSimpleInterest({
