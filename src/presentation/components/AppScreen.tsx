@@ -193,6 +193,9 @@ export function AppScreen() {
           <Link href="/interest" style={styles.navigationLink}>
             Lãi suất & tiền gửi
           </Link>
+          <Link href="/task05-interest-acceptance" style={styles.navigationLink}>
+            Task05 acceptance (DEV)
+          </Link>
           <Link href="/categories" style={styles.navigationLink}>
             Danh mục
           </Link>
