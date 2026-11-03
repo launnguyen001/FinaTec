@@ -33,14 +33,18 @@ export class AssetValuationService {
       quote.currencyCode !== facts.asset.quoteCurrency ||
       quote.currencyCode !== facts.assetType.quoteCurrency
     ) {
-      throw new Error("Market quote currency does not match the asset configuration");
+      throw new Error(
+        "Market quote currency does not match the asset configuration",
+      );
     }
 
     const [quantity, currencies] = await Promise.all([
       this.assets.getCurrentQuantity(quote.assetId),
       this.ledger.listCurrencies(false),
     ]);
-    const currency = currencies.find((item) => item.code === quote.currencyCode);
+    const currency = currencies.find(
+      (item) => item.code === quote.currencyCode,
+    );
     if (!currency?.isActive) {
       throw new Error("Quote currency is missing or inactive");
     }
