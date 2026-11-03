@@ -91,6 +91,15 @@ export class SqliteAssetRepository implements AssetRepository {
     };
   }
 
+  async findAssetTransactionByJournalEntryId(journalEntryId: string) {
+    const row = await this.db.select({
+      transactionKind: assetTransactions.transactionKind,
+      lotId: assetTransactions.lotId,
+    }).from(assetTransactions)
+      .where(eq(assetTransactions.journalEntryId, journalEntryId)).get();
+    return row ?? null;
+  }
+
   async findLotForSale(lotId: string) {
     const row = await this.db
       .select()
