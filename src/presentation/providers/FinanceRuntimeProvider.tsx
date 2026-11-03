@@ -67,9 +67,13 @@ export function FinanceRuntimeProvider({
         });
     };
     refresh();
+    void runtime.interest.catchUpActivePlans().catch(() => undefined);
     const timer = setInterval(refresh, 60_000);
     const subscription = AppState.addEventListener("change", (nextState) => {
-      if (nextState === "active") refresh();
+      if (nextState === "active") {
+        refresh();
+        void runtime.interest.catchUpActivePlans().catch(() => undefined);
+      }
     });
     return () => {
       clearInterval(timer);
