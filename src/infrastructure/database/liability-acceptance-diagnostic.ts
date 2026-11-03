@@ -5,9 +5,7 @@ import * as SQLite from "expo-sqlite";
 import { drizzle } from "drizzle-orm/expo-sqlite";
 import { migrate } from "drizzle-orm/expo-sqlite/migrator";
 
-import {
-  LiabilityService,
-} from "../../application/liability/liability-service";
+import { LiabilityService } from "../../application/liability/liability-service";
 import { Currency } from "../../domain/ledger/currency";
 import { calculateAccountBalance } from "../../domain/ledger/posting";
 import type { Account } from "../../domain/ledger/repository";
@@ -182,7 +180,8 @@ export async function runLiabilityAcceptanceDiagnostic() {
       createId,
       now,
     });
-    stage = "originate the first scheduled liability and persist its journal/installments";
+    stage =
+      "originate the first scheduled liability and persist its journal/installments";
     const loan = await service.create({
       name: "Scheduled repayment diagnostic",
       liabilityAccountId: loanAccount.id,
@@ -435,7 +434,7 @@ export async function runLiabilityAcceptanceDiagnostic() {
     };
   } catch (error) {
     const cause =
-      error instanceof Error ? error.stack ?? error.message : String(error);
+      error instanceof Error ? (error.stack ?? error.message) : String(error);
     let foreignKeyState = "unavailable";
     if (client) {
       try {
