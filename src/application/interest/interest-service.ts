@@ -319,8 +319,15 @@ export class InterestService {
     const raced =
       await this.repository.findAccrualByIdempotencyKey(idempotencyKey);
     if (raced) return { accrual: raced, calculation };
-    await this.repository.createAccrual(accrual);
-    return { accrual, calculation };
+    try {
+      await this.repository.createAccrual(accrual);
+      return { accrual, calculation };
+    } catch (error) {
+      const concurrent =
+        await this.repository.findAccrualByIdempotencyKey(idempotencyKey);
+      if (concurrent) return { accrual: concurrent, calculation };
+      throw error;
+    }
   }
 
   async postAccrual(accrualId: string): Promise<InterestAccrual> {
