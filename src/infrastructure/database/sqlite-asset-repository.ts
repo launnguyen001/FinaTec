@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 
 import {
   aggregateDcaLots,
@@ -17,7 +17,9 @@ import type { LedgerDatabase } from "./database";
 import {
   accounts,
   assetDcaComponents,
+  assetDailyValuations,
   assetLots,
+  assetPriceQuotes,
   assetTransactions,
   assets,
   assetTypes,
@@ -47,6 +49,14 @@ type AssetTransactionWrite = {
   occurredAt: string;
   createdAt: string;
 };
+
+function formatMinorAmount(amount: bigint, precision: number): string {
+  const scale = 10n ** BigInt(precision);
+  const whole = amount / scale;
+  if (precision === 0) return whole.toString();
+  const fraction = (amount % scale).toString().padStart(precision, "0");
+  return whole.toString() + "." + fraction;
+}
 
 type LedgerTransaction = Parameters<
   Parameters<LedgerDatabase["transaction"]>[0]
@@ -320,6 +330,147 @@ export class SqliteAssetRepository implements AssetRepository {
       }
 
       return { created: true, calculation };
+    });
+  }
+
+  async recordQuoteAndSnapshot(input: {
+    quoteId: string;
+    snapshotId: string;
+    quote: MarketQuote;
+    quantity: string;
+    valuationDate: string;
+    snapshotCapturedAt: string;
+    quantityPrecision: number;
+    pricePrecision: number;
+    currencyMinorUnit: number;
+  }): Promise<DailyValuation | null> {
+    return this.db.transaction((tx) => {
+      const { quote } = input;
+      const asset = tx.select().from(assets)
+        .where(eq(assets.id, quote.assetId)).get();
+      if (!asset || asset.isArchived || asset.quoteCurrency !== quote.currencyCode) {
+        throw new Error("Quote asset or quote currency is invalid");
+      }
+      if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(input.valuationDate)) {
+        throw new Error("Valuation date must use YYYY-MM-DD");
+      }
+      if (!Number.isFinite(Date.parse(quote.observedAt)) ||
+          !Number.isFinite(Date.parse(quote.capturedAt)) ||
+          !Number.isFinite(Date.parse(input.snapshotCapturedAt))) {
+        throw new Error("Quote and snapshot timestamps must be valid ISO dates");
+      }
+
+      tx.insert(assetPriceQuotes).values({
+        id: input.quoteId,
+        assetId: quote.assetId,
+        priceDecimal: quote.price,
+        currencyCode: quote.currencyCode,
+        source: quote.source,
+        quoteStatus: quote.status,
+        observedAt: quote.observedAt,
+        capturedAt: quote.capturedAt,
+        conversionBasis: quote.conversionBasis ?? null,
+        createdAt: input.snapshotCapturedAt,
+      }).run();
+
+      if (quote.status === "REJECTED") return null;
+      const normalizedQuantity = normalizeDecimal(input.quantity, input.quantityPrecision);
+      const normalizedPrice = normalizeDecimal(quote.price, input.pricePrecision);
+      const totalMinor = normalizedQuantity === "0"
+        ? 0n
+        : multiplyDecimalToMinor({
+            quantity: normalizedQuantity,
+            quantityPrecision: input.quantityPrecision,
+            unitPrice: normalizedPrice,
+            pricePrecision: input.pricePrecision,
+            currencyMinorUnit: input.currencyMinorUnit,
+          });
+      const totalValue = formatMinorAmount(totalMinor, input.currencyMinorUnit);
+
+      const latest = tx.select().from(assetDailyValuations)
+        .where(eq(assetDailyValuations.assetId, quote.assetId))
+        .orderBy(desc(assetDailyValuations.valuationDate))
+        .limit(1)
+        .get();
+      if (latest && input.valuationDate < latest.valuationDate) return null;
+
+      const sameDay = tx.select().from(assetDailyValuations)
+        .where(and(
+          eq(assetDailyValuations.assetId, quote.assetId),
+          eq(assetDailyValuations.valuationDate, input.valuationDate),
+        ))
+        .get();
+      if (sameDay) {
+        if (sameDay.closedAt !== null) return null;
+        const updated = tx.update(assetDailyValuations).set({
+          quantity: normalizedQuantity,
+          unitPrice: normalizedPrice,
+          totalValue,
+          currencyCode: quote.currencyCode,
+          source: quote.source,
+          quoteStatus: quote.status,
+          observedAt: quote.observedAt,
+          capturedAt: input.snapshotCapturedAt,
+        }).where(and(
+          eq(assetDailyValuations.id, sameDay.id),
+          isNull(assetDailyValuations.closedAt),
+        )).run();
+        if (updated.changes !== 1) throw new Error("Open daily valuation changed during quote capture");
+        return {
+          id: sameDay.id,
+          assetId: quote.assetId,
+          valuationDate: input.valuationDate,
+          quantity: normalizedQuantity,
+          unitPrice: normalizedPrice,
+          totalValue,
+          currencyCode: quote.currencyCode,
+          source: quote.source,
+          quoteStatus: quote.status,
+          observedAt: quote.observedAt,
+          capturedAt: input.snapshotCapturedAt,
+          closedAt: null,
+        };
+      }
+
+      if (latest && latest.closedAt === null) {
+        tx.update(assetDailyValuations)
+          .set({ closedAt: input.snapshotCapturedAt })
+          .where(and(
+            eq(assetDailyValuations.id, latest.id),
+            isNull(assetDailyValuations.closedAt),
+          ))
+          .run();
+      }
+
+      tx.insert(assetDailyValuations).values({
+        id: input.snapshotId,
+        assetId: quote.assetId,
+        valuationDate: input.valuationDate,
+        quantity: normalizedQuantity,
+        unitPrice: normalizedPrice,
+        totalValue,
+        currencyCode: quote.currencyCode,
+        source: quote.source,
+        quoteStatus: quote.status,
+        observedAt: quote.observedAt,
+        capturedAt: input.snapshotCapturedAt,
+        closedAt: null,
+        createdAt: input.snapshotCapturedAt,
+      }).run();
+      return {
+        id: input.snapshotId,
+        assetId: quote.assetId,
+        valuationDate: input.valuationDate,
+        quantity: normalizedQuantity,
+        unitPrice: normalizedPrice,
+        totalValue,
+        currencyCode: quote.currencyCode,
+        source: quote.source,
+        quoteStatus: quote.status,
+        observedAt: quote.observedAt,
+        capturedAt: input.snapshotCapturedAt,
+        closedAt: null,
+      };
     });
   }
 
