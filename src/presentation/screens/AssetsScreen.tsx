@@ -88,7 +88,19 @@ export function AssetsScreen() {
     setCurrencies(nextCurrencies);
     setQuantities(Object.fromEntries(nextQuantities));
     if (!selectedTypeId && nextTypes[0]) setSelectedTypeId(nextTypes[0].id);
-    if (!manualAssetId && nextAssets[0]) setManualAssetId(nextAssets[0].id);
+    const marketAssets = nextAssets.filter((asset) =>
+      nextTypes.some(
+        (type) =>
+          type.id === asset.assetTypeId &&
+          type.valuationModel === "MARKET_VALUED",
+      ),
+    );
+    if (
+      !manualAssetId ||
+      !marketAssets.some((asset) => asset.id === manualAssetId)
+    ) {
+      setManualAssetId(marketAssets[0]?.id ?? "");
+    }
     if (!nextCurrencies.some((currency) => currency.code === quoteCurrency)) {
       setQuoteCurrency(
         nextCurrencies.find((currency) => currency.isActive)?.code ?? "VND",
@@ -360,7 +372,7 @@ export function AssetsScreen() {
           tạo Journal Entry.
         </Text>
         <View style={styles.choices}>
-          {assets.map((item) => (
+          {assets.filter((asset) => assetTypes.some((type) => type.id === asset.assetTypeId && type.valuationModel === "MARKET_VALUED")).map((item) => (
             <Choice
               key={item.id}
               value={item.symbol}
