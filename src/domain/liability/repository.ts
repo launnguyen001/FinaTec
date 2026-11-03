@@ -5,7 +5,6 @@ import type {
   LiabilityRateChange,
   LiabilityPaymentReversal,
   LiabilityJournalCommit,
-  LiabilityJournalCommit,
   LiabilityPaymentCommit,
 } from "./liability";
 
