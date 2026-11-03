@@ -1,0 +1,28 @@
+name: Task04 format report
+
+on:
+  push:
+    branches:
+      - "task/04-asset-management"
+
+permissions:
+  contents: read
+
+jobs:
+  format-report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Generate Prettier patch for remaining Task04 files
+        run: |
+          npx prettier --write \
+            src/application/asset/asset-valuation-service.ts \
+            src/infrastructure/database/sqlite-asset-repository.ts \
+            src/presentation/screens/AssetsScreen.tsx \
+            src/presentation/screens/AssetTransactionsScreen.tsx
+          git --no-pager diff --unified=2
