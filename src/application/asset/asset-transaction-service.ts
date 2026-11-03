@@ -72,6 +72,23 @@ export class AssetTransactionService {
     input: BuyAssetInput,
   ): Promise<{ created: boolean; lotId: string }> {
     const key = this.requireKey(input.idempotencyKey);
+    const entryId = "asset:buy:" + key;
+    const existing = await this.ledger.findJournalEntryByIdempotencyKey(entryId);
+    if (existing) {
+      if (existing.status !== "POSTED") {
+        throw new Error(
+          "Asset purchase idempotency key belongs to a non-posted Journal Entry",
+        );
+      }
+      const transaction =
+        await this.assets.findAssetTransactionByJournalEntryId(existing.id);
+      if (!transaction || transaction.transactionKind !== "BUY") {
+        throw new Error(
+          "Asset purchase idempotency key does not resolve to a committed BUY transaction",
+        );
+      }
+      return { created: false, lotId: transaction.lotId };
+    }
     const facts = await this.requireMarketAsset(
       input.assetId,
       input.currencyCode,
@@ -216,6 +233,23 @@ export class AssetTransactionService {
     calculation: ReturnType<typeof calculateSale> | null;
   }> {
     const key = this.requireKey(input.idempotencyKey);
+    const entryId = "asset:sell:" + key;
+    const existing = await this.ledger.findJournalEntryByIdempotencyKey(entryId);
+    if (existing) {
+      if (existing.status !== "POSTED") {
+        throw new Error(
+          "Asset sale idempotency key belongs to a non-posted Journal Entry",
+        );
+      }
+      const transaction =
+        await this.assets.findAssetTransactionByJournalEntryId(existing.id);
+      if (!transaction || transaction.transactionKind !== "SELL") {
+        throw new Error(
+          "Asset sale idempotency key does not resolve to a committed SELL transaction",
+        );
+      }
+      return { created: false, calculation: null };
+    }
     const facts = await this.requireMarketAsset(
       input.assetId,
       input.currencyCode,
