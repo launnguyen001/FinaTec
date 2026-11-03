@@ -52,6 +52,7 @@ export interface LiabilityPayment {
   journalEntryId: string;
   fxRateNumerator: string;
   fxRateDenominator: string;
+  replacesPaymentId: string | null;
   idempotencyKey: string;
   paidAt: string;
   principalPaidMinor: bigint;
@@ -78,6 +79,33 @@ export interface LiabilityRateChange {
   liabilityId: string;
   annualRatePpm: bigint;
   effectiveDate: string;
+  reason: string | null;
+  createdAt: string;
+}
+
+export interface LiabilityPaymentAllocation {
+  id: string;
+  paymentId: string;
+  installmentId: string;
+  principalMinor: bigint;
+  interestMinor: bigint;
+  principalBeforeMinor: bigint;
+  interestBeforeMinor: bigint;
+  statusBefore: RepaymentStatus;
+}
+
+export interface LiabilityPaymentScheduleChange {
+  id: string;
+  paymentId: string;
+  installmentId: string;
+  action: "CANCELLED" | "CREATED";
+  previousStatus: RepaymentStatus | null;
+}
+
+export interface LiabilityPaymentReversal {
+  id: string;
+  paymentId: string;
+  journalEntryId: string;
   reason: string | null;
   createdAt: string;
 }
