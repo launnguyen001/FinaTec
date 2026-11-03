@@ -255,8 +255,8 @@ export class SqliteAssetRepository implements AssetRepository {
       cryptoRefreshMinutes: row.cryptoRefreshMinutes,
       metalRefreshMinutes: row.metalRefreshMinutes,
       fiatRefreshMinutes: row.fiatRefreshMinutes,
-      primaryCryptoProvider: row.primaryCryptoProvider,
-      fallbackCryptoProvider: row.fallbackCryptoProvider,
+      primaryCryptoProvider: row.primaryCryptoProvider as AssetSettingsRecord["primaryCryptoProvider"],
+      fallbackCryptoProvider: row.fallbackCryptoProvider as AssetSettingsRecord["fallbackCryptoProvider"],
       updatedAt: row.updatedAt,
     };
   }

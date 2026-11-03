@@ -185,6 +185,12 @@ export function AppScreen() {
           <Link href="/asset-transactions" style={styles.navigationLink}>
             Giao dịch tài sản
           </Link>
+          <Link href="/asset-history" style={styles.navigationLink}>
+            Lịch sử định giá
+          </Link>
+          <Link href="/asset-settings" style={styles.navigationLink}>
+            Cài đặt tài sản
+          </Link>
           <Link href="/categories" style={styles.navigationLink}>
             Danh mục
           </Link>

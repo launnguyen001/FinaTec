@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "expo-router";
 import {
   ActivityIndicator,
   Pressable,
@@ -212,6 +213,10 @@ export function AssetsScreen() {
         Theo dõi holdings, giá vốn và định giá. Số dư tiền vẫn lấy trực tiếp từ
         Ledger, không tạo bản sao.
       </Text>
+      <View style={styles.choices}>
+        <Link href="/asset-history" style={styles.navigationLink}>Lịch sử định giá</Link>
+        <Link href="/asset-settings" style={styles.navigationLink}>Cài đặt định giá</Link>
+      </View>
 
       {loading ? <ActivityIndicator color={colors.primary} /> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -236,9 +241,35 @@ export function AssetsScreen() {
                     {type?.name ?? "Loại tài sản"} · {type?.unitCode ?? ""}
                   </Text>
                 </View>
-                <Text style={styles.quantity}>
-                  {quantities[asset.id] ?? "—"}
-                </Text>
+                <View style={styles.assetActions}>
+                  <Text style={styles.quantity}>
+                    {quantities[asset.id] ?? "—"}
+                  </Text>
+                  {quantities[asset.id] === "0" ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      disabled={busy}
+                      onPress={async () => {
+                        if (!runtime) return;
+                        setBusy(true);
+                        setFailure(null);
+                        setMessage(null);
+                        try {
+                          await runtime.assetCatalog.archiveAsset(asset.id);
+                          setMessage("Đã archive hồ sơ tài sản.");
+                          await refresh();
+                        } catch (cause) {
+                          setFailure(cause instanceof Error ? cause.message : "Không thể archive tài sản.");
+                        } finally {
+                          setBusy(false);
+                        }
+                      }}
+                      style={styles.archiveButton}
+                    >
+                      <Text style={styles.archiveButtonText}>Archive</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
               </View>
             );
           })
@@ -484,6 +515,10 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 2,
   },
+  assetActions: { alignItems: "flex-end", gap: spacing.xs },
+  archiveButton: { borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: spacing.sm, paddingVertical: 4 },
+  archiveButtonText: { color: colors.mutedText, fontSize: 11, fontWeight: "700" },
+  navigationLink: { color: colors.primary, fontSize: typography.caption, fontWeight: "700", paddingVertical: spacing.xs },
   assetSymbol: {
     color: colors.text,
     fontSize: typography.body,
