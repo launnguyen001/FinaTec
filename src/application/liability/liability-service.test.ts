@@ -637,5 +637,4 @@ describe("LiabilityService", () => {
     );
     expect(repository.archive).not.toHaveBeenCalled();
   });
-
 });
