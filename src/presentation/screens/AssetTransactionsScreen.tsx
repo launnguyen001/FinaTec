@@ -9,7 +9,11 @@ import {
   View,
 } from "react-native";
 import { decimalToMinorUnits } from "../../domain/asset/asset";
-import type { AssetLotRecord, AssetRecord, AssetTypeRecord } from "../../domain/asset/repository";
+import type {
+  AssetLotRecord,
+  AssetRecord,
+  AssetTypeRecord,
+} from "../../domain/asset/repository";
 import type { Account } from "../../domain/ledger/repository";
 import type { Category } from "../../domain/category/category";
 import { ScreenBackLink } from "../components/ScreenBackLink";
@@ -66,17 +70,20 @@ export function AssetTransactionsScreen() {
   const [message, setMessage] = useState<string | null>(null);
 
   const selectedAsset = assets.find((item) => item.id === assetId);
-  const selectedType = types.find((item) => item.id === selectedAsset?.assetTypeId);
+  const selectedType = types.find(
+    (item) => item.id === selectedAsset?.assetTypeId,
+  );
   const currencyCode = selectedAsset?.quoteCurrency ?? "";
 
   const refresh = useCallback(async () => {
     if (!runtime) return;
-    const [nextAssets, nextTypes, nextAccounts, nextCategories] = await Promise.all([
-      runtime.assetCatalog.listAssets(),
-      runtime.assetCatalog.listAssetTypes(),
-      runtime.accounts.list(false),
-      runtime.categories.list(true),
-    ]);
+    const [nextAssets, nextTypes, nextAccounts, nextCategories] =
+      await Promise.all([
+        runtime.assetCatalog.listAssets(),
+        runtime.assetCatalog.listAssetTypes(),
+        runtime.accounts.list(false),
+        runtime.categories.list(true),
+      ]);
     const marketAssets = nextAssets.filter((asset) =>
       nextTypes.some(
         (type) =>
@@ -100,7 +107,8 @@ export function AssetTransactionsScreen() {
     }
     const nextLots = await runtime.assetRepository.listLots(assetId);
     setLots(nextLots);
-    if (!nextLots.some((item) => item.id === lotId)) setLotId(nextLots[0]?.id ?? "");
+    if (!nextLots.some((item) => item.id === lotId))
+      setLotId(nextLots[0]?.id ?? "");
     setSelectedLotIds((current) =>
       current.filter((id) => nextLots.some((item) => item.id === id)),
     );
@@ -110,7 +118,9 @@ export function AssetTransactionsScreen() {
     // Load options after the encrypted finance runtime is ready.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void refresh().catch((cause: unknown) =>
-      setFailure(cause instanceof Error ? cause.message : "Không thể tải dữ liệu."),
+      setFailure(
+        cause instanceof Error ? cause.message : "Không thể tải dữ liệu.",
+      ),
     );
   }, [refresh]);
 
@@ -118,7 +128,9 @@ export function AssetTransactionsScreen() {
     // Lot list is derived from the selected asset and refreshed on route focus.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void refreshLots().catch((cause: unknown) =>
-      setFailure(cause instanceof Error ? cause.message : "Không thể tải các lot."),
+      setFailure(
+        cause instanceof Error ? cause.message : "Không thể tải các lot.",
+      ),
     );
   }, [refreshLots]);
 
@@ -153,8 +165,12 @@ export function AssetTransactionsScreen() {
       const currencyRecord = (await runtime.ledger.listCurrencies(false)).find(
         (item) => item.code === currencyCode,
       );
-      if (!currencyRecord) throw new Error("Không tìm thấy tiền tệ của tài sản.");
-      const feeMinor = decimalToMinorUnits(feeAmount || "0", currencyRecord.minorUnit);
+      if (!currencyRecord)
+        throw new Error("Không tìm thấy tiền tệ của tài sản.");
+      const feeMinor = decimalToMinorUnits(
+        feeAmount || "0",
+        currencyRecord.minorUnit,
+      );
 
       if (mode === "BUY") {
         const result = await runtime.assetTransactions.buy({
@@ -169,7 +185,11 @@ export function AssetTransactionsScreen() {
           feeCategoryId: feeMinor > 0n ? feeCategoryId : null,
           idempotencyKey: runtime.createId(),
         });
-        setMessage(result.created ? "Đã ghi nhận giao dịch mua." : "Giao dịch mua đã được ghi nhận trước đó.");
+        setMessage(
+          result.created
+            ? "Đã ghi nhận giao dịch mua."
+            : "Giao dịch mua đã được ghi nhận trước đó.",
+        );
       } else if (mode === "SELL") {
         const result = await runtime.assetTransactions.sell({
           assetId,
@@ -186,7 +206,11 @@ export function AssetTransactionsScreen() {
           realizedLossAccountId: lossAccountId || null,
           idempotencyKey: runtime.createId(),
         });
-        setMessage(result.created ? "Đã ghi nhận giao dịch bán." : "Giao dịch bán đã được ghi nhận trước đó.");
+        setMessage(
+          result.created
+            ? "Đã ghi nhận giao dịch bán."
+            : "Giao dịch bán đã được ghi nhận trước đó.",
+        );
       } else {
         if (selectedLotIds.length < 2) {
           throw new Error("DCA cần chọn ít nhất hai lot.");
@@ -200,7 +224,11 @@ export function AssetTransactionsScreen() {
       setSelectedLotIds([]);
       await refreshLots();
     } catch (cause) {
-      setFailure(cause instanceof Error ? cause.message : "Không thể lưu giao dịch tài sản.");
+      setFailure(
+        cause instanceof Error
+          ? cause.message
+          : "Không thể lưu giao dịch tài sản.",
+      );
     } finally {
       setBusy(false);
     }
@@ -208,7 +236,9 @@ export function AssetTransactionsScreen() {
 
   function toggleLot(id: string) {
     setSelectedLotIds((current) =>
-      current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
+      current.includes(id)
+        ? current.filter((item) => item !== id)
+        : [...current, id],
     );
   }
 
@@ -250,7 +280,9 @@ export function AssetTransactionsScreen() {
           ))}
         </View>
         {!selectedAsset ? (
-          <Text style={styles.muted}>Chưa có market-valued asset. Tạo hồ sơ tại màn hình Tài sản.</Text>
+          <Text style={styles.muted}>
+            Chưa có market-valued asset. Tạo hồ sơ tại màn hình Tài sản.
+          </Text>
         ) : (
           <>
             <Text style={styles.muted}>
@@ -282,7 +314,9 @@ export function AssetTransactionsScreen() {
                   placeholder="0.00000000"
                   style={styles.input}
                 />
-                <Text style={styles.label}>Execution price ({currencyCode})</Text>
+                <Text style={styles.label}>
+                  Execution price ({currencyCode})
+                </Text>
                 <TextInput
                   accessibilityLabel="Execution price"
                   keyboardType="decimal-pad"
@@ -349,7 +383,9 @@ export function AssetTransactionsScreen() {
                 ) : null}
                 {mode === "SELL" ? (
                   <>
-                    <Text style={styles.label}>Realized gain account (INCOME)</Text>
+                    <Text style={styles.label}>
+                      Realized gain account (INCOME)
+                    </Text>
                     <View style={styles.choices}>
                       {incomeAccounts.map((item) => (
                         <Choice
@@ -360,7 +396,9 @@ export function AssetTransactionsScreen() {
                         />
                       ))}
                     </View>
-                    <Text style={styles.label}>Realized loss account (EXPENSE)</Text>
+                    <Text style={styles.label}>
+                      Realized loss account (EXPENSE)
+                    </Text>
                     <View style={styles.choices}>
                       {expenseAccounts.map((item) => (
                         <Choice
@@ -399,10 +437,19 @@ export function AssetTransactionsScreen() {
           accessibilityRole="button"
           disabled={busy || !selectedAsset || (mode === "SELL" && !lotId)}
           onPress={() => void submit()}
-          style={[styles.primaryButton, (busy || !selectedAsset) && styles.disabled]}
+          style={[
+            styles.primaryButton,
+            (busy || !selectedAsset) && styles.disabled,
+          ]}
         >
           <Text style={styles.primaryButtonText}>
-            {busy ? "Đang xử lý…" : mode === "BUY" ? "Xác nhận mua" : mode === "SELL" ? "Xác nhận bán" : "Hợp nhất DCA"}
+            {busy
+              ? "Đang xử lý…"
+              : mode === "BUY"
+                ? "Xác nhận mua"
+                : mode === "SELL"
+                  ? "Xác nhận bán"
+                  : "Hợp nhất DCA"}
           </Text>
         </Pressable>
       </View>
