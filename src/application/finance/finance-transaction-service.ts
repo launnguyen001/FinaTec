@@ -61,9 +61,7 @@ export class FinanceTransactionService {
     return this.accounting.reverseEntry(input);
   }
 
-  settleArchivedAccount(input: { idempotencyKey: string; archivedAccountId: string; destinationAccountId: string; amountMinor: bigint; reason: string; occurredAt?: string; fxRateNumerator?: string; fxRateDenominator?: string }): Promise<PostingResult> {
-    return this.accounting.settleArchivedAccount(input);
-  }
+
   private async validateCommon(assetId: string, counterpartId: string, categoryId: string, kind: "INCOME" | "EXPENSE", amountMinor: bigint): Promise<{ asset: Account; category: NonNullable<Awaited<ReturnType<CategoryRepository["findById"]>>>; counterpart: Account }> {
     if (amountMinor <= 0n) throw new Error("Transaction amount must be positive");
     const [asset, counterpart, category] = await Promise.all([this.ledger.findAccountById(assetId), this.ledger.findAccountById(counterpartId), this.categories.findById(categoryId)]);
