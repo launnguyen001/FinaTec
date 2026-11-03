@@ -30,6 +30,30 @@ CREATE TABLE liability_payment_reversals (
   created_at TEXT NOT NULL
 );
 --> statement-breakpoint
+CREATE UNIQUE INDEX liability_payments_replacement_unique
+  ON liability_payments(replaces_payment_id) WHERE replaces_payment_id IS NOT NULL;
+--> statement-breakpoint
+DROP TRIGGER liability_installments_update_guard;
+--> statement-breakpoint
+CREATE TRIGGER liability_installments_update_guard
+BEFORE UPDATE ON liability_installments
+WHEN NEW.id <> OLD.id OR NEW.liability_id <> OLD.liability_id
+  OR NEW.sequence <> OLD.sequence OR NEW.period_start <> OLD.period_start OR NEW.due_date <> OLD.due_date
+  OR NEW.opening_principal_minor <> OLD.opening_principal_minor
+  OR NEW.principal_due_minor <> OLD.principal_due_minor OR NEW.interest_due_minor <> OLD.interest_due_minor
+  OR NEW.total_due_minor <> OLD.total_due_minor OR NEW.closing_principal_minor <> OLD.closing_principal_minor
+  OR NEW.annual_rate_ppm <> OLD.annual_rate_ppm
+  OR ((NEW.principal_paid_minor < OLD.principal_paid_minor OR NEW.interest_paid_minor < OLD.interest_paid_minor)
+      AND NOT EXISTS (
+        SELECT 1 FROM liability_payment_allocations a
+        INNER JOIN liability_payment_reversals r ON r.payment_id = a.payment_id
+        WHERE a.installment_id = OLD.id
+          AND NEW.principal_paid_minor = a.principal_before_minor
+          AND NEW.interest_paid_minor = a.interest_before_minor
+      ))
+  OR NEW.principal_paid_minor > NEW.principal_due_minor OR NEW.interest_paid_minor > NEW.interest_due_minor
+BEGIN SELECT RAISE(ABORT, 'installment snapshots are immutable outside payment or linked reversal'); END;
+--> statement-breakpoint
 CREATE TRIGGER liability_payment_allocations_no_update
 BEFORE UPDATE ON liability_payment_allocations
 BEGIN SELECT RAISE(ABORT, 'payment allocation history is immutable'); END;
