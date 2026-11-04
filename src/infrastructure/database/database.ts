@@ -6,11 +6,11 @@ import { drizzle } from "drizzle-orm/expo-sqlite";
 import { migrate } from "drizzle-orm/expo-sqlite/migrator";
 
 import { ledgerMigrations } from "./migrations";
+import { resolveDatabaseKey } from "./key-lifecycle";
 import { ledgerSchema } from "./schema";
 
 const DATABASE_NAME = "ket-so-ledger.db";
 const KEY_STORAGE_NAME = "ketso.database.sqlcipher-key.v1";
-const RAW_KEY_PATTERN = /^[0-9a-f]{64}$/;
 
 class SqlCipherUnavailableError extends Error {
   constructor() {
@@ -38,29 +38,15 @@ function databaseFile(): FileSystem.File {
   return new FileSystem.File(uri, DATABASE_NAME);
 }
 
-async function resolveDatabaseKey(
+async function resolveProductionDatabaseKey(
   databaseExists: boolean,
 ): Promise<{ key: string; generated: boolean }> {
-  const storedKey = await SecureStore.getItemAsync(KEY_STORAGE_NAME);
-
-  if (storedKey !== null) {
-    if (!RAW_KEY_PATTERN.test(storedKey)) {
-      throw new Error(
-        "Stored database key is invalid; refusing to open database",
-      );
-    }
-    return { key: storedKey, generated: false };
-  }
-
-  if (databaseExists) {
-    throw new Error(
-      "Database exists but its encryption key is missing; refusing to regenerate a key or open the file",
-    );
-  }
-
-  const key = toHex(await Crypto.getRandomBytesAsync(32));
-  await SecureStore.setItemAsync(KEY_STORAGE_NAME, key);
-  return { key, generated: true };
+  return resolveDatabaseKey(
+    databaseExists,
+    KEY_STORAGE_NAME,
+    SecureStore,
+    async () => toHex(await Crypto.getRandomBytesAsync(32)),
+  );
 }
 
 function createLedgerDatabase(client: SQLite.SQLiteDatabase) {
@@ -72,7 +58,7 @@ export type LedgerDatabase = ReturnType<typeof createLedgerDatabase>;
 async function openLedgerDatabase(): Promise<LedgerDatabase> {
   const file = databaseFile();
   const databaseExisted = file.exists;
-  const keyResult = await resolveDatabaseKey(databaseExisted);
+  const keyResult = await resolveProductionDatabaseKey(databaseExisted);
   const client = await SQLite.openDatabaseAsync(DATABASE_NAME, {
     useNewConnection: true,
   });
