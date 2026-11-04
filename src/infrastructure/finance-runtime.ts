@@ -39,7 +39,11 @@ export async function createFinanceRuntime() {
   const readRepository = new SqliteFinanceReadRepository(db);
   const now = () => new Date().toISOString();
   const createId = () => Crypto.randomUUID();
-  const accounting = new AccountingService(ledger, { createId, now });
+  const accounting = new AccountingService(ledger, {
+    createId,
+    now,
+    categories: categoryRepository,
+  });
   const assetValuations = new AssetValuationService(assetRepository, ledger, {
     now,
     createId,
