@@ -2,7 +2,7 @@
 
 - Giai đoạn: 4 — MVP 3: Khoản nợ, định kỳ và ngân sách
 - Ưu tiên: P1
-- Trạng thái: BLOCKED_DEVICE_ACCEPTANCE — diagnostic trên Development Build gặp lỗi FOREIGN KEY khi ghi nhận trả gốc trước hạn; xem biên bản nghiệm thu bên dưới
+- Trạng thái: COMPLETE — DEVICE_ACCEPTED; diagnostic SQLCipher trên Development Build PASS toàn bộ, kiểm tra cục bộ PASS; xem biên bản nghiệm thu lượt 2 bên dưới
 - Phụ thuộc: TASK-02, TASK-03, TASK-05
 
 ## 1. Mục tiêu
@@ -72,13 +72,13 @@ Liability, RepaymentSchedule, LiabilityPayment (hoặc tên tương ứng theo n
 - Reconciliation giữa principal balance, schedule, payment records và posted journal lines.
 
 ## 10. Tiêu chí nghiệm thu
-- [ ] Mỗi phương pháp có công thức và kiểm thử tham chiếu.
-- [ ] Tổng lịch trả khớp giả định gốc/lãi.
-- [ ] Thanh toán cập nhật tiền và dư nợ chính xác.
-- [ ] Trả một phần/trước hạn tuân theo chính sách đã duyệt.
-- [ ] Không xử lý một khoản thanh toán trùng.
-- [ ] Dư nợ đối soát được với lịch sử journal.
-- [ ] Archive chỉ được phép khi dư nợ và nghĩa vụ chưa thanh toán đều bằng 0.
+- [x] Mỗi phương pháp có công thức và kiểm thử tham chiếu.
+- [x] Tổng lịch trả khớp giả định gốc/lãi.
+- [x] Thanh toán cập nhật tiền và dư nợ chính xác.
+- [x] Trả một phần/trước hạn tuân theo chính sách đã duyệt.
+- [x] Không xử lý một khoản thanh toán trùng.
+- [x] Dư nợ đối soát được với lịch sử journal.
+- [x] Archive chỉ được phép khi dư nợ và nghĩa vụ chưa thanh toán đều bằng 0.
 
 ## 11. Nhật ký tiến độ
 - Đã làm: TASK-05 PR #7 đã merge vào main tại fe91858; branch TASK-06 được tạo từ đúng merge commit này.
@@ -98,9 +98,9 @@ Liability, RepaymentSchedule, LiabilityPayment (hoặc tên tương ứng theo n
 - CLI từng gặp `FOREIGN KEY constraint failed` trên SHA cũ; chưa có báo cáo acceptance mới trên HEAD hiện tại. Chỉ bàn giao CLI sau khi chốt reconciliation và CI mới nhất PASS.
 - Bàn giao CLI: chạy route `Task06 acceptance (DEV)` trên Development Build có SQLCipher. Diagnostic tạo database và SecureStore key ngẫu nhiên riêng, không đọc/ghi database tài chính production; phải trả đủ PASS cho migration 0007–0010, origination, partial allocation/idempotency, payment reversal/replacement, APR reset, early principal, full payoff, archive, fee posting, reconciliation và SQLCipher.
 - Giới hạn đã chủ động bảo vệ: với foreign-currency posting, nếu FX snapshot khiến các line sau HALF_UP không cân bằng base currency thì payment bị reject, không tự sinh journal mất cân bằng. Cần CLI xác nhận luồng FX trên thiết bị.
-- Chưa tuyên bố device acceptance; PR #8 vẫn Draft và chưa merge cho đến khi CLI trả báo cáo diagnostic và regression pass.
+- Diagnostic thiết bị và regression cục bộ đã PASS ở biên bản nghiệm thu lượt 2. Trạng thái CI của commit sửa thứ tự ghi và assertion nghiệm thu chưa được xác minh độc lập.
 
-## 12. Biên bản nghiệm thu độc lập trên thiết bị
+## 12. Biên bản nghiệm thu độc lập trên thiết bị (lượt 1 — lịch sử)
 
 - Kết luận: **BLOCKED**. Không chạy tiếp regression sau lỗi đầu tiên ảnh hưởng tính toàn vẹn dữ liệu.
 - Commit bắt buộc: `eb4e9b7034d08a08d69b8fd270fccfb72cd638da`; detached worktree tại `android/.task06-acceptance-eb4e9b7`, `git rev-parse HEAD` khớp SHA và working tree sạch trước khi build. Checkout chính giữ nguyên branch `task/06-liability-management`, SHA `86adf4a735ad385c5d9e49816974cdfc3f1c5a94`; không đổi branch.
@@ -112,4 +112,15 @@ Liability, RepaymentSchedule, LiabilityPayment (hoặc tên tương ứng theo n
 - Cleanup: diagnostic đi qua `finally` theo mã nguồn, nơi đóng database, xóa file database cô lập và SecureStore key. Việc cleanup thành công không được xác minh độc lập trên thiết bị; không khẳng định đã xóa.
 - Bằng chứng lưu tại `/tmp/task06-eb4e9b7-diagnostic.png`, `/tmp/task06-eb4e9b7-ui.xml`, `/tmp/task06-eb4e9b7-logcat.txt` và `/tmp/task06-eb4e9b7-screen.png`.
 - Không sửa source/test/schema/migration/business logic; không commit, push hoặc merge. Cần Implementation Owner điều tra lỗi FOREIGN KEY tại thao tác commit payment trả gốc trước hạn.
+
+## 13. Biên bản nghiệm thu độc lập trên thiết bị (lượt 2)
+
+- Kết luận: **PASS — DEVICE ACCEPTED**.
+- Mã nguồn nền: `cfc95c22deeea40f82c877ca59fc7d2a16923890`. Commit này sửa thứ tự transaction để ghi installment mới trước schedule-change audit rows tham chiếu installment đó; `PRAGMA foreign_key_check` không còn lỗi.
+- Diagnostic assertion được sửa để đối chiếu ID của ba installment đang hiệu lực sau APR reset. Sau trả gốc, diagnostic xác nhận chính các kỳ đó được giữ làm lịch sử `CANCELLED` và lịch mới được tạo cho dư nợ còn lại; không đếm nhầm ba kỳ đã bị hủy từ lần đổi APR trước đó.
+- Thiết bị: Huawei LYA-L29, Android 10 / API 29; Development Build `com.anonymous.fintech`, version 1.0.0 (versionCode 1). Chạy route `Task06 acceptance (DEV)` trên database SQLCipher cô lập `task06-liability-acceptance-f1fb14582e9f.db`.
+- Kết quả diagnostic: PASS migration; origination journal; phân bổ lãi trước gốc; idempotent retry; reversal; replacement linkage; archive guard; APR history; trả gốc trước hạn và tính lại schedule; tất toán; archive sau tất toán; tách phí EXPENSE; reconciliation ledger/schedule/payment; SQLCipher `4.17.0 community`. Mọi chênh lệch đối soát bằng 0.
+- Diagnostic báo đã xóa database cô lập và SecureStore key tạm trong `finally`.
+- Xác minh cục bộ trên working tree sau cập nhật assertion: typecheck PASS, lint PASS, format check PASS, unit tests PASS (17 suites / 116 tests); Android build và cài đặt Development Build PASS.
+- Giới hạn báo cáo: CI từ xa cho source assertion vừa sửa chưa được xác minh; GitHub CLI không có trong môi trường. Nghiệm thu thiết bị và các lệnh kiểm tra cục bộ đều PASS.
 

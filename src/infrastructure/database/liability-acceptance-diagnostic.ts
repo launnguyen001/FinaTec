@@ -314,6 +314,11 @@ export async function runLiabilityAcceptanceDiagnostic() {
       "Acceptance APR reset",
     );
     const afterRateChange = await service.getDetail(earlyLoan.id);
+    const rateAdjustedFutureIds = new Set(
+      afterRateChange.installments
+        .filter((item) => item.status === "UPCOMING")
+        .map((item) => item.id),
+    );
     check(
       "APR history and forward-only recalculation",
       rateChange.annualRatePpm === 240_000n &&
@@ -335,8 +340,9 @@ export async function runLiabilityAcceptanceDiagnostic() {
       idempotencyKey: `task06-${suffix}-early-principal`,
     });
     const afterEarly = await service.getDetail(earlyLoan.id);
-    const cancelledOriginal = afterEarly.installments.filter(
-      (item) => item.status === "CANCELLED",
+    const rateAdjustedRowsCancelled = afterEarly.installments.filter(
+      (item) =>
+        rateAdjustedFutureIds.has(item.id) && item.status === "CANCELLED",
     );
     const activeFuture = afterEarly.installments.filter(
       (item) => item.status === "UPCOMING",
@@ -348,7 +354,8 @@ export async function runLiabilityAcceptanceDiagnostic() {
     check(
       "Early principal schedule recalculation",
       afterEarly.liability.outstandingPrincipalMinor === 80_000n &&
-        cancelledOriginal.length === 3 &&
+        rateAdjustedRowsCancelled.length === rateAdjustedFutureIds.size &&
+        rateAdjustedFutureIds.size === 3 &&
         activeFuture.length === 3 &&
         scheduledPrincipal === 80_000n &&
         afterEarly.reconciliation.differenceMinor === 0n &&
