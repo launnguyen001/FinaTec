@@ -1,7 +1,7 @@
 import {
   resolveDatabaseKey,
   type SecureKeyStore,
-} from "../infrastructure/database/spike/key-lifecycle";
+} from "../infrastructure/database/key-lifecycle";
 
 function makeSecureStore(initialValue: string | null) {
   let value = initialValue;
