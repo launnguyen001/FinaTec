@@ -449,12 +449,6 @@ export class SqliteLiabilityRepository implements LiabilityRepository {
           )
           .run();
       }
-      if (input.scheduleChanges.length) {
-        tx.insert(liabilityPaymentScheduleChanges)
-          .values(input.scheduleChanges)
-          .run();
-      }
-
       for (const item of input.installmentUpdates) {
         const changed = tx
           .update(liabilityInstallments)
@@ -482,6 +476,14 @@ export class SqliteLiabilityRepository implements LiabilityRepository {
               this.installmentRow(item, input.payment.createdAt),
             ),
           )
+          .run();
+      }
+
+      // Schedule-change audit rows may reference newly generated installments.
+      // Persist those installments first to satisfy the FK to liability_installments.
+      if (input.scheduleChanges.length) {
+        tx.insert(liabilityPaymentScheduleChanges)
+          .values(input.scheduleChanges)
           .run();
       }
 
