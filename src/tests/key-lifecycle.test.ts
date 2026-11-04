@@ -75,11 +75,29 @@ describe("resolveDatabaseKey", () => {
     const generateRawKey = jest.fn(async () => "e".repeat(64));
 
     await expect(
-      resolveDatabaseKey(false, "invalid-key", secureStore, generateRawKey),
+      resolveDatabaseKey(true, "invalid-key", secureStore, generateRawKey),
     ).rejects.toMatchObject({
       code: "INVALID_STORED_KEY",
     });
     expect(generateRawKey).not.toHaveBeenCalled();
     expect(secureStore.setItemAsync).not.toHaveBeenCalled();
+  });
+
+  it("does not save a generated key when the generator returns an invalid value", async () => {
+    const { secureStore, getValue } = makeSecureStore(null);
+    const generateRawKey = jest.fn(async () => "not-a-raw-key");
+
+    await expect(
+      resolveDatabaseKey(
+        false,
+        "invalid-generated-key",
+        secureStore,
+        generateRawKey,
+      ),
+    ).rejects.toMatchObject({ code: "INVALID_GENERATED_KEY" });
+
+    expect(generateRawKey).toHaveBeenCalledTimes(1);
+    expect(secureStore.setItemAsync).not.toHaveBeenCalled();
+    expect(getValue()).toBeNull();
   });
 });

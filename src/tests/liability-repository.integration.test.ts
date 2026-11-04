@@ -1,0 +1,213 @@
+import { LiabilityService } from "../application/liability/liability-service";
+import type { Account, AccountType } from "../domain/ledger/repository";
+import { SqliteLedgerRepository } from "../infrastructure/database/sqlite-ledger-repository";
+import { SqliteLiabilityRepository } from "../infrastructure/database/sqlite-liability-repository";
+import { createRealSqliteTestDatabase } from "./helpers/real-sqlite";
+
+const timestamp = "2026-01-15T12:00:00.000Z";
+
+function account(id: string, type: AccountType): Account {
+  return {
+    id,
+    name: id,
+    type,
+    currencyCode: "VND",
+    isSystem: false,
+    isArchived: false,
+    subtype: type === "ASSET" ? "CASH" : null,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+}
+
+async function createLiabilityFixture(
+  database: Awaited<ReturnType<typeof createRealSqliteTestDatabase>>,
+) {
+  const ledger = new SqliteLedgerRepository(database.db);
+  const repository = new SqliteLiabilityRepository(database.db);
+  let nextId = 0;
+  const service = new LiabilityService(repository, ledger, {
+    now: () => timestamp,
+    createId: () => `liability-test-${++nextId}`,
+  });
+  await ledger.setBaseCurrencyCode("VND", timestamp);
+  await ledger.createAccount(account("liability-test-cash", "ASSET"));
+  await ledger.createAccount(account("liability-test-loan", "LIABILITY"));
+  await ledger.createAccount(account("liability-test-interest", "EXPENSE"));
+  const liability = await service.create({
+    name: "SQLite early repayment fixture",
+    liabilityAccountId: "liability-test-loan",
+    receivingAccountId: "liability-test-cash",
+    interestExpenseAccountId: "liability-test-interest",
+    principalMinor: 100_000n,
+    annualRatePpm: 120_000n,
+    repaymentMethod: "EQUAL_PRINCIPAL",
+    termMonths: 3,
+    startDate: "2026-01-01",
+    firstDueDate: "2026-02-01",
+    timezoneId: "UTC",
+    earlyPaymentPolicy: "KEEP_MATURITY_REDUCE_INSTALLMENT",
+  });
+  return { ledger, repository, service, liability };
+}
+
+describe("SQLite liability payment repository", () => {
+  it("commits replacement installments before their schedule audit rows", async () => {
+    const database = await createRealSqliteTestDatabase();
+    try {
+      const { ledger, repository, service, liability } =
+        await createLiabilityFixture(database);
+      const foreignKeys = database.raw.prepare("PRAGMA foreign_keys").get() as {
+        foreign_keys: number;
+      };
+      expect(foreignKeys.foreign_keys).toBe(1);
+
+      const payment = await service.recordPayment({
+        liabilityId: liability.id,
+        sourceAccountId: "liability-test-cash",
+        amountMinor: 20_000n,
+        paidAt: timestamp,
+        idempotencyKey: "sqlite-early-principal",
+      });
+      const detail = await service.getDetail(liability.id);
+      const scheduleChanges = database.raw
+        .prepare(
+          `SELECT installment_id AS installmentId, action
+           FROM liability_payment_schedule_changes
+           WHERE payment_id = ? ORDER BY action, installment_id`,
+        )
+        .all(payment.id) as { installmentId: string; action: string }[];
+      const createdInstallmentIds = scheduleChanges
+        .filter((change) => change.action === "CREATED")
+        .map((change) => change.installmentId);
+      const persistedInstallments = database.raw
+        .prepare("SELECT id FROM liability_installments WHERE id IN (?, ?, ?)")
+        .all(...createdInstallmentIds) as { id: string }[];
+      const persistedPayment = await repository.findPaymentById(payment.id);
+      const journal = await ledger.findJournalEntryById(payment.journalEntryId);
+      const journalLines = await ledger.listJournalLines(
+        payment.journalEntryId,
+      );
+
+      expect(createdInstallmentIds).toHaveLength(3);
+      expect(persistedInstallments.map((row) => row.id).sort()).toEqual(
+        createdInstallmentIds.sort(),
+      );
+      expect(persistedPayment).toMatchObject({
+        id: payment.id,
+        journalEntryId: payment.journalEntryId,
+        principalPaidMinor: 20_000n,
+      });
+      expect(journal?.status).toBe("POSTED");
+      expect(journalLines.length).toBeGreaterThanOrEqual(2);
+      expect(detail.liability.outstandingPrincipalMinor).toBe(80_000n);
+      expect(
+        detail.installments
+          .filter((installment) => installment.status !== "CANCELLED")
+          .reduce(
+            (sum, installment) => sum + installment.principalDueMinor,
+            0n,
+          ),
+      ).toBe(80_000n);
+      expect(detail.reconciliation.differenceMinor).toBe(0n);
+      expect(detail.reconciliation.scheduleDifferenceMinor).toBe(0n);
+      expect(detail.reconciliation.paymentDifferenceMinor).toBe(0n);
+      expect(database.raw.prepare("PRAGMA foreign_key_check").all()).toEqual(
+        [],
+      );
+
+      // This is the old write order's failing operation: SQLite checks the
+      // immediate FK as soon as an audit row references a not-yet-inserted row.
+      expect(() =>
+        database.raw
+          .prepare(
+            `INSERT INTO liability_payment_schedule_changes
+             (id, payment_id, installment_id, action, previous_status)
+             VALUES (?, ?, ?, 'CREATED', NULL)`,
+          )
+          .run("old-order-regression", payment.id, "not-inserted-yet"),
+      ).toThrow(/FOREIGN KEY constraint failed/);
+    } finally {
+      database.close();
+    }
+  });
+
+  it("rolls back every payment write when a late transaction write fails", async () => {
+    const database = await createRealSqliteTestDatabase();
+    try {
+      const { service, liability } = await createLiabilityFixture(database);
+      const before = {
+        entries: database.raw
+          .prepare("SELECT COUNT(*) AS count FROM journal_entries")
+          .get() as { count: number },
+        lines: database.raw
+          .prepare("SELECT COUNT(*) AS count FROM journal_lines")
+          .get() as { count: number },
+        installments: database.raw
+          .prepare("SELECT COUNT(*) AS count FROM liability_installments")
+          .get() as { count: number },
+      };
+      database.raw.exec(`
+        CREATE TRIGGER fail_payment_after_schedule_writes
+        BEFORE UPDATE OF outstanding_principal_minor ON liabilities
+        BEGIN
+          SELECT RAISE(ABORT, 'forced late payment failure');
+        END;
+      `);
+
+      await expect(
+        service.recordPayment({
+          liabilityId: liability.id,
+          sourceAccountId: "liability-test-cash",
+          amountMinor: 20_000n,
+          paidAt: timestamp,
+          idempotencyKey: "sqlite-rollback-early-principal",
+        }),
+      ).rejects.toThrow(/forced late payment failure/);
+
+      const detail = await service.getDetail(liability.id);
+      const after = {
+        entries: database.raw
+          .prepare("SELECT COUNT(*) AS count FROM journal_entries")
+          .get() as { count: number },
+        lines: database.raw
+          .prepare("SELECT COUNT(*) AS count FROM journal_lines")
+          .get() as { count: number },
+        installments: database.raw
+          .prepare("SELECT COUNT(*) AS count FROM liability_installments")
+          .get() as { count: number },
+        payments: database.raw
+          .prepare("SELECT COUNT(*) AS count FROM liability_payments")
+          .get() as { count: number },
+        allocations: database.raw
+          .prepare(
+            "SELECT COUNT(*) AS count FROM liability_payment_allocations",
+          )
+          .get() as { count: number },
+        scheduleChanges: database.raw
+          .prepare(
+            "SELECT COUNT(*) AS count FROM liability_payment_schedule_changes",
+          )
+          .get() as { count: number },
+      };
+
+      expect(after.entries.count).toBe(before.entries.count);
+      expect(after.lines.count).toBe(before.lines.count);
+      expect(after.installments.count).toBe(before.installments.count);
+      expect(after.payments.count).toBe(0);
+      expect(after.allocations.count).toBe(0);
+      expect(after.scheduleChanges.count).toBe(0);
+      expect(detail.liability.outstandingPrincipalMinor).toBe(100_000n);
+      expect(
+        detail.installments.every((installment) =>
+          ["UPCOMING", "DUE"].includes(installment.status),
+        ),
+      ).toBe(true);
+      expect(database.raw.prepare("PRAGMA foreign_key_check").all()).toEqual(
+        [],
+      );
+    } finally {
+      database.close();
+    }
+  });
+});

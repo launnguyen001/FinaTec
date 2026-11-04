@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/expo-sqlite";
 import { migrate } from "drizzle-orm/expo-sqlite/migrator";
 
-import { RAW_KEY_PATTERN, resolveDatabaseKey } from "./key-lifecycle";
+import { RAW_KEY_PATTERN, resolveDatabaseKey } from "../key-lifecycle";
 import { spikeProbe } from "./schema";
 
 const DATABASE_NAME = "task00-drizzle-integration-v3.db";

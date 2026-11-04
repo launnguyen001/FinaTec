@@ -197,6 +197,11 @@ export function AppScreen() {
             Lãi suất & tiền gửi
           </Link>
           {__DEV__ ? (
+            <Link href="/remediation-acceptance" style={styles.navigationLink}>
+              F-01 / F-02 acceptance (DEV)
+            </Link>
+          ) : null}
+          {__DEV__ ? (
             <Link
               href="/task06-liability-acceptance"
               style={styles.navigationLink}

@@ -594,6 +594,57 @@ Diff TASK-06 không phải nguyên nhân của NO-GO cấp dự án. TASK-06 có
 - F-03 được cover bởi automated real-SQLite regression test, hoặc có CI gate tương đương.
 - Owner chấp nhận rõ F-01 và F-02 là lỗi có sẵn trên `main`, sẽ remediate riêng.
 
+---
+
+## Remediation closeout — F-01 → F-06 (PR #9)
+
+**Ngày:** 2026-11-04  
+**Branch:** `remediation/audit-00-06`  
+**Base/remote HEAD được fetch:** `848ad77c76d30878e80791efb487d49752dcc550`  
+**PR:** #9, không merge. Không chuyển sang TASK-07.
+
+Phần audit phía trên ghi nhận trạng thái trước remediation; các kết luận NO-GO ở đó là lịch sử của baseline, không phải trạng thái hiện tại của source. Remote được fetch và kiểm tra; các commit remediation đã có trên remote được giữ nguyên:
+
+| Finding | Commit triển khai trên branch |
+|---|---|
+| F-01 | `998a34b` — inject CategoryRepository vào production accounting runtime |
+| F-02 | `39bb6d5` — khôi phục currency triggers trong migration 0004 |
+| F-05 | `9fa2e48` — account-filtered history giữ đủ journal lines |
+| F-06 | `895270e`, `061db02`, `c282eb2`, `848ad77` — lifecycle dùng chung, test module production và bỏ spike resolver trùng |
+
+### Kết quả theo finding
+
+| Finding | Trạng thái nghiệm thu | Thay đổi / bằng chứng |
+|---|---|---|
+| F-01 | **Implementation + automated integration PASS; device acceptance PENDING** | `finance-runtime.ts` giữ injection `categories: categoryRepository`. `finance-runtime.integration.test.ts` khởi tạo `createFinanceRuntime()` trên SQLite/migrations thật, ghi Quick Income, Quick Expense và categorized reversal; kiểm tra posted entries, journal lines, category linkage, reversal và balance. Test gọi composition root nên bỏ injection làm fail. Native route đã được thêm nhưng chưa chạy được trên thiết bị. |
+| F-02 | **Migration implementation + fresh/upgrade database tests PASS; requested device DB reset PENDING** | Migration 0004 trên remote tạo lại hai trigger. `currency-migration.integration.test.ts` áp dụng toàn bộ migration chain vào SQLite mới, xác nhận `sqlite_master`, từ chối đổi currency code/precision sau reference và `foreign_key_check=[]`. Test upgrade chạy migrations 0000–0003 rồi 0004–0010 và kiểm tra cùng invariants. Không xóa migration source/history. Development DB trên thiết bị chưa reset được. |
+| F-03 | **FIXED — automated acceptance PASS** | `liability-repository.integration.test.ts` dùng SQLite thật và migrations thật, không mock `commitPayment`. Early principal repayment xác nhận replacement installments được lưu trước các schedule audit references, payment/journal đầy đủ, outstanding và scheduled principal đều reconcile về 80,000, FK check rỗng. Probe ghi audit row trước installment bị immediate FK reject, tái hiện lỗi của thứ tự cũ. Trigger gây lỗi ở bước ghi liability balance xác nhận toàn bộ journal/payment/installment/audit writes rollback. |
+| F-04 | **FIXED — automated integration PASS** | Cùng `finance-runtime.integration.test.ts` boot production composition root thay vì tự dựng AccountingService. Test cover income/expense/reversal và balances. |
+| F-05 | **FIXED — automated repository integration PASS** | `finance-history-repository.integration.test.ts` tạo transfer/reversal có hai account, lọc theo một account và kiểm tra detail vẫn trả cả hai journal lines cùng reversal relation/status. Chạy correlated EXISTS query qua Drizzle/SQLite thật. |
+| F-06 | **FIXED — shared production module and lifecycle tests PASS** | Production database và spike diagnostics import `src/infrastructure/database/key-lifecycle.ts`; không còn resolver duplicate. `key-lifecycle.test.ts` cover valid stored, missing key + existing DB, invalid stored, valid generated và invalid generated; trường hợp generated invalid xác nhận SecureStore không được ghi. |
+
+### Verification, CI và device
+
+Chuỗi chạy tuần tự trên working tree hiện tại:
+
+1. `npm ci` — PASS (1355 packages installed; npm báo 45 dependency audit findings: 1 low, 44 moderate; không tự ý nâng dependency ngoài remediation).
+2. `npm run typecheck` — PASS.
+3. `npm run lint` — PASS.
+4. `npm run format:check` — PASS.
+5. `npm test` — PASS, **21 suites / 123 tests**; Jest giới hạn `roots` về `src` để test discovery không bị các worktree/dev artifact ngoài source làm nhiễu.
+
+CI run **#715**, run ID `41792371045`, PR #9, SHA `848ad77c76d30878e80791efb487d49752dcc550`: **FAIL** tại Typecheck; lint, format và unit tests bị skip. Local typecheck ban đầu tái hiện các lỗi stale import `./key-lifecycle` trong hai spike diagnostics; import đã được sửa thành `../key-lifecycle`. Không có CI run mới cho working tree sau remediation vì thay đổi local chưa được push; do đó không claim GitHub CI green.
+
+SQLite repository tests chạy cùng production Drizzle migration bundle. Fresh DB test áp dụng toàn bộ journal entries; upgrade test đi qua migration 0004 và kiểm tra trigger trước/sau. Cả hai xác nhận trigger, mutation rejection và foreign key integrity. Đây là test database ephemeral thật, không phải mock.
+
+Native Android: `npx expo run:android --no-bundler` **BUILD SUCCESSFUL** trên cấu hình `arm64-v8a`. Chưa đạt device acceptance: app không tải JavaScript bundle do timeout tới `10.137.0.11:8081`; sau khi thử ADB reverse tunnel, màn hình vẫn chưa hiển thị route/test result. `run-as com.anonymous.fintech` cũng thất bại với `/data has wrong owner`. Vì vậy production development DB **chưa reset**, migration trên DB đó chưa được kiểm tra độc lập trong lần này, và Quick Income/Expense/reversal chưa được xác nhận trên device. Không đánh dấu device PASS. Chỉ build không được tính là acceptance.
+
+### Working tree handoff
+
+Các test/harness, development acceptance route và typecheck import fixes hiện là thay đổi local chưa commit trên `848ad77`; remote commit HEAD không bị ghi đè. Source diff gồm `finance-runtime.ts`, hai spike import paths, Jest root config, integration tests/helpers, lifecycle regression tests, `remediation-acceptance.tsx`, `remediation-acceptance-diagnostic.ts`, `AppScreen.tsx`, và report này. PR không merge.
+
+**Kết luận nghiệm thu:** F-03, F-04, F-05, F-06 có implementation và automated evidence đủ; F-01/F-02 đã pass automated source/migration tests nhưng các acceptance điều kiện native trên DB development chưa thực hiện được. Do yêu cầu bắt buộc reset/kiểm tra development DB và chạy native flow, không thể tuyên bố toàn bộ F-01 → F-06 đã nghiệm thu xong. Giữ F-01/F-02 ở trạng thái pending device/database verification cho tới khi route chạy được trên thiết bị; không chuyển TASK-07.
+
 PR #8 vẫn chưa merge. Không task status hoặc roadmap checkbox nào bị thay đổi bởi audit này.
 
 **Audit dừng tại đây. Chưa implement remediation. Cần approval rõ ràng trước khi sửa code.**

@@ -7,7 +7,7 @@ import {
   KeyLifecycleError,
   resolveDatabaseKey,
   type SecureKeyStore,
-} from "./key-lifecycle";
+} from "../key-lifecycle";
 
 const DATABASE_NAME = "task00-key-loss-probe-v2.db";
 const KEY_STORAGE_NAME = "kets0.task00.key-loss-probe-v2";
