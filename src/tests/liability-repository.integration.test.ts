@@ -137,9 +137,7 @@ describe("SQLite liability payment repository", () => {
     }
   });
 
-  it(
-    "reconciles posted interest expense ledger lines and nets payment reversals",
-    async () => {
+  it("reconciles interest ledger and reversal netting", async () => {
     const database = await createRealSqliteTestDatabase();
     try {
       const { service, liability } = await createLiabilityFixture(
@@ -183,9 +181,7 @@ describe("SQLite liability payment repository", () => {
     }
   });
 
-  it(
-    "detects matching payment and installment interest corruption against the posted ledger",
-    async () => {
+  it("detects correlated interest corruption against ledger", async () => {
     const database = await createRealSqliteTestDatabase();
     try {
       const { service, liability } = await createLiabilityFixture(
@@ -202,7 +198,7 @@ describe("SQLite liability payment repository", () => {
       database.raw.exec("DROP TRIGGER liability_payments_no_update;");
       database.raw
         .prepare(
-          "UPDATE liability_payments SET interest_paid_minor = 1000 WHERE id = ?",
+          "UPDATE liability_payments SET interest_paid_minor=1000 WHERE id=?",
         )
         .run(payment.id);
       database.raw
@@ -229,6 +225,7 @@ describe("SQLite liability payment repository", () => {
       database.close();
     }
   });
+
   it("prevents concurrent payments from allocating the same installment interest twice", async () => {
     const database = await createRealSqliteTestDatabase();
     try {
