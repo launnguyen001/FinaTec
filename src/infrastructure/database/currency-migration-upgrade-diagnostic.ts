@@ -65,7 +65,10 @@ export async function runCurrencyMigrationUpgradeDiagnostic(): Promise<
       legacyEntries.map((entry) => {
         const index = entry.idx.toString().padStart(4, "0");
         const key = `m${index}`;
-        return [key, key === "m0004" ? legacyMigration0004 : migrationSources[key]!];
+        return [
+          key,
+          key === "m0004" ? legacyMigration0004 : migrationSources[key]!,
+        ];
       }),
     );
 
@@ -100,7 +103,9 @@ export async function runCurrencyMigrationUpgradeDiagnostic(): Promise<
       ...triggerNames,
     );
     const restoredNames = afterUpgrade.map((row) => row.name).sort();
-    if (JSON.stringify(restoredNames) !== JSON.stringify([...triggerNames].sort())) {
+    if (
+      JSON.stringify(restoredNames) !== JSON.stringify([...triggerNames].sort())
+    ) {
       throw new Error(
         `Migration 0011 did not restore both currency triggers: ${restoredNames.join(", ") || "none"}`,
       );
@@ -128,7 +133,8 @@ export async function runCurrencyMigrationUpgradeDiagnostic(): Promise<
       );
     } catch (error) {
       codeMutationRejected =
-        error instanceof Error && error.message.includes("currency codes are immutable");
+        error instanceof Error &&
+        error.message.includes("currency codes are immutable");
     }
 
     let precisionMutationRejected = false;
@@ -139,12 +145,12 @@ export async function runCurrencyMigrationUpgradeDiagnostic(): Promise<
     } catch (error) {
       precisionMutationRejected =
         error instanceof Error &&
-        error.message.includes("currency precision is immutable after first use");
+        error.message.includes(
+          "currency precision is immutable after first use",
+        );
     }
 
-    const foreignKeys = await client.getAllAsync(
-      "PRAGMA foreign_key_check",
-    );
+    const foreignKeys = await client.getAllAsync("PRAGMA foreign_key_check");
     if (!codeMutationRejected || !precisionMutationRejected) {
       throw new Error(
         `Currency invariant enforcement failed: codeRejected=${codeMutationRejected}, precisionRejected=${precisionMutationRejected}`,
@@ -160,7 +166,8 @@ export async function runCurrencyMigrationUpgradeDiagnostic(): Promise<
       {
         name: "Legacy migration state before 0011",
         passed: beforeUpgrade.length === 0,
-        detail: "Historical 0004 and migrations 0005-0010 applied; both triggers absent",
+        detail:
+          "Historical 0004 and migrations 0005-0010 applied; both triggers absent",
       },
       {
         name: "Forward migration 0011 on SQLCipher",
