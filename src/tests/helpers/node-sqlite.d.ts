@@ -20,5 +20,8 @@ declare module "node:sqlite" {
 }
 
 declare module "node:fs" {
-  export function rmSync(path: string, options?: { force?: boolean }): void;
+  export function rmSync(
+    path: string,
+    options?: { force?: boolean },
+  ): void;
 }

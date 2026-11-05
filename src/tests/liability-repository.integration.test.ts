@@ -214,14 +214,10 @@ describe("SQLite liability payment repository", () => {
         secondConnection.db,
       );
       let nextSyncId = 0;
-      const syncService = new LiabilityService(
-        secondRepository,
-        secondLedger,
-        {
-          now: () => "2026-02-02T12:00:00.000Z",
-          createId: () => `liability-sync-test-${++nextSyncId}`,
-        },
-      );
+      const syncService = new LiabilityService(secondRepository, secondLedger, {
+        now: () => "2026-02-02T12:00:00.000Z",
+        createId: () => `liability-sync-test-${++nextSyncId}`,
+      });
 
       // Start the overdue catch-up and the payment from separate SQLite
       // connections at the same time. Whichever writer commits first, status
