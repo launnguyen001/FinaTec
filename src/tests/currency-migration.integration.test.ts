@@ -73,7 +73,9 @@ describe("currency immutability migration chain", () => {
       `);
       expect(
         database.raw
-          .prepare("SELECT name FROM sqlite_master WHERE type = 'trigger' AND name IN (?, ?)")
+          .prepare(
+            "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name IN (?, ?)",
+          )
           .all(...triggerNames),
       ).toHaveLength(0);
 
