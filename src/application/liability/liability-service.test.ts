@@ -99,6 +99,8 @@ function createHarness(
       paymentDifferenceMinor: 0n,
       scheduleInterestPaidMinor: 0n,
       paymentDerivedInterestPaidMinor: 0n,
+      ledgerInterestPaidMinor: 0n,
+      ledgerInterestDifferenceMinor: 0n,
       interestDifferenceMinor: 0n,
     }),
   } as unknown as jest.Mocked<LiabilityRepository>;
@@ -613,6 +615,8 @@ describe("LiabilityService", () => {
       paymentDifferenceMinor: 0n,
       scheduleInterestPaidMinor: 0n,
       paymentDerivedInterestPaidMinor: 0n,
+      ledgerInterestPaidMinor: 0n,
+      ledgerInterestDifferenceMinor: 0n,
       interestDifferenceMinor: 0n,
     });
 

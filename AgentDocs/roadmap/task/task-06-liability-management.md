@@ -392,3 +392,11 @@ Không có phát hiện critical/high trong phạm vi sửa over-allocation.
 - **R1 implementation:** `syncStatuses` no longer SELECTs installment snapshots and then updates rows individually. It computes status from the current persisted principal/interest due and paid columns in one atomic SQL `UPDATE ... CASE` statement, excluding terminal `PAID` and `CANCELLED` rows. This removes the stale read-modify-write window that could overwrite `PAID` with `OVERDUE`.
 - **R2 implementation:** the real-SQLite test harness supports a file-backed database and a second independent connection, with WAL and a busy timeout. A regression test starts overdue status synchronization and payment concurrently through separate connections, then asserts the installment remains `PAID`, interest reconciliation is zero, and both connections report no foreign-key violations.
 - **Verification status:** implementation is committed separately from the original F-07 acceptance checkpoint. Typecheck, lint, Prettier, Jest, CI, and independent re-acceptance must still pass before this remediation can be marked accepted or merged. No device acceptance is claimed by this Node-side concurrency change.
+
+## 17. Remediation F-07-R3 — Ledger interest reconciliation
+
+- Reconciliation now independently sums posted debit/credit lines on the liability's configured `interestExpenseAccountId`, scoped to that liability's payment journal entries and their reversal journal entries. Shared expense accounts do not pull in unrelated transactions.
+- `ledgerInterestPaidMinor` reports the net ledger debit; `ledgerInterestDifferenceMinor` compares that amount with non-reversed payment history. Existing `interestDifferenceMinor` continues to compare payment history with installment allocations.
+- Liability archive is blocked if either payment-vs-schedule or ledger-vs-payment interest reconciliation is non-zero.
+- Real-SQLite integration coverage: a normal interest payment and its reversal must net to zero across all three sources; a deliberately corrupted payment/installment pair that still agrees internally must be detected against the unchanged posted ledger.
+- Verification status: implementation submitted for CI and independent review; no device acceptance is claimed for this Node/SQLite reconciliation change.

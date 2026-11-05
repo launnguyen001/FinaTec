@@ -137,6 +137,78 @@ describe("SQLite liability payment repository", () => {
     }
   });
 
+  it("reconciles posted interest expense ledger lines and nets payment reversals", async () => {
+    const database = await createRealSqliteTestDatabase();
+    try {
+      const { service, liability } = await createLiabilityFixture(
+        database,
+        "INTEREST_ONLY",
+      );
+      const payment = await service.recordPayment({
+        liabilityId: liability.id,
+        sourceAccountId: "liability-test-cash",
+        amountMinor: 1_000n,
+        paidAt: "2026-02-01T12:00:00.000Z",
+        idempotencyKey: "r3-ledger-interest-payment",
+      });
+      const afterPayment = await service.getDetail(liability.id);
+      expect(afterPayment.reconciliation.paymentDerivedInterestPaidMinor).toBe(1_000n);
+      expect(afterPayment.reconciliation.ledgerInterestPaidMinor).toBe(1_000n);
+      expect(afterPayment.reconciliation.ledgerInterestDifferenceMinor).toBe(0n);
+
+      await service.reversePayment(payment.id, "R3 reversal coverage");
+      const afterReversal = await service.getDetail(liability.id);
+      expect(afterReversal.reconciliation.scheduleInterestPaidMinor).toBe(0n);
+      expect(afterReversal.reconciliation.paymentDerivedInterestPaidMinor).toBe(0n);
+      expect(afterReversal.reconciliation.ledgerInterestPaidMinor).toBe(0n);
+      expect(afterReversal.reconciliation.interestDifferenceMinor).toBe(0n);
+      expect(afterReversal.reconciliation.ledgerInterestDifferenceMinor).toBe(0n);
+      expect(database.raw.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+    } finally {
+      database.close();
+    }
+  });
+
+  it("detects matching payment and installment interest corruption against the posted ledger", async () => {
+    const database = await createRealSqliteTestDatabase();
+    try {
+      const { service, liability } = await createLiabilityFixture(
+        database,
+        "INTEREST_ONLY",
+      );
+      const payment = await service.recordPayment({
+        liabilityId: liability.id,
+        sourceAccountId: "liability-test-cash",
+        amountMinor: 500n,
+        paidAt: "2026-02-01T12:00:00.000Z",
+        idempotencyKey: "r3-correlated-interest-corruption",
+      });
+      database.raw.exec("DROP TRIGGER liability_payments_no_update;");
+      database.raw
+        .prepare("UPDATE liability_payments SET interest_paid_minor = 1000 WHERE id = ?")
+        .run(payment.id);
+      database.raw
+        .prepare(
+          `UPDATE liability_installments
+           SET interest_paid_minor = 1000, status = 'PAID'
+           WHERE id = (
+             SELECT installment_id FROM liability_payment_allocations
+             WHERE payment_id = ? LIMIT 1
+           )`,
+        )
+        .run(payment.id);
+
+      const reconciliation = await service.reconcile(liability.id);
+      expect(reconciliation.paymentDerivedInterestPaidMinor).toBe(1_000n);
+      expect(reconciliation.scheduleInterestPaidMinor).toBe(1_000n);
+      expect(reconciliation.interestDifferenceMinor).toBe(0n);
+      expect(reconciliation.ledgerInterestPaidMinor).toBe(500n);
+      expect(reconciliation.ledgerInterestDifferenceMinor).toBe(-500n);
+      expect(database.raw.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+    } finally {
+      database.close();
+    }
+  });
   it("prevents concurrent payments from allocating the same installment interest twice", async () => {
     const database = await createRealSqliteTestDatabase();
     try {

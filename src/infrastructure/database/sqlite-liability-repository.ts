@@ -1,4 +1,4 @@
-import { and, asc, eq, notInArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, notInArray, sql } from "drizzle-orm";
 
 import {
   fromSqliteInteger,
@@ -850,7 +850,13 @@ export class SqliteLiabilityRepository implements LiabilityRepository {
         .from(liabilityPaymentReversals)
         .all(),
     ]);
-    const reversedPaymentIds = new Set(reversals.map((item) => item.paymentId));
+    const liabilityPaymentIds = new Set(payments.map((item) => item.id));
+    const liabilityReversals = reversals.filter((item) =>
+      liabilityPaymentIds.has(item.paymentId),
+    );
+    const reversedPaymentIds = new Set(
+      liabilityReversals.map((item) => item.paymentId),
+    );
     const netPrincipalPaidMinor = payments
       .filter((item) => !reversedPaymentIds.has(item.id))
       .reduce(
@@ -869,6 +875,41 @@ export class SqliteLiabilityRepository implements LiabilityRepository {
         (total, item) => total + fromSqliteInteger(item.interestPaidMinor),
         0n,
       );
+    // Reconcile the liability's interest expense against only the journal
+    // entries owned by this liability's payments and their reversals. The
+    // expense account may be shared, so unrelated entries must not be counted.
+    const interestJournalEntryIds = [
+      ...payments.map((item) => item.journalEntryId),
+      ...liabilityReversals.map((item) => item.journalEntryId),
+    ];
+    const interestJournalLines = interestJournalEntryIds.length
+      ? await this.db
+          .select({
+            side: journalLines.side,
+            amountMinor: journalLines.amountMinor,
+          })
+          .from(journalLines)
+          .innerJoin(
+            journalEntries,
+            eq(journalEntries.id, journalLines.entryId),
+          )
+          .where(
+            and(
+              eq(journalLines.accountId, row.interestExpenseAccountId),
+              eq(journalEntries.status, "POSTED"),
+              inArray(journalLines.entryId, interestJournalEntryIds),
+            ),
+          )
+          .all()
+      : [];
+    const ledgerInterestPaidMinor = interestJournalLines.reduce(
+      (total, line) =>
+        total +
+        (line.side === "DEBIT"
+          ? fromSqliteInteger(line.amountMinor)
+          : -fromSqliteInteger(line.amountMinor)),
+      0n,
+    );
     return {
       ledgerPrincipalMinor,
       recordedPrincipalMinor,
@@ -876,6 +917,9 @@ export class SqliteLiabilityRepository implements LiabilityRepository {
       paymentDerivedPrincipalMinor,
       scheduleInterestPaidMinor,
       paymentDerivedInterestPaidMinor,
+      ledgerInterestPaidMinor,
+      ledgerInterestDifferenceMinor:
+        ledgerInterestPaidMinor - paymentDerivedInterestPaidMinor,
       differenceMinor: ledgerPrincipalMinor - recordedPrincipalMinor,
       scheduleDifferenceMinor: schedulePrincipalMinor - recordedPrincipalMinor,
       paymentDifferenceMinor:
