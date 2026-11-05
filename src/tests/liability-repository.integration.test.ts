@@ -159,17 +159,20 @@ describe("SQLite liability payment repository", () => {
         }),
       ]);
 
-      expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(
-        1,
-      );
-      expect(results.filter((result) => result.status === "rejected")).toHaveLength(
-        1,
-      );
+      expect(
+        results.filter((result) => result.status === "fulfilled"),
+      ).toHaveLength(1);
+      expect(
+        results.filter((result) => result.status === "rejected"),
+      ).toHaveLength(1);
 
       const payments = await repository.listPayments(liability.id);
       expect(payments).toHaveLength(1);
       expect(
-        payments.reduce((total, payment) => total + payment.interestPaidMinor, 0n),
+        payments.reduce(
+          (total, payment) => total + payment.interestPaidMinor,
+          0n,
+        ),
       ).toBe(1_000n);
 
       const detail = await service.getDetail(liability.id);

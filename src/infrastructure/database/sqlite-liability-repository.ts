@@ -419,10 +419,7 @@ export class SqliteLiabilityRepository implements LiabilityRepository {
           .where(
             and(
               eq(liabilityInstallments.id, allocation.installmentId),
-              eq(
-                liabilityInstallments.liabilityId,
-                input.payment.liabilityId,
-              ),
+              eq(liabilityInstallments.liabilityId, input.payment.liabilityId),
             ),
           )
           .get();
@@ -464,10 +461,7 @@ export class SqliteLiabilityRepository implements LiabilityRepository {
           .where(
             and(
               eq(liabilityInstallments.id, change.installmentId),
-              eq(
-                liabilityInstallments.liabilityId,
-                input.payment.liabilityId,
-              ),
+              eq(liabilityInstallments.liabilityId, input.payment.liabilityId),
             ),
           )
           .get();
