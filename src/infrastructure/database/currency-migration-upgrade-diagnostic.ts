@@ -79,12 +79,16 @@ export async function runCurrencyMigrationUpgradeDiagnostic(): Promise<
     });
 
     const beforeUpgrade = await client.getAllAsync<{ name: string }>(
-      "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name IN (?, ?)",
+      `SELECT name
+       FROM sqlite_master
+       WHERE type = 'trigger' AND name IN (?, ?)`,
       ...triggerNames,
     );
     if (beforeUpgrade.length !== 0) {
       throw new Error(
-        `Legacy 0004-0010 fixture unexpectedly contains currency triggers: ${beforeUpgrade.map((row) => row.name).join(", ")}`,
+        `Legacy 0004-0010 fixture unexpectedly contains currency triggers: ${beforeUpgrade
+          .map((row) => row.name)
+          .join(", ")}`,
       );
     }
 
@@ -108,7 +112,8 @@ export async function runCurrencyMigrationUpgradeDiagnostic(): Promise<
       JSON.stringify(restoredNames) !== JSON.stringify([...triggerNames].sort())
     ) {
       throw new Error(
-        `Migration 0011 did not restore both currency triggers: ${restoredNames.join(", ") || "none"}`,
+        `Migration 0011 did not restore both currency triggers: ${restoredNames
+          .join(", ") || "none"}`,
       );
     }
 
@@ -154,7 +159,8 @@ export async function runCurrencyMigrationUpgradeDiagnostic(): Promise<
     const foreignKeys = await client.getAllAsync("PRAGMA foreign_key_check");
     if (!codeMutationRejected || !precisionMutationRejected) {
       throw new Error(
-        `Currency invariant enforcement failed: codeRejected=${codeMutationRejected}, precisionRejected=${precisionMutationRejected}`,
+        `Currency invariant enforcement failed: codeRejected=${codeMutationRejected}, ` +
+          `precisionRejected=${precisionMutationRejected}`,
       );
     }
     if (foreignKeys.length !== 0) {
@@ -212,7 +218,13 @@ export async function runCurrencyMigrationUpgradeDiagnostic(): Promise<
         persistedSettings?.base_currency_code === "VND" &&
         reopenedForeignKeys.length === 0;
       reopenDetail =
-        `triggers=${reopenedTriggerNames.join(", ") || "none"}; currencyPersisted=${Boolean(persistedCurrency)}; accountPersisted=${Boolean(persistedAccount)}; baseCurrencyPersisted=${persistedSettings?.base_currency_code ?? "missing"}; foreignKeyViolations=${reopenedForeignKeys.length}`;
+        [
+          `triggers=${reopenedTriggerNames.join(", ") || "none"}`,
+          `currencyPersisted=${Boolean(persistedCurrency)}`,
+          `accountPersisted=${Boolean(persistedAccount)}`,
+          `baseCurrencyPersisted=${persistedSettings?.base_currency_code ?? "missing"}`,
+          `foreignKeyViolations=${reopenedForeignKeys.length}`,
+        ].join("; ");
     } catch (error) {
       reopenDetail =
         error instanceof Error ? error.message : String(error);
@@ -233,7 +245,10 @@ export async function runCurrencyMigrationUpgradeDiagnostic(): Promise<
       {
         name: "Currency code and referenced precision immutability",
         passed: codeMutationRejected && precisionMutationRejected,
-        detail: `code update rejected=${codeMutationRejected}; precision update rejected=${precisionMutationRejected}`,
+        detail: [
+          `code update rejected=${codeMutationRejected}`,
+          `precision update rejected=${precisionMutationRejected}`,
+        ].join("; "),
       },
       {
         name: "Foreign key integrity after upgrade",
