@@ -46,7 +46,8 @@ export default function F02UpgradeAcceptanceRoute() {
       <Text>
         Creates an isolated SQLCipher database using the historical pre-0011
         migration state, then runs migration 0011 through the production Drizzle
-        migrator. The existing development database and its records are untouched.
+        migrator. The existing development database and its records are
+        untouched.
       </Text>
       <Button
         title={running ? "Running…" : "Run F-02 upgrade verification"}
