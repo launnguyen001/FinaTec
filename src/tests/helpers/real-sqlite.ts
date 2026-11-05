@@ -6,6 +6,7 @@ import { migrate } from "drizzle-orm/expo-sqlite/migrator";
 
 import type { LedgerDatabase } from "../../infrastructure/database/database";
 import { ledgerMigrations } from "../../infrastructure/database/migrations";
+import { legacyMigration0004 } from "../../infrastructure/database/migrations/legacy-fixtures";
 import { ledgerSchema } from "../../infrastructure/database/schema";
 
 type SynchronousResult = {
@@ -79,7 +80,10 @@ function expoSqliteClient(raw: DatabaseSync) {
 export interface RealSqliteTestDatabase {
   raw: DatabaseSync;
   db: LedgerDatabase;
-  migrateEntries(indices: number[]): Promise<void>;
+  migrateEntries(
+    indices: number[],
+    migrationOverrides?: Record<string, string>,
+  ): Promise<void>;
   close(): void;
 }
 
@@ -99,7 +103,10 @@ export async function createRealSqliteTestDatabase(
     schema: ledgerSchema,
   }) as unknown as LedgerDatabase;
 
-  const migrateEntries = async (indices: number[]) => {
+  const migrateEntries = async (
+    indices: number[],
+    migrationOverrides: Record<string, string> = {},
+  ) => {
     const entries = ledgerMigrations.journal.entries.filter((entry) =>
       indices.includes(entry.idx),
     );
@@ -110,7 +117,8 @@ export async function createRealSqliteTestDatabase(
     const migrations = Object.fromEntries(
       entries.map((entry) => {
         const index = entry.idx.toString().padStart(4, "0");
-        return [`m${index}`, migrationSources[`m${index}`]!];
+        const key = `m${index}`;
+        return [key, migrationOverrides[key] ?? migrationSources[key]!];
       }),
     );
     await migrate(db, { journal: { entries }, migrations });
