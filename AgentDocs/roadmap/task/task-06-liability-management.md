@@ -135,3 +135,135 @@ Liability, RepaymentSchedule, LiabilityPayment (hoặc tên tương ứng theo n
 - Harness `src/tests/helpers/real-sqlite.ts` dùng `node:sqlite` và cùng migration bundle Drizzle với production. Môi trường Node 22 là điều kiện chạy test.
 - Báo cáo remediation ghi nhận local verification PASS: typecheck, lint, format:check và Jest **21 suites / 123 tests**. Tuy nhiên CI run #715 trên SHA `848ad77c76d30878e80791efb487d49752dcc550` FAIL tại typecheck do hai stale import path sau khi chuyển key lifecycle; hai import hiện đã được sửa thành `../key-lifecycle` trên branch.
 - **Trạng thái tại thời điểm ghi:** regression implementation đã có trên branch; cần một CI run mới trên đúng HEAD chứa các import fixes và test mới trước khi chuyển CLI sang nghiệm thu cuối. Device acceptance lượt 2 trên Huawei LYA-L29 đã PASS theo biên bản §13; không cần chạy lại TASK-06 diagnostic chỉ vì bổ sung test harness Node-side, trừ khi CI hoặc rà soát source phát hiện thay đổi ảnh hưởng native path.
+
+## 15. Final Acceptance — TASK-06 (2026-11-05)
+
+### 15.1. Phạm vi và nguyên tắc thực hiện
+
+- Đối tượng nghiệm thu: TASK-06 (Quản lý khoản nợ) trên branch `remediation/audit-00-06`.
+- Commit được nghiệm thu: `5052e0437c5a7712840385f5ed458d9d645a0d30` (`docs(task-06): record real SQLite payment regression coverage`).
+- Không commit, amend, rebase, reset, merge, push; không tạo branch mới; không sửa source, test, schema hay migration. Tài liệu này là tệp duy nhất được thay đổi.
+- Mọi thao tác database phá hủy chỉ chạy trên database tạm trong bộ nhớ hoặc tệp tạm dưới `/tmp/opencode`; không có tệp `.db` nào trong repository và không truy cập database production.
+- Trạng thái cuối cùng của TASK-06 được tách biệt khỏi các phát hiện cross-task F-01–F-06.
+
+### 15.2. CI và môi trường
+
+| Hạng mục | Kết quả | Bằng chứng |
+|---|---|---|
+| CI run | **PASS** | Run `#717`, run ID `42022859173`, event `pull_request`, PR #9 |
+| Head SHA của CI | **KHỚP** | `5052e0437c5a7712840385f5ed458d9d645a0d30` |
+| Branch của CI | **KHỚP** | `remediation/audit-00-06` |
+| Kết luận CI | **success** | Toàn bộ 8 bước CI success (xác minh qua GitHub API) |
+| Log chi tiết của CI | **KHÔNG LẤY ĐƯỢC** | Tải log trả HTTP 403 khi không có auth; số test trong CI không đọc được từ log |
+
+Số lượng test dưới đây là kết quả chạy lại cục bộ trên đúng HEAD, không phải số liệu trích từ log CI.
+
+### 15.3. Quality gate chạy lại cục bộ
+
+| Lệnh | Kết quả |
+|---|---|
+| `npm run typecheck` | **PASS** |
+| `npm run lint` | **PASS** |
+| `npm run format:check` | **PASS** |
+| `npm test` | **PASS — 21 suites / 123 tests** |
+
+### 15.4. Kiểm thử SQLite thật (không mock repository)
+
+Chạy trực tiếp 5 suite trọng tâm trên `node:sqlite` với toàn bộ migration production: **PASS — 5 suites / 11 tests**.
+
+- `src/tests/liability-repository.integration.test.ts`
+- `src/tests/finance-runtime.integration.test.ts`
+- `src/tests/finance-history-repository.integration.test.ts`
+- `src/tests/currency-migration.integration.test.ts`
+- `src/tests/key-lifecycle.test.ts`
+
+### 15.5. Kiểm tra persistence trên tệp SQLite
+
+Kịch bản tạo khoản nợ, ghi một payment trả gốc trước hạn, đóng database rồi mở lại đúng tệp:
+
+- Khoản nợ, payment và journal đọc lại được sau khi mở lại database: **PASS**.
+- `outstandingPrincipalMinor` = `80000`; principal của payment = `20000`: **PASS**.
+- Journal ở trạng thái `POSTED`: **PASS**.
+- Cả ba chênh lệch reconciliation (`difference`, `schedule`, `payment`) đều bằng `0`: **PASS**.
+- `PRAGMA foreign_key_check` trả `[]`: **PASS**.
+- Trigger bất biến tiền tệ tồn tại trên database mới: **PASS**.
+
+### 15.6. Vòng đời nghiệp vụ TASK-06 trên SQLite thật
+
+Các kịch bản tuần tự sau đều **PASS**:
+
+- Phân bổ lãi trước, gốc sau cho payment một phần.
+- Retry cùng `idempotencyKey` trả lại payment cũ, không nhân đôi payment/journal.
+- Từ chối overpayment.
+- Từ chối tài khoản nguồn không hợp lệ và tài khoản phí không hợp lệ.
+- Cả hai chính sách trả trước hạn (`KEEP_INSTALLMENT_SHORTEN_TERM` và chính sách còn lại).
+- Tất toán toàn bộ (full payoff).
+- Archive khoản nợ.
+- Reversal payment.
+- Payment thay thế có liên kết (linked replacement).
+- `PRAGMA foreign_key_check` rỗng sau toàn bộ chuỗi thao tác.
+
+Kết luận: luồng tuần tự / đơn người dùng của TASK-06 đạt yêu cầu về nghiệp vụ, ledger và toàn vẹn khóa ngoại.
+
+### 15.7. Phát hiện lỗi TASK-06 — ghi đồng thời hai payment khác idempotency key
+
+**Mức độ: nghiêm trọng (integrity defect). Trạng thái: FAIL.**
+
+Kịch bản trên SQLite thật, khoản nợ `INTEREST_ONLY` gốc `100000`, lãi kỳ đầu `1000`, hai payment `1000` được gọi đồng thời bằng `Promise.allSettled` với hai key khác nhau (`race-a`, `race-b`):
+
+| Chỉ số | Kết quả thực tế | Kỳ vọng |
+|---|---|---|
+| Hai payment | Cả hai `fulfilled` | Một thành công, một bị chặn hoặc phân bổ tuần tự |
+| Tổng lãi đã trả trong payment history | `2000` | `1000` |
+| Lãi kỳ đầu due / paid | `1000` / `1000` | `1000` / `1000` |
+| Trạng thái kỳ đầu | `PAID` | `PAID` |
+| Dư nợ gốc | `100000` | `99000` |
+| Reconciliation `difference` / `schedule` / `payment` | `0` / `0` / `0` | `0` / `0` / `0` |
+
+Đối chứng tuần tự trên cùng cấu hình (hai payment lần lượt): payment thứ hai phân bổ `0` vào lãi và giảm gốc, dư nợ còn `99000`, tổng lãi đã trả `1000`. Như vậy sai lệch chỉ xuất hiện khi hai payment được xử lý đồng thời.
+
+Nguyên nhân: bước đọc allocation và tính toán nằm ngoài transaction ghi của repository, nên hai transaction cùng đọc trạng thái lãi chưa trả trước khi bên kia commit (read-modify-write race). Reconciliation hiện chỉ đối chiếu gốc nên vẫn báo `0`, không phát hiện lãi bị trả vượt.
+
+Đề xuất khắc phục (không thực hiện trong lần nghiệm thu này):
+
+1. Đưa thao tác đọc allocation và tính toán vào cùng transaction ghi trong `SqliteLiabilityRepository`, hoặc dùng optimistic concurrency (version/compare-and-swap) trên khoản nợ/installment.
+2. Bổ sung đối soát lãi (interest reconciliation), không chỉ gốc.
+3. Thêm test SQLite thật cho hai payment đồng thời khác key, khẳng định không có double allocation.
+4. Cân nhắc ràng buộc uniqueness/khóa theo `(liabilityId, installmentId)` cho allocation đang hiệu lực.
+
+Lưu ý: retry cùng một `idempotencyKey` vẫn an toàn; lỗi chỉ xảy ra với hai key khác nhau.
+
+### 15.8. Ma trận xác minh cross-task F-01–F-06
+
+| Mã | Nội dung kiểm tra | Kết quả | Bằng chứng chính |
+|---|---|---|---|
+| F-01 | `finance-runtime` inject `categories` đầy đủ | **PASS** | Composition-root test `finance-runtime.integration.test.ts` chạy SQLite thật |
+| F-02 | Migration tiền tệ áp dụng được cho database đã migrate cũ | **FAIL** | Database đã chạy `0004` cũ vẫn không có trigger sau khi migrator hiện tại chạy lại (xem §15.9) |
+| F-03 | Regression SQLite thật cho payment/early principal | **PASS** | `liability-repository.integration.test.ts` (5 suite / 11 test) |
+| F-04 | Tích hợp composition root | **PASS** | `finance-runtime.integration.test.ts` |
+| F-05 | Truy vấn lịch sử dùng `EXISTS` tương quan | **PASS** | `finance-history-repository.integration.test.ts` |
+| F-06 | Dùng chung key lifecycle resolver | **PASS** | `key-lifecycle.test.ts`; `database.ts` dùng resolver chung |
+
+F-02 là lỗi cross-task, không quy trực tiếp cho logic TASK-06, nhưng ảnh hưởng đường nâng cấp database của ứng dụng.
+
+### 15.9. Chi tiết lỗi F-02 — sửa migration hồi tố
+
+- `0004_usdt_currency_code.ts` được sửa trực tiếp thay vì thêm migration tiến (forward migration). Database đã từng chạy phiên bản `0004` cũ được đánh dấu đã áp dụng, nên nội dung sửa không bao giờ chạy lại.
+- Tái hiện: database mô phỏng đã migrate bằng `0004` cũ có **11 migration đã áp dụng** và **0 trigger tiền tệ**. Chạy migrator hiện tại trên cùng database vẫn **11 migration** và **0 trigger**.
+- Database mới (fresh) có đủ trigger: **PASS**.
+- Đề xuất khắc phục: thêm migration `0011` tạo lại `currencies_code_immutable` và `currencies_no_precision_change_when_referenced`, đăng ký trong `migrations/index.ts`, kèm test nâng cấp thật từ database `0004` cũ. Không sửa hồi tố `0004`.
+
+### 15.10. Nghiệm thu thiết bị
+
+- Biên bản gần nhất: **PASS** trên Huawei LYA-L29, Android 10 / API 29, SQLCipher `4.17.0 community`, tại source `cfc95c22deeea40f82c877ca59fc7d2a16923890` (§13).
+- Từ SHA đó đến HEAD hiện tại có thay đổi key lifecycle dùng chung và chỉnh sửa migration/trigger, tức đường khởi tạo database, migration và quản lý khóa native đã thay đổi.
+- Vì vậy **không thể tuyên bố nghiệm thu thiết bị cho HEAD hiện tại**. Trạng thái: **NOT VERIFIED** cho `5052e043...`. Cần một lượt chạy diagnostic `Task06 acceptance (DEV)` trên Development Build có SQLCipher trước khi chốt phát hành.
+- Không có kết quả thiết bị nào được suy diễn hoặc tạo mới trong lần nghiệm thu này.
+
+### 15.11. Kết luận
+
+- **TASK-06 (luồng tuần tự): PASS** — nghiệp vụ, ledger, persistence, reversal/replacement, archive, tất toán, phí và FK đều đạt trên SQLite thật.
+- **TASK-06 (toàn bộ): FAIL** — lỗi ghi đồng thời hai payment khác key làm trả vượt lãi và không giảm gốc, trong khi reconciliation vẫn báo khớp. Đây là lỗi toàn vẹn dữ liệu tài chính, phải sửa trước khi chấp nhận.
+- **Cross-task F-02: FAIL** — đường nâng cấp database từ `0004` cũ không nhận trigger tiền tệ; F-01, F-03, F-04, F-05, F-06 PASS.
+- **Thiết bị trên HEAD hiện tại: NOT VERIFIED**.
+- **Trạng thái nghiệm thu cuối: FAIL**. Không có thay đổi source/test/migration nào được thực hiện; chỉ tài liệu này được cập nhật.
