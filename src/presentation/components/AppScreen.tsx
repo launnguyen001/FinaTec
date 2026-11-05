@@ -190,9 +190,25 @@ export function AppScreen() {
           <Link href="/asset-settings" style={styles.navigationLink}>
             Cài đặt tài sản
           </Link>
+          <Link href="/liabilities" style={styles.navigationLink}>
+            Khoản nợ & lịch trả
+          </Link>
           <Link href="/interest" style={styles.navigationLink}>
             Lãi suất & tiền gửi
           </Link>
+          {__DEV__ ? (
+            <Link href="/remediation-acceptance" style={styles.navigationLink}>
+              F-01 / F-02 acceptance (DEV)
+            </Link>
+          ) : null}
+          {__DEV__ ? (
+            <Link
+              href="/task06-liability-acceptance"
+              style={styles.navigationLink}
+            >
+              Task06 acceptance (DEV)
+            </Link>
+          ) : null}
           {__DEV__ ? (
             <Link
               href="/task05-interest-acceptance"

@@ -4,6 +4,12 @@ import { migration0002 } from "./0002_asset_management";
 import { migration0003 } from "./0003_asset_remaining_cost_basis";
 import { migration0004 } from "./0004_usdt_currency_code";
 import { migration0005 } from "./0005_interest_engine";
+import { migration0006 } from "./0006_liability_management";
+import { migration0007 } from "./0007_liability_rate_history";
+import { migration0008 } from "./0008_liability_fx_snapshots";
+import { migration0009 } from "./0009_liability_payment_corrections";
+import { migration0010 } from "./0010_liability_payment_order";
+import { migration0011 } from "./0011_currency_immutability_triggers";
 
 const migrationTime = 1_793_520_000_000;
 const coreFinanceMigrationTime = 1_793_700_000_000;
@@ -11,6 +17,12 @@ const assetManagementMigrationTime = 1_793_800_000_000;
 const assetRemainingCostBasisMigrationTime = 1_793_900_000_000;
 const usdtCurrencyMigrationTime = 1_794_000_000_000;
 const interestEngineMigrationTime = 1_794_100_000_000;
+const liabilityManagementMigrationTime = 1_794_200_000_000;
+const liabilityRateHistoryMigrationTime = 1_794_300_000_000;
+const liabilityFxSnapshotMigrationTime = 1_794_400_000_000;
+const liabilityPaymentCorrectionMigrationTime = 1_794_500_000_000;
+const liabilityPaymentOrderMigrationTime = 1_794_600_000_000;
+const currencyImmutabilityMigrationTime = 1_794_700_000_000;
 
 export const ledgerMigrations = {
   journal: {
@@ -51,6 +63,42 @@ export const ledgerMigrations = {
         tag: "0005_interest_engine",
         breakpoints: true,
       },
+      {
+        idx: 6,
+        when: liabilityManagementMigrationTime,
+        tag: "0006_liability_management",
+        breakpoints: true,
+      },
+      {
+        idx: 7,
+        when: liabilityRateHistoryMigrationTime,
+        tag: "0007_liability_rate_history",
+        breakpoints: true,
+      },
+      {
+        idx: 8,
+        when: liabilityFxSnapshotMigrationTime,
+        tag: "0008_liability_fx_snapshots",
+        breakpoints: true,
+      },
+      {
+        idx: 9,
+        when: liabilityPaymentCorrectionMigrationTime,
+        tag: "0009_liability_payment_corrections",
+        breakpoints: true,
+      },
+      {
+        idx: 10,
+        when: liabilityPaymentOrderMigrationTime,
+        tag: "0010_liability_payment_order",
+        breakpoints: true,
+      },
+      {
+        idx: 11,
+        when: currencyImmutabilityMigrationTime,
+        tag: "0011_currency_immutability_triggers",
+        breakpoints: true,
+      },
     ],
   },
   migrations: {
@@ -60,5 +108,11 @@ export const ledgerMigrations = {
     m0003: migration0003,
     m0004: migration0004,
     m0005: migration0005,
+    m0006: migration0006,
+    m0007: migration0007,
+    m0008: migration0008,
+    m0009: migration0009,
+    m0010: migration0010,
+    m0011: migration0011,
   },
 };

@@ -7,6 +7,7 @@ import { AssetValuationService } from "../application/asset/asset-valuation-serv
 import { AssetSettingsService } from "../application/asset/asset-settings-service";
 import { AssetPriceRefreshService } from "../application/asset/asset-price-refresh-service";
 import { InterestService } from "../application/interest/interest-service";
+import { LiabilityService } from "../application/liability/liability-service";
 import {
   CoinGeckoDemoProvider,
   CoinPaprikaProvider,
@@ -25,18 +26,41 @@ import { SqliteFinanceReadRepository } from "./database/finance-read-repository"
 import { SqliteLedgerRepository } from "./database/sqlite-ledger-repository";
 import { SqliteAssetRepository } from "./database/sqlite-asset-repository";
 import { SqliteInterestRepository } from "./database/sqlite-interest-repository";
+import { SqliteLiabilityRepository } from "./database/sqlite-liability-repository";
+import type { LedgerDatabase } from "./database/database";
 
-export async function createFinanceRuntime() {
-  const db = await getLedgerDatabase();
+export interface FinanceRuntimeFactoryOptions {
+  now?: () => string;
+  createId?: () => string;
+}
+
+export async function createFinanceRuntime(
+  database?: LedgerDatabase,
+  options: FinanceRuntimeFactoryOptions = {},
+) {
+  const db = database ?? (await getLedgerDatabase());
+  return createFinanceRuntimeFromDatabase(db, options);
+}
+
+/** Builds the production service graph over an initialized Ledger database. */
+export function createFinanceRuntimeFromDatabase(
+  db: LedgerDatabase,
+  options: FinanceRuntimeFactoryOptions = {},
+) {
   const ledger = new SqliteLedgerRepository(db);
   const assetRepository = new SqliteAssetRepository(db);
   const interestRepository = new SqliteInterestRepository(db);
+  const liabilityRepository = new SqliteLiabilityRepository(db);
   const accountRepository = new SqliteAccountRepository(db);
   const categoryRepository = new SqliteCategoryRepository(db);
   const readRepository = new SqliteFinanceReadRepository(db);
-  const now = () => new Date().toISOString();
-  const createId = () => Crypto.randomUUID();
-  const accounting = new AccountingService(ledger, { createId, now });
+  const now = options.now ?? (() => new Date().toISOString());
+  const createId = options.createId ?? (() => Crypto.randomUUID());
+  const accounting = new AccountingService(ledger, {
+    createId,
+    now,
+    categories: categoryRepository,
+  });
   const assetValuations = new AssetValuationService(assetRepository, ledger, {
     now,
     createId,
@@ -50,6 +74,10 @@ export async function createFinanceRuntime() {
     createId,
     ledger,
     assetRepository,
+    liabilities: new LiabilityService(liabilityRepository, ledger, {
+      createId,
+      now,
+    }),
     interest: new InterestService(interestRepository, ledger, {
       createId,
       now,

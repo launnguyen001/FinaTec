@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, lte } from "drizzle-orm";
+import { and, asc, eq, exists, gte, lte } from "drizzle-orm";
 import type {
   FinanceHistoryFilter,
   FinanceReadLine,
@@ -32,8 +32,23 @@ export class SqliteFinanceReadRepository implements FinanceReadRepository {
     ];
     if (filter.categoryId)
       conditions.push(eq(journalEntries.categoryId, filter.categoryId));
-    if (filter.accountId)
-      conditions.push(eq(journalLines.accountId, filter.accountId));
+    if (filter.accountId) {
+      // Select matching entries by account, but keep every journal line when
+      // loading their detail so transfers and reversals remain auditable.
+      conditions.push(
+        exists(
+          this.db
+            .select({ id: journalLines.id })
+            .from(journalLines)
+            .where(
+              and(
+                eq(journalLines.entryId, journalEntries.id),
+                eq(journalLines.accountId, filter.accountId),
+              ),
+            ),
+        ),
+      );
+    }
     const rows = await this.db
       .select({
         entry: journalEntries,
