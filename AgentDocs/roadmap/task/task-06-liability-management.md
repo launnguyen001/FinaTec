@@ -267,3 +267,120 @@ F-02 là lỗi cross-task, không quy trực tiếp cho logic TASK-06, nhưng �
 - **Cross-task F-02: FAIL** — đường nâng cấp database từ `0004` cũ không nhận trigger tiền tệ; F-01, F-03, F-04, F-05, F-06 PASS.
 - **Thiết bị trên HEAD hiện tại: NOT VERIFIED**.
 - **Trạng thái nghiệm thu cuối: FAIL**. Không có thay đổi source/test/migration nào được thực hiện; chỉ tài liệu này được cập nhật.
+
+## 16. Independent Acceptance — F-07 Concurrency Remediation (2026-11-05)
+
+### 16.1. Đối tượng và phạm vi kiểm tra
+
+- Branch: `remediation/task-06-concurrency`.
+- HEAD được kiểm tra: `955a51f51a40a14df91267c151440fc0c424715e`.
+- Working tree sạch tại thời điểm bắt đầu; không có thay đổi chưa commit.
+- Baseline so sánh: `4dc3b89` (HEAD trước remediation). Ba commit trong phạm vi:
+  - `75a6ebe` — `fix(task-06): reject stale concurrent payment allocations`
+  - `222b2ca` — `ci: run validation on remediation branches`
+  - `955a51f` — `style(task-06): fix Prettier formatting in liability files`
+- Diff remediation chỉ tác động service, domain repository interface, SQLite liability repository và test; commit sau chỉ sửa CI trigger và định dạng Prettier. Không có thay đổi schema/migration/native.
+- CI #720 trên đúng HEAD: `success` (run ID `42031162541`, đủ 8 bước). CI chỉ dùng làm bằng chứng phụ; kết luận dưới đây dựa trên kiểm tra độc lập.
+
+### 16.2. Nguyên nhân gốc và cách sửa
+
+**Nguyên nhân cũ:** `LiabilityService.recordPayment` đọc installment và tính allocation trước khi gọi `commitPayment`. Hai request đồng thời có thể cùng đọc `interestPaidMinor = 0`, cùng tính 1.000 lãi, rồi cùng ghi; request sau ghi đè hoặc cộng dồn trạng thái đã cũ. Transaction ghi một mình không đủ vì snapshot đã được đọc ngoài transaction.
+
+**Cách sửa trong `SqliteLiabilityRepository.commitPayment`:** bên trong transaction ghi, trước khi insert journal/payment/allocation:
+
+- Kiểm tra tổng interest allocation bằng `payment.interestPaidMinor`; tổng principal allocation không vượt `payment.principalPaidMinor`.
+- Với từng allocation, đọc lại installment trong transaction và đối chiếu `principalBeforeMinor`, `interestBeforeMinor`, `statusBefore`; từ chối nếu khác.
+- Kiểm tra allocation không âm, không rỗng, không vượt `principalDueMinor`/`interestDueMinor`.
+- Với từng schedule change `CANCELLED`, đối chiếu `previousStatus` với trạng thái hiện tại; từ chối nếu lịch đã đổi.
+- Kiểm tra `outstandingPrincipalMinor` khớp chính xác với dư nợ hiện tại trừ principal của payment.
+
+Các kiểm tra nằm trước `insertPostedJournal`, nên khi bị từ chối không có journal, payment, allocation, schedule change hay thay đổi liability nào được ghi. Idempotency được kiểm tra đầu transaction: cùng key cùng payload trả payment cũ; cùng key khác payload bị từ chối.
+
+**Reconciliation:** bổ sung `scheduleInterestPaidMinor`, `paymentDerivedInterestPaidMinor`, `interestDifferenceMinor`; `archive` từ chối nếu interest difference khác 0. Interest của payment đã reverse được loại khỏi tổng; installment được reversal khôi phục về `interestBeforeMinor`.
+
+### 16.3. Phân tích transaction và SQLite
+
+- Production dùng một connection singleton (`database.ts`), bật `PRAGMA foreign_keys = ON` và `PRAGMA journal_mode = WAL`.
+- Drizzle expo-sqlite dùng `begin` (deferred), callback transaction đồng bộ, rồi `commit`/`rollback`. Trên cùng một connection, callback đồng bộ không thể bị xen ngang; hai request chỉ xen nhau ở các `await` phía service trước khi vào transaction.
+- Trên hai connection riêng biệt với WAL, probe độc lập cho thấy:
+  - Connection A `BEGIN`, đọc dữ liệu; connection B ghi và commit; A thử ghi → `database is locked` (`ERR_SQLITE_ERROR`), không ghi được snapshot cũ.
+  - Hai writer đồng thời → writer thứ hai `database is locked`.
+  - Đây là lớp bảo vệ ở tầng SQLite bên cạnh kiểm tra revalidation ở tầng repository.
+- Kiểm tra bằng hai connection/tệp DB thật (không chỉ hai promise chung một connection): dùng barrier trước `commitPayment` để buộc cả hai request đã đọc snapshot cũ rồi mới ghi. Kết quả: đúng một request thắng, request còn lại bị từ chối; không có ghi một phần.
+- Test rollback có sẵn (trigger lỗi ở bước cập nhật liability sau khi đã ghi journal/installment) PASS: toàn bộ journal, line, installment, payment, allocation, schedule change bị rollback; `foreign_key_check` rỗng.
+
+### 16.4. Kịch bản và kết quả thực tế
+
+**Tuần tự (một connection, SQLite thật):**
+
+| Kịch bản | Kết quả |
+|---|---|
+| Payment 5.000 lãi trước, gốc sau | PASS — lãi 1.000, gốc 4.000 |
+| Retry cùng idempotency key | PASS — trả cùng payment, không thêm journal/payment |
+| Overpayment | PASS — bị từ chối, không ghi gì |
+| Nguồn tiền/phí không hợp lệ | PASS — bị từ chối |
+| Payment có phí | PASS — đúng một fee line, reconcile 0 |
+| Trả gốc trước hạn 20.000 | PASS — dư nợ 80.000, thay lịch, reconcile 0 |
+| Reversal payment trả trước hạn | PASS — khôi phục dư nợ 100.000, 3 kỳ active, interest reconcile 0 |
+| Replacement có liên kết | PASS — dư nợ 80.000, reconcile 0 |
+| Tất toán toàn bộ | PASS — `PAID_OFF`, reconcile 0 |
+| Archive sau tất toán | PASS — `ARCHIVED` khi interest reconcile 0 |
+| Chính sách `KEEP_INSTALLMENT_SHORTEN_TERM` | PASS — dư nợ 80.000, reconcile 0 |
+| Dữ liệu cố ý sai lệch | PASS — phát hiện interest difference 500 và principal difference −500; archive bị chặn |
+
+**Đồng thời (hai connection/tệp DB thật, barrier trước commit):**
+
+| Kịch bản | Kết quả |
+|---|---|
+| Interest-only, hai payment 1.000 khác key | 1 thành công, 1 bị từ chối “Installment changed while payment was being prepared”; 1 payment, lãi 1.000, dư nợ 100.000 |
+| Principal + interest, hai payment 2.000 | 1 thành công, 1 bị từ chối “Payment principal does not reconcile”; lãi 1.000, gốc 1.000, dư nợ 99.000 |
+| Trả gốc trước hạn, hai payment 40.000 | 1 thành công, 1 bị từ chối; lãi 1.000, gốc 39.000, dư nợ 61.000; đúng 2 kỳ bị hủy + 2 kỳ mới, 3 kỳ active, sequence không trùng |
+| Payment có phí, hai payment 1.000 + phí 100 | 1 thành công, 1 bị từ chối; phí 100 chỉ một lần |
+| Cùng key, cùng payload | Cả hai fulfilled và trả cùng một payment ID; chỉ 1 payment/journal |
+| Cùng key, payload khác | 1 thành công, 1 bị từ chối “reused with a different payload”; không nhân đôi |
+| Không barrier, hai payment tự nhiên | 1 thành công, 1 bị từ chối stale snapshot |
+| Reversal đồng thời cùng payment | 1 thành công, 1 bị từ chối “Payment has already been reversed”; đúng 1 reversal journal, reconcile 0 |
+
+Tổng probe độc lập: **84 check, 0 fail**, gồm 7 kịch bản đồng thời, 1 kịch bản reversal đồng thời và chuỗi tuần tự. Mọi trường hợp sau thắng đều có đúng một payment, một journal entry; `PRAGMA foreign_key_check` trả `[]`; các chênh lệch reconciliation bằng 0.
+
+### 16.5. Bằng chứng reconciliation
+
+- Trong mọi luồng bình thường (interest-only, principal+interest, trả trước hạn, phí, reversal, replacement, tất toán, shorten-term): `differenceMinor`, `scheduleDifferenceMinor`, `paymentDifferenceMinor`, `interestDifferenceMinor` đều bằng `0`.
+- Sau reversal: `scheduleInterestPaidMinor = 0`, `paymentDerivedInterestPaidMinor = 0`; installment được khôi phục đúng `interestBeforeMinor`.
+- Sau replacement: payment gốc đã reverse bị loại khỏi tổng interest; payment thay thế được tính; reconcile 0.
+- Kiểm tra cố ý: thêm một payment giả có interest 500/principal 500 cùng journal `POSTED` (không cập nhật installment) → `interestDifferenceMinor = 500`, `paymentDifferenceMinor = −500`; archive bị chặn bởi điều kiện reconciliation.
+- Giới hạn: reconciliation interest hiện so sánh payment history với installment paid, chưa đối chiếu độc lập với tài khoản chi phí lãi trên ledger. Principal reconciliation vẫn là bốn chiều (ledger, liability, schedule, payment).
+
+### 16.6. Phát hiện còn lại
+
+**F-07-R1 — Trung bình: `syncStatuses` có thể ghi đè trạng thái `PAID` bằng trạng thái cũ.**
+
+- `LiabilityService.recordPayment` gọi `repository.syncStatuses` trước khi đọc lịch. `syncStatuses` đọc toàn bộ installment, tính status, rồi update từng dòng ngoài transaction thanh toán, không có điều kiện compare-and-swap.
+- Kịch bản kiểm soát: request B đọc installment (interestPaid 0, status OVERDUE) rồi bị trì hoãn; request A thanh toán lãi và commit (status PAID, interestPaid 1.000); sau đó B mới update status cũ. Kết quả: `firstAfterA.status = PAID`, nhưng `firstAfterBoth.status = OVERDUE` dù `interestDue = interestPaid = 1.000`; dư nợ 99.000; reconciliation vẫn 0; FK rỗng.
+- Ảnh hưởng: sai trạng thái hiển thị/due list và có thể chặn archive cho đến lần `syncStatuses` kế tiếp; chưa quan sát thấy sai lệch số tiền lãi/gốc trong kịch bản này. Mức độ trung bình, không phải critical/high.
+- Đề xuất: update status có điều kiện theo `principal_paid_minor`/`interest_paid_minor` đã đọc, hoặc đưa `syncStatuses` vào cùng transaction/ghi nguyên tử; thêm test đồng thời cho status.
+- Không sửa trong lần acceptance này.
+
+**F-07-R2 — Thấp: test regression trong repo chỉ dùng một connection.**
+
+- Test `prevents concurrent payments from allocating the same installment interest twice` dùng `Promise.allSettled` trên cùng một `createRealSqliteTestDatabase`. Nó kiểm tra revalidation tầng service/repository nhưng không kiểm tra khóa/transaction giữa hai connection.
+- Đã kiểm tra độc lập bằng hai connection/tệp DB thật và PASS; đề xuất bổ sung test file-backed hai connection để giữ regression lâu dài.
+
+**F-07-R3 — Thấp: interest reconciliation chưa đối chiếu ledger interest.**
+
+- Đã nêu tại §16.5; không ảnh hưởng kịch bản F-07 hiện tại nhưng là khoảng trống nếu sau này có lỗi ghi đồng thời cả payment và installment theo cùng một hướng sai.
+
+Không có phát hiện critical/high trong phạm vi sửa over-allocation.
+
+### 16.7. Kết luận
+
+- **F-07 core (chống double-allocation khi thanh toán đồng thời): PASS.** Kịch bản gốc không còn tái hiện; đúng một payment thắng; không nhân đôi lãi/gốc/phí/journal; atomicity và FK được chứng minh; reconciliation phát hiện cả principal và interest.
+- **Independent acceptance toàn phạm vi thanh toán: PARTIAL.** Lý do là F-07-R1 — một race trung bình trong `syncStatuses` vẫn có thể làm sai trạng thái installment sau khi payment đồng thời commit. Đây không phải lỗi double-allocation và không làm sai số dư tài chính trong thử nghiệm, nhưng vi phạm invariant trạng thái của payment lifecycle.
+- Nếu phạm vi được giới hạn tuyệt đối vào lỗi over-allocation ban đầu thì có thể ghi F-07 PASS; theo tiêu chí acceptance đầy đủ (“all relevant payment paths preserve their invariants”), kết luận trung thực là **PARTIAL**.
+- **Thiết bị: NOT PERFORMED / NOT CLAIMED.** Không chạy device acceptance trong task này. HEAD hiện tại vẫn chứa các thay đổi key lifecycle/migration trước đó so với lần PASS thiết bị gần nhất, nên vẫn cần một lượt device acceptance trên Development Build có SQLCipher trước khi phát hành; không suy diễn PASS từ CI hay test Node.
+
+### 16.8. Git và phạm vi
+
+- Không sửa source, test, schema, migration hay business logic; không commit, không push, không merge.
+- Chỉ tài liệu này được sửa (append section 16). Các script probe nằm ngoài repo tại `/tmp/opencode`; database dùng cho kiểm tra là file tạm/in-memory và đã đóng, không đụng production.
+- Lệnh `git status --porcelain=v1` sau khi ghi báo đúng một tệp: `M AgentDocs/roadmap/task/task-06-liability-management.md`.
