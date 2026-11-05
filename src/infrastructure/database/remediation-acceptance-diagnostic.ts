@@ -1,4 +1,5 @@
 import { getLedgerDatabase } from "./database";
+import { runCurrencyMigrationUpgradeDiagnostic } from "./currency-migration-upgrade-diagnostic";
 import type { FinanceRuntime } from "../finance-runtime";
 
 export interface RemediationAcceptanceCheck {
@@ -88,6 +89,8 @@ export async function runRemediationAcceptanceDiagnostic(
       entryLines[0]?.amountMinor === entryLines[1]?.amountMinor,
   );
 
+  const migrationChecks = await runCurrencyMigrationUpgradeDiagnostic();
+
   return [
     {
       name: "Quick Income, Quick Expense, categorized reversal persisted",
@@ -104,5 +107,6 @@ export async function runRemediationAcceptanceDiagnostic(
       passed: foreignKeys.length === 0,
       detail: `${foreignKeys.length} foreign key violations`,
     },
+    ...migrationChecks,
   ];
 }
