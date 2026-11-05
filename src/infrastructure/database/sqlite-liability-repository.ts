@@ -846,7 +846,10 @@ export class SqliteLiabilityRepository implements LiabilityRepository {
         .where(eq(liabilityPayments.liabilityId, id))
         .all(),
       this.db
-        .select({ paymentId: liabilityPaymentReversals.paymentId })
+        .select({
+          paymentId: liabilityPaymentReversals.paymentId,
+          journalEntryId: liabilityPaymentReversals.journalEntryId,
+        })
         .from(liabilityPaymentReversals)
         .all(),
     ]);
