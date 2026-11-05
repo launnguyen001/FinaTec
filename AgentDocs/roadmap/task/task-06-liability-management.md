@@ -2,7 +2,7 @@
 
 - Giai đoạn: 4 — MVP 3: Khoản nợ, định kỳ và ngân sách
 - Ưu tiên: P1
-- Trạng thái: COMPLETE — DEVICE_ACCEPTED; diagnostic SQLCipher trên Development Build PASS toàn bộ, kiểm tra cục bộ PASS; xem biên bản nghiệm thu lượt 2 bên dưới
+- Trạng thái: COMPLETE — ACCEPTED (implementation, independent remediation acceptance và CI trên audit HEAD); device diagnostic cho luồng TASK-06 gốc PASS tại SHA `cfc95c22...`; các remediation R1/R2/R3 được xác minh bằng real-SQLite tests/CI, không tuyên bố đã chạy lại toàn bộ Task06 device diagnostic trên audit HEAD.
 - Phụ thuộc: TASK-02, TASK-03, TASK-05
 
 ## 1. Mục tiêu
@@ -400,3 +400,46 @@ Không có phát hiện critical/high trong phạm vi sửa over-allocation.
 - Liability archive is blocked if either payment-vs-schedule or ledger-vs-payment interest reconciliation is non-zero.
 - Real-SQLite integration coverage: a normal interest payment and its reversal must net to zero across all three sources; a deliberately corrupted payment/installment pair that still agrees internally must be detected against the unchanged posted ledger.
 - Verification status: implementation submitted for CI and independent review; no device acceptance is claimed for this Node/SQLite reconciliation change.
+
+
+## 18. Final Closure — TASK-06 (2026-11-05, audit closeout)
+
+### 18.1. Source of truth
+
+- Audit branch: `remediation/audit-00-06`.
+- Exact source HEAD reviewed: `7a6035db07c60ec840a99ef09d514371289b224a`.
+- PR #9 points from `remediation/audit-00-06` to `main`; it remains Draft and is not merged.
+- This closeout does not merge into `main`, rewrite historical acceptance sections, or change the immutable project-state checkpoint.
+
+### 18.2. Final remediation status
+
+| Finding | Kết quả | Cơ sở |
+|---|---|---|
+| F-07-R1 — concurrent status synchronization | **ACCEPTED** | Atomic SQL `UPDATE ... CASE`; regression uses independent SQLite connections and verifies payment cannot be overwritten from a stale status snapshot. |
+| F-07-R2 — two-connection regression coverage | **ACCEPTED** | File-backed SQLite, second connection, WAL/busy timeout; payment + overdue sync race preserves `PAID`, reconciliation and FK integrity. |
+| F-07-R3 — interest ledger reconciliation | **ACCEPTED** | Net posted DEBIT/CREDIT on the liability's configured Interest Expense account, scoped to its payment/reversal journal IDs; archive guard checks ledger-vs-payment and payment-vs-schedule differences. |
+| TASK-06 sequential lifecycle | **PASS** | Prior independent SQLite and Development Build diagnostic: origination, allocation, idempotency, reversal/replacement, early principal, payoff, archive, fee and reconciliation. |
+| TASK-06 foreign-key integrity | **PASS** | Real-SQLite integration tests and `PRAGMA foreign_key_check` assertions. |
+
+### 18.3. Verification on the reviewed audit HEAD
+
+- Combined GitHub Actions CI for exact HEAD `7a6035db07c60ec840a99ef09d514371289b224a`: **PASS**, run #749 (run ID `42047786185`).
+- Reported combined suite result: **21 suites / 129 tests PASS**; typecheck, lint and Prettier checks PASS.
+- R3 integration tests explicitly cover:
+  - interest payment and reversal netting to zero across schedule, payment history and ledger;
+  - correlated corruption where payment history and installment allocation agree with each other but differ from the unchanged posted ledger;
+  - archive rejection when ledger interest reconciliation is non-zero.
+- The independently re-accepted R1/R2 result is retained: R1 ACCEPTED, R2 ACCEPTED, CANCELLED regression PASS, targeted liability integration tests PASS (5/5), full suite PASS (21 suites / 126 tests) at its own tested checkpoint. The later R3 combined audit run raises the suite total to 129 tests.
+
+### 18.4. Device evidence boundary
+
+- The original TASK-06 Development Build diagnostic passed on Huawei LYA-L29 / Android 10 / SQLCipher `4.17.0 community` at source SHA `cfc95c22deeea40f82c877ca59fc7d2a16923890`; it covered the liability lifecycle and reported zero reconciliation differences.
+- R1/R2/R3 are SQLite repository/service consistency changes and are covered by real-SQLite automated tests. This closeout does **not** claim that the complete TASK-06 diagnostic was rerun on exact audit HEAD `7a6035db...`.
+- The separate cross-task Android remediation route reported F-01 PASS and F-02 NOT VERIFIED. F-02 concerns currency migration 0011 upgrade-path evidence; it is not a TASK-06 liability acceptance criterion and does not reopen TASK-06.
+
+### 18.5. Final decision
+
+- **TASK-06: ACCEPTED / COMPLETE** on the audit integration branch.
+- No outstanding TASK-06 implementation or test finding remains in the reviewed R1/R2/R3 scope.
+- F-02 upgrade-path verification and unrelated TASK-01 diagnostic findings remain separate audit work items.
+- No merge to `main` is authorized or performed by this closeout. PR #9 remains Draft pending the project-wide release gates.
