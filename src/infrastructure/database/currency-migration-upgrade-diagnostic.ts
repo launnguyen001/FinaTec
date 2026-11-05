@@ -117,8 +117,9 @@ export async function runCurrencyMigrationUpgradeDiagnostic(): Promise<
       JSON.stringify(restoredNames) !== JSON.stringify([...triggerNames].sort())
     ) {
       throw new Error(
-        `Migration 0011 did not restore both currency triggers: ${restoredNames
-          .join(", ") || "none"}`,
+        `Migration 0011 did not restore both currency triggers: ${
+          restoredNames.join(", ") || "none"
+        }`,
       );
     }
 
@@ -213,9 +214,7 @@ export async function runCurrencyMigrationUpgradeDiagnostic(): Promise<
       );
       const persistedSettings = await client.getFirstAsync<{
         base_currency_code: string;
-      }>(
-        "SELECT base_currency_code FROM ledger_settings WHERE id = 1",
-      );
+      }>("SELECT base_currency_code FROM ledger_settings WHERE id = 1");
       const reopenedForeignKeys = await client.getAllAsync(
         "PRAGMA foreign_key_check",
       );
@@ -237,16 +236,14 @@ export async function runCurrencyMigrationUpgradeDiagnostic(): Promise<
         `foreignKeyViolations=${reopenedForeignKeys.length}`,
       ].join("; ");
     } catch (error) {
-      reopenDetail =
-        error instanceof Error ? error.message : String(error);
+      reopenDetail = error instanceof Error ? error.message : String(error);
     }
 
     return [
       {
         name: "Legacy migration state before 0011",
         passed: beforeUpgrade.length === 0,
-        detail:
-          "Historical 0004 and 0005-0010 applied; both triggers absent",
+        detail: "Historical 0004 and 0005-0010 applied; both triggers absent",
       },
       {
         name: "Forward migration 0011 on SQLCipher",
