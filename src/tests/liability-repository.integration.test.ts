@@ -213,12 +213,13 @@ describe("SQLite liability payment repository", () => {
       const secondRepository = new SqliteLiabilityRepository(
         secondConnection.db,
       );
+      let nextSyncId = 0;
       const syncService = new LiabilityService(
         secondRepository,
         secondLedger,
         {
           now: () => "2026-02-02T12:00:00.000Z",
-          createId: () => `liability-sync-test-${Date.now()}`,
+          createId: () => `liability-sync-test-${++nextSyncId}`,
         },
       );
 
