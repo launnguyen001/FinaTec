@@ -1,3 +1,4 @@
+import { legacyMigration0004 } from "../infrastructure/database/migrations/legacy-fixtures";
 import { SqliteLedgerRepository } from "../infrastructure/database/sqlite-ledger-repository";
 import { createRealSqliteTestDatabase } from "./helpers/real-sqlite";
 
@@ -64,13 +65,11 @@ describe("currency immutability migration chain", () => {
       await database.migrateEntries([0, 1, 2, 3]);
       expectCurrencyTriggers(database);
 
-      await database.migrateEntries([4, 5, 6, 7, 8, 9, 10]);
-      // Simulate a database that applied historical migrations before the
-      // forward trigger-restoration migration was introduced.
-      database.raw.exec(`
-        DROP TRIGGER currencies_code_immutable;
-        DROP TRIGGER currencies_no_precision_change_when_referenced;
-      `);
+      await database.migrateEntries([4, 5, 6, 7, 8, 9, 10], {
+        m0004: legacyMigration0004,
+      });
+      // This is the exact pre-remediation 0004 schema: the migration has
+      // already been recorded, but it never created either currency trigger.
       expect(
         database.raw
           .prepare(
