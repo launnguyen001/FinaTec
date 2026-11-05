@@ -172,7 +172,9 @@ export async function runCurrencyMigrationUpgradeDiagnostic(): Promise<
     client = null;
     try {
       if (!encryptionKey) {
-        throw new Error("SQLCipher key was not retained for reopen verification");
+        throw new Error(
+          "SQLCipher key was not retained for reopen verification",
+        );
       }
       client = await SQLite.openDatabaseAsync(databaseName, {
         useNewConnection: true,
