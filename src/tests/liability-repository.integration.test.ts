@@ -22,6 +22,7 @@ function account(id: string, type: AccountType): Account {
 
 async function createLiabilityFixture(
   database: Awaited<ReturnType<typeof createRealSqliteTestDatabase>>,
+  repaymentMethod: "EQUAL_PRINCIPAL" | "INTEREST_ONLY" = "EQUAL_PRINCIPAL",
 ) {
   const ledger = new SqliteLedgerRepository(database.db);
   const repository = new SqliteLiabilityRepository(database.db);
@@ -41,7 +42,7 @@ async function createLiabilityFixture(
     interestExpenseAccountId: "liability-test-interest",
     principalMinor: 100_000n,
     annualRatePpm: 120_000n,
-    repaymentMethod: "EQUAL_PRINCIPAL",
+    repaymentMethod,
     termMonths: 3,
     startDate: "2026-01-01",
     firstDueDate: "2026-02-01",
@@ -112,6 +113,7 @@ describe("SQLite liability payment repository", () => {
       expect(detail.reconciliation.differenceMinor).toBe(0n);
       expect(detail.reconciliation.scheduleDifferenceMinor).toBe(0n);
       expect(detail.reconciliation.paymentDifferenceMinor).toBe(0n);
+      expect(detail.reconciliation.interestDifferenceMinor).toBe(0n);
       expect(database.raw.prepare("PRAGMA foreign_key_check").all()).toEqual(
         [],
       );
@@ -127,6 +129,63 @@ describe("SQLite liability payment repository", () => {
           )
           .run("old-order-regression", payment.id, "not-inserted-yet"),
       ).toThrow(/FOREIGN KEY constraint failed/);
+    } finally {
+      database.close();
+    }
+  });
+
+  it("prevents concurrent payments from allocating the same installment interest twice", async () => {
+    const database = await createRealSqliteTestDatabase();
+    try {
+      const { repository, service, liability } = await createLiabilityFixture(
+        database,
+        "INTEREST_ONLY",
+      );
+      const paidAt = "2026-02-01T12:00:00.000Z";
+      const results = await Promise.allSettled([
+        service.recordPayment({
+          liabilityId: liability.id,
+          sourceAccountId: "liability-test-cash",
+          amountMinor: 1_000n,
+          paidAt,
+          idempotencyKey: "concurrent-interest-payment-a",
+        }),
+        service.recordPayment({
+          liabilityId: liability.id,
+          sourceAccountId: "liability-test-cash",
+          amountMinor: 1_000n,
+          paidAt,
+          idempotencyKey: "concurrent-interest-payment-b",
+        }),
+      ]);
+
+      expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(
+        1,
+      );
+      expect(results.filter((result) => result.status === "rejected")).toHaveLength(
+        1,
+      );
+
+      const payments = await repository.listPayments(liability.id);
+      expect(payments).toHaveLength(1);
+      expect(
+        payments.reduce((total, payment) => total + payment.interestPaidMinor, 0n),
+      ).toBe(1_000n);
+
+      const detail = await service.getDetail(liability.id);
+      expect(detail.liability.outstandingPrincipalMinor).toBe(100_000n);
+      expect(
+        detail.installments.find((item) => item.sequence === 1)
+          ?.interestPaidMinor,
+      ).toBe(1_000n);
+      expect(detail.reconciliation.scheduleInterestPaidMinor).toBe(1_000n);
+      expect(detail.reconciliation.paymentDerivedInterestPaidMinor).toBe(
+        1_000n,
+      );
+      expect(detail.reconciliation.interestDifferenceMinor).toBe(0n);
+      expect(database.raw.prepare("PRAGMA foreign_key_check").all()).toEqual(
+        [],
+      );
     } finally {
       database.close();
     }

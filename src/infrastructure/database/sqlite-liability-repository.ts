@@ -393,6 +393,93 @@ export class SqliteLiabilityRepository implements LiabilityRepository {
           "Payment principal does not reconcile to the new liability balance",
         );
       }
+
+      // Revalidate application-layer allocation snapshots inside the write
+      // transaction. Concurrent requests must not consume the same installment
+      // interest or principal balance from an earlier read.
+      const allocatedInterestMinor = input.allocations.reduce(
+        (total, allocation) => total + allocation.interestMinor,
+        0n,
+      );
+      const allocatedPrincipalMinor = input.allocations.reduce(
+        (total, allocation) => total + allocation.principalMinor,
+        0n,
+      );
+      if (
+        allocatedInterestMinor !== input.payment.interestPaidMinor ||
+        allocatedPrincipalMinor > input.payment.principalPaidMinor
+      ) {
+        throw new Error("Payment allocations do not match the payment totals");
+      }
+
+      for (const allocation of input.allocations) {
+        const currentInstallment = tx
+          .select()
+          .from(liabilityInstallments)
+          .where(
+            and(
+              eq(liabilityInstallments.id, allocation.installmentId),
+              eq(
+                liabilityInstallments.liabilityId,
+                input.payment.liabilityId,
+              ),
+            ),
+          )
+          .get();
+        if (!currentInstallment) {
+          throw new Error(
+            `Installment disappeared during payment: ${allocation.installmentId}`,
+          );
+        }
+        if (
+          fromSqliteInteger(currentInstallment.principalPaidMinor) !==
+            allocation.principalBeforeMinor ||
+          fromSqliteInteger(currentInstallment.interestPaidMinor) !==
+            allocation.interestBeforeMinor ||
+          currentInstallment.status !== allocation.statusBefore
+        ) {
+          throw new Error(
+            "Installment changed while payment was being prepared; retry payment",
+          );
+        }
+        if (
+          allocation.principalMinor < 0n ||
+          allocation.interestMinor < 0n ||
+          (allocation.principalMinor === 0n &&
+            allocation.interestMinor === 0n) ||
+          allocation.principalBeforeMinor + allocation.principalMinor >
+            fromSqliteInteger(currentInstallment.principalDueMinor) ||
+          allocation.interestBeforeMinor + allocation.interestMinor >
+            fromSqliteInteger(currentInstallment.interestDueMinor)
+        ) {
+          throw new Error("Payment allocation exceeds the installment balance");
+        }
+      }
+
+      for (const change of input.scheduleChanges) {
+        if (change.action !== "CANCELLED") continue;
+        const currentInstallment = tx
+          .select()
+          .from(liabilityInstallments)
+          .where(
+            and(
+              eq(liabilityInstallments.id, change.installmentId),
+              eq(
+                liabilityInstallments.liabilityId,
+                input.payment.liabilityId,
+              ),
+            ),
+          )
+          .get();
+        if (
+          !currentInstallment ||
+          currentInstallment.status !== change.previousStatus
+        ) {
+          throw new Error(
+            "Repayment schedule changed while payment was being prepared; retry payment",
+          );
+        }
+      }
       if (
         input.journalEntry.id !== input.payment.journalEntryId ||
         input.journalEntry.idempotencyKey !== input.payment.idempotencyKey ||
@@ -783,15 +870,29 @@ export class SqliteLiabilityRepository implements LiabilityRepository {
       );
     const paymentDerivedPrincipalMinor =
       fromSqliteInteger(row.originalPrincipalMinor) - netPrincipalPaidMinor;
+    const scheduleInterestPaidMinor = installments.reduce(
+      (total, item) => total + fromSqliteInteger(item.interestPaidMinor),
+      0n,
+    );
+    const paymentDerivedInterestPaidMinor = payments
+      .filter((item) => !reversedPaymentIds.has(item.id))
+      .reduce(
+        (total, item) => total + fromSqliteInteger(item.interestPaidMinor),
+        0n,
+      );
     return {
       ledgerPrincipalMinor,
       recordedPrincipalMinor,
       schedulePrincipalMinor,
       paymentDerivedPrincipalMinor,
+      scheduleInterestPaidMinor,
+      paymentDerivedInterestPaidMinor,
       differenceMinor: ledgerPrincipalMinor - recordedPrincipalMinor,
       scheduleDifferenceMinor: schedulePrincipalMinor - recordedPrincipalMinor,
       paymentDifferenceMinor:
         paymentDerivedPrincipalMinor - recordedPrincipalMinor,
+      interestDifferenceMinor:
+        paymentDerivedInterestPaidMinor - scheduleInterestPaidMinor,
     };
   }
 
