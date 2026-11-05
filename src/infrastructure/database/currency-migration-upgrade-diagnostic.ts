@@ -36,6 +36,7 @@ export async function runCurrencyMigrationUpgradeDiagnostic(): Promise<
 > {
   const databaseName = `f02-upgrade-${Date.now()}.db`;
   let client: SQLite.SQLiteDatabase | null = null;
+  let encryptionKey: string | null = null;
 
   try {
     client = await SQLite.openDatabaseAsync(databaseName, {
@@ -48,8 +49,8 @@ export async function runCurrencyMigrationUpgradeDiagnostic(): Promise<
       throw new Error("SQLCipher is unavailable for the isolated migration DB");
     }
 
-    const key = toHex(await Crypto.getRandomBytesAsync(32));
-    await client.execAsync(`PRAGMA key = "x'${key}'"`);
+    encryptionKey = toHex(await Crypto.getRandomBytesAsync(32));
+    await client.execAsync(`PRAGMA key = "x'${encryptionKey}'"`);
     await client.execAsync("PRAGMA foreign_keys = ON");
     await client.execAsync("PRAGMA journal_mode = WAL");
 
@@ -162,6 +163,59 @@ export async function runCurrencyMigrationUpgradeDiagnostic(): Promise<
       );
     }
 
+    let reopenPassed = false;
+    let reopenDetail = "Database was not reopened";
+
+    // Close and reopen the exact same encrypted file before cleanup. Reapply
+    // the same key, then verify durable rows and migration-created triggers.
+    await client.closeAsync();
+    client = null;
+    try {
+      if (!encryptionKey) {
+        throw new Error("SQLCipher key was not retained for reopen verification");
+      }
+      client = await SQLite.openDatabaseAsync(databaseName, {
+        useNewConnection: true,
+      });
+      await client.execAsync(`PRAGMA key = "x'${encryptionKey}'"`);
+      await client.execAsync("PRAGMA foreign_keys = ON");
+
+      const reopenedTriggers = await client.getAllAsync<{ name: string }>(
+        "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name IN (?, ?)",
+        ...triggerNames,
+      );
+      const reopenedTriggerNames = reopenedTriggers
+        .map((row) => row.name)
+        .sort();
+      const persistedCurrency = await client.getFirstAsync<{ code: string }>(
+        "SELECT code FROM currencies WHERE code = 'VND'",
+      );
+      const persistedAccount = await client.getFirstAsync<{ id: string }>(
+        "SELECT id FROM accounts WHERE id = 'f02-upgrade-verification-cash'",
+      );
+      const persistedSettings = await client.getFirstAsync<{
+        base_currency_code: string;
+      }>(
+        "SELECT base_currency_code FROM ledger_settings WHERE id = 1",
+      );
+      const reopenedForeignKeys = await client.getAllAsync(
+        "PRAGMA foreign_key_check",
+      );
+
+      reopenPassed =
+        JSON.stringify(reopenedTriggerNames) ===
+          JSON.stringify([...triggerNames].sort()) &&
+        persistedCurrency?.code === "VND" &&
+        persistedAccount?.id === "f02-upgrade-verification-cash" &&
+        persistedSettings?.base_currency_code === "VND" &&
+        reopenedForeignKeys.length === 0;
+      reopenDetail =
+        `triggers=${reopenedTriggerNames.join(", ") || "none"}; currencyPersisted=${Boolean(persistedCurrency)}; accountPersisted=${Boolean(persistedAccount)}; baseCurrencyPersisted=${persistedSettings?.base_currency_code ?? "missing"}; foreignKeyViolations=${reopenedForeignKeys.length}`;
+    } catch (error) {
+      reopenDetail =
+        error instanceof Error ? error.message : String(error);
+    }
+
     return [
       {
         name: "Legacy migration state before 0011",
@@ -183,6 +237,11 @@ export async function runCurrencyMigrationUpgradeDiagnostic(): Promise<
         name: "Foreign key integrity after upgrade",
         passed: foreignKeys.length === 0,
         detail: `${foreignKeys.length} foreign key violation(s)`,
+      },
+      {
+        name: "Same upgraded SQLCipher database survives close and reopen",
+        passed: reopenPassed,
+        detail: reopenDetail,
       },
     ];
   } finally {
