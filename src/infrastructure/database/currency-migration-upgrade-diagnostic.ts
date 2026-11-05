@@ -85,10 +85,11 @@ export async function runCurrencyMigrationUpgradeDiagnostic(): Promise<
       ...triggerNames,
     );
     if (beforeUpgrade.length !== 0) {
+      const unexpectedTriggerNames = beforeUpgrade
+        .map((row) => row.name)
+        .join(", ");
       throw new Error(
-        `Legacy 0004-0010 fixture unexpectedly contains currency triggers: ${beforeUpgrade
-          .map((row) => row.name)
-          .join(", ")}`,
+        `Legacy 0004-0010 fixture unexpectedly contains currency triggers: ${unexpectedTriggerNames}`,
       );
     }
 
@@ -104,7 +105,9 @@ export async function runCurrencyMigrationUpgradeDiagnostic(): Promise<
     });
 
     const afterUpgrade = await client.getAllAsync<{ name: string }>(
-      "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name IN (?, ?)",
+      `SELECT name
+       FROM sqlite_master
+       WHERE type = 'trigger' AND name IN (?, ?)`,
       ...triggerNames,
     );
     const restoredNames = afterUpgrade.map((row) => row.name).sort();
@@ -158,9 +161,12 @@ export async function runCurrencyMigrationUpgradeDiagnostic(): Promise<
 
     const foreignKeys = await client.getAllAsync("PRAGMA foreign_key_check");
     if (!codeMutationRejected || !precisionMutationRejected) {
+      const invariantFailureDetail = [
+        `codeRejected=${codeMutationRejected}`,
+        `precisionRejected=${precisionMutationRejected}`,
+      ].join(", ");
       throw new Error(
-        `Currency invariant enforcement failed: codeRejected=${codeMutationRejected}, ` +
-          `precisionRejected=${precisionMutationRejected}`,
+        `Currency invariant enforcement failed: ${invariantFailureDetail}`,
       );
     }
     if (foreignKeys.length !== 0) {
@@ -189,7 +195,9 @@ export async function runCurrencyMigrationUpgradeDiagnostic(): Promise<
       await client.execAsync("PRAGMA foreign_keys = ON");
 
       const reopenedTriggers = await client.getAllAsync<{ name: string }>(
-        "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name IN (?, ?)",
+        `SELECT name
+       FROM sqlite_master
+       WHERE type = 'trigger' AND name IN (?, ?)`,
         ...triggerNames,
       );
       const reopenedTriggerNames = reopenedTriggers
@@ -217,14 +225,15 @@ export async function runCurrencyMigrationUpgradeDiagnostic(): Promise<
         persistedAccount?.id === "f02-upgrade-verification-cash" &&
         persistedSettings?.base_currency_code === "VND" &&
         reopenedForeignKeys.length === 0;
-      reopenDetail =
-        [
-          `triggers=${reopenedTriggerNames.join(", ") || "none"}`,
-          `currencyPersisted=${Boolean(persistedCurrency)}`,
-          `accountPersisted=${Boolean(persistedAccount)}`,
-          `baseCurrencyPersisted=${persistedSettings?.base_currency_code ?? "missing"}`,
-          `foreignKeyViolations=${reopenedForeignKeys.length}`,
-        ].join("; ");
+      const persistedBaseCurrency =
+        persistedSettings?.base_currency_code ?? "missing";
+      reopenDetail = [
+        `triggers=${reopenedTriggerNames.join(", ") || "none"}`,
+        `currencyPersisted=${Boolean(persistedCurrency)}`,
+        `accountPersisted=${Boolean(persistedAccount)}`,
+        `baseCurrencyPersisted=${persistedBaseCurrency}`,
+        `foreignKeyViolations=${reopenedForeignKeys.length}`,
+      ].join("; ");
     } catch (error) {
       reopenDetail =
         error instanceof Error ? error.message : String(error);
@@ -235,7 +244,7 @@ export async function runCurrencyMigrationUpgradeDiagnostic(): Promise<
         name: "Legacy migration state before 0011",
         passed: beforeUpgrade.length === 0,
         detail:
-          "Historical 0004 and migrations 0005-0010 applied; both triggers absent",
+          "Historical 0004 and 0005-0010 applied; both triggers absent",
       },
       {
         name: "Forward migration 0011 on SQLCipher",
