@@ -99,6 +99,8 @@ function createHarness(
       paymentDifferenceMinor: 0n,
       scheduleInterestPaidMinor: 0n,
       paymentDerivedInterestPaidMinor: 0n,
+      ledgerInterestPaidMinor: 0n,
+      ledgerInterestDifferenceMinor: 0n,
       interestDifferenceMinor: 0n,
     }),
   } as unknown as jest.Mocked<LiabilityRepository>;
@@ -613,6 +615,8 @@ describe("LiabilityService", () => {
       paymentDifferenceMinor: 0n,
       scheduleInterestPaidMinor: 0n,
       paymentDerivedInterestPaidMinor: 0n,
+      ledgerInterestPaidMinor: 0n,
+      ledgerInterestDifferenceMinor: 0n,
       interestDifferenceMinor: 0n,
     });
 
@@ -636,6 +640,37 @@ describe("LiabilityService", () => {
       differenceMinor: 0n,
       scheduleDifferenceMinor: 0n,
       paymentDifferenceMinor: 1n,
+      scheduleInterestPaidMinor: 0n,
+      paymentDerivedInterestPaidMinor: 0n,
+      ledgerInterestPaidMinor: 0n,
+      ledgerInterestDifferenceMinor: 0n,
+      interestDifferenceMinor: 0n,
+    });
+
+    await expect(service.archive(current.id)).rejects.toThrow(
+      "Ledger, schedule and payment history must reconcile before archiving",
+    );
+    expect(repository.archive).not.toHaveBeenCalled();
+  });
+  it("blocks archive when ledger interest reconciliation is not balanced", async () => {
+    const current = baseLiability({
+      status: "PAID_OFF",
+      outstandingPrincipalMinor: 0n,
+    });
+    const { service, repository } = createHarness(current);
+    (repository.reconcile as jest.Mock).mockResolvedValue({
+      ledgerPrincipalMinor: 0n,
+      recordedPrincipalMinor: 0n,
+      schedulePrincipalMinor: 0n,
+      paymentDerivedPrincipalMinor: 0n,
+      differenceMinor: 0n,
+      scheduleDifferenceMinor: 0n,
+      paymentDifferenceMinor: 0n,
+      scheduleInterestPaidMinor: 1_000n,
+      paymentDerivedInterestPaidMinor: 1_000n,
+      ledgerInterestPaidMinor: 500n,
+      ledgerInterestDifferenceMinor: -500n,
+      interestDifferenceMinor: 0n,
     });
 
     await expect(service.archive(current.id)).rejects.toThrow(
