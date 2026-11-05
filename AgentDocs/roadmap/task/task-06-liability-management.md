@@ -124,3 +124,14 @@ Liability, RepaymentSchedule, LiabilityPayment (hoặc tên tương ứng theo n
 - Xác minh cục bộ trên working tree sau cập nhật assertion: typecheck PASS, lint PASS, format check PASS, unit tests PASS (17 suites / 116 tests); Android build và cài đặt Development Build PASS.
 - Giới hạn báo cáo: CI từ xa cho source assertion vừa sửa chưa được xác minh; GitHub CLI không có trong môi trường. Nghiệm thu thiết bị và các lệnh kiểm tra cục bộ đều PASS.
 
+
+
+## 14. Bổ sung regression tự động sau audit (2026-11-05)
+
+- Đã bổ sung `src/tests/liability-repository.integration.test.ts`, chạy `SqliteLiabilityRepository` và `LiabilityService` trên SQLite thật (`node:sqlite`) với toàn bộ migration production; không mock `commitPayment`.
+- Regression early-principal xác nhận replacement installments được persist trước các schedule-change audit rows tham chiếu chúng; kiểm tra payment, posted journal, principal outstanding, schedule principal và cả ba reconciliation differences.
+- Probe tái hiện invariant FK immediate: thao tác ghi schedule-change row trước khi installment được insert phải bị SQLite từ chối bằng `FOREIGN KEY constraint failed`.
+- Rollback regression chủ động gây lỗi ở bước cập nhật liability sau khi các payment/journal/installment/audit writes đã chạy; xác nhận toàn bộ transaction rollback, không để lại journal, payment, allocation hoặc schedule-change rows và `PRAGMA foreign_key_check` rỗng.
+- Harness `src/tests/helpers/real-sqlite.ts` dùng `node:sqlite` và cùng migration bundle Drizzle với production. Môi trường Node 22 là điều kiện chạy test.
+- Báo cáo remediation ghi nhận local verification PASS: typecheck, lint, format:check và Jest **21 suites / 123 tests**. Tuy nhiên CI run #715 trên SHA `848ad77c76d30878e80791efb487d49752dcc550` FAIL tại typecheck do hai stale import path sau khi chuyển key lifecycle; hai import hiện đã được sửa thành `../key-lifecycle` trên branch.
+- **Trạng thái tại thời điểm ghi:** regression implementation đã có trên branch; cần một CI run mới trên đúng HEAD chứa các import fixes và test mới trước khi chuyển CLI sang nghiệm thu cuối. Device acceptance lượt 2 trên Huawei LYA-L29 đã PASS theo biên bản §13; không cần chạy lại TASK-06 diagnostic chỉ vì bổ sung test harness Node-side, trừ khi CI hoặc rà soát source phát hiện thay đổi ảnh hưởng native path.
