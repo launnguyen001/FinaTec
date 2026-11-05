@@ -198,8 +198,7 @@ describe("SQLite liability payment repository", () => {
   });
 
   it("preserves PAID status when status sync races payment across two SQLite connections", async () => {
-    const databasePath =
-      `/tmp/finatec-liability-${Date.now()}-${Math.random()}.sqlite`;
+    const databasePath = `/tmp/finatec-liability-${Date.now()}-${Math.random()}.sqlite`;
     const database = await createRealSqliteTestDatabase(
       undefined,
       databasePath,
@@ -219,10 +218,7 @@ describe("SQLite liability payment repository", () => {
         secondLedger,
         {
           now: () => "2026-02-02T12:00:00.000Z",
-          createId: (() => {
-            let nextId = 0;
-            return () => `liability-sync-test-${++nextId}`;
-          })(),
+          createId: () => `liability-sync-test-${Date.now()}`,
         },
       );
 

@@ -19,7 +19,6 @@ declare module "node:sqlite" {
   }
 }
 
-
 declare module "node:fs" {
   export function rmSync(
     path: string,
