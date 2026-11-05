@@ -137,7 +137,9 @@ describe("SQLite liability payment repository", () => {
     }
   });
 
-  it("reconciles posted interest expense ledger lines and nets payment reversals", async () => {
+  it(
+    "reconciles posted interest expense ledger lines and nets payment reversals",
+    async () => {
     const database = await createRealSqliteTestDatabase();
     try {
       const { service, liability } = await createLiabilityFixture(
@@ -155,7 +157,9 @@ describe("SQLite liability payment repository", () => {
       expect(
         afterPayment.reconciliation.paymentDerivedInterestPaidMinor,
       ).toBe(1_000n);
-      expect(afterPayment.reconciliation.ledgerInterestPaidMinor).toBe(1_000n);
+      expect(
+        afterPayment.reconciliation.ledgerInterestPaidMinor,
+      ).toBe(1_000n);
       expect(
         afterPayment.reconciliation.ledgerInterestDifferenceMinor,
       ).toBe(0n);
@@ -179,7 +183,9 @@ describe("SQLite liability payment repository", () => {
     }
   });
 
-  it("detects matching payment and installment interest corruption against the posted ledger", async () => {
+  it(
+    "detects matching payment and installment interest corruption against the posted ledger",
+    async () => {
     const database = await createRealSqliteTestDatabase();
     try {
       const { service, liability } = await createLiabilityFixture(
