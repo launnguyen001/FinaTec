@@ -65,6 +65,21 @@ describe("currency immutability migration chain", () => {
       expectCurrencyTriggers(database);
 
       await database.migrateEntries([4, 5, 6, 7, 8, 9, 10]);
+      // Simulate a database that applied historical migrations before the
+      // forward trigger-restoration migration was introduced.
+      database.raw.exec(`
+        DROP TRIGGER currencies_code_immutable;
+        DROP TRIGGER currencies_no_precision_change_when_referenced;
+      `);
+      expect(
+        database.raw
+          .prepare(
+            "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name IN (?, ?)",
+          )
+          .all(...triggerNames),
+      ).toHaveLength(0);
+
+      await database.migrateEntries([11]);
       expectCurrencyTriggers(database);
       await verifyReferencedCurrencyInvariants(database);
     } finally {
