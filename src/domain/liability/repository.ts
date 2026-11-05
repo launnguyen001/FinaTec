@@ -48,5 +48,8 @@ export interface LiabilityRepository {
     differenceMinor: bigint;
     scheduleDifferenceMinor: bigint;
     paymentDifferenceMinor: bigint;
+    scheduleInterestPaidMinor: bigint;
+    paymentDerivedInterestPaidMinor: bigint;
+    interestDifferenceMinor: bigint;
   }>;
 }

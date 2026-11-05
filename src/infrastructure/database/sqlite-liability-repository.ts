@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, notInArray, sql } from "drizzle-orm";
 
 import {
   fromSqliteInteger,
@@ -16,6 +16,7 @@ import type {
   LiabilityJournalCommit,
   LiabilityRateChange,
   LiabilityPaymentReversal,
+  RepaymentStatus,
 } from "../../domain/liability/liability";
 import type {
   CreateLiabilityRecord,
@@ -393,6 +394,87 @@ export class SqliteLiabilityRepository implements LiabilityRepository {
           "Payment principal does not reconcile to the new liability balance",
         );
       }
+
+      // Revalidate application-layer allocation snapshots inside the write
+      // transaction. Concurrent requests must not consume the same installment
+      // interest or principal balance from an earlier read.
+      const allocatedInterestMinor = input.allocations.reduce(
+        (total, allocation) => total + allocation.interestMinor,
+        0n,
+      );
+      const allocatedPrincipalMinor = input.allocations.reduce(
+        (total, allocation) => total + allocation.principalMinor,
+        0n,
+      );
+      if (
+        allocatedInterestMinor !== input.payment.interestPaidMinor ||
+        allocatedPrincipalMinor > input.payment.principalPaidMinor
+      ) {
+        throw new Error("Payment allocations do not match the payment totals");
+      }
+
+      for (const allocation of input.allocations) {
+        const currentInstallment = tx
+          .select()
+          .from(liabilityInstallments)
+          .where(
+            and(
+              eq(liabilityInstallments.id, allocation.installmentId),
+              eq(liabilityInstallments.liabilityId, input.payment.liabilityId),
+            ),
+          )
+          .get();
+        if (!currentInstallment) {
+          throw new Error(
+            `Installment disappeared during payment: ${allocation.installmentId}`,
+          );
+        }
+        if (
+          fromSqliteInteger(currentInstallment.principalPaidMinor) !==
+            allocation.principalBeforeMinor ||
+          fromSqliteInteger(currentInstallment.interestPaidMinor) !==
+            allocation.interestBeforeMinor ||
+          currentInstallment.status !== allocation.statusBefore
+        ) {
+          throw new Error(
+            "Installment changed while payment was being prepared; retry payment",
+          );
+        }
+        if (
+          allocation.principalMinor < 0n ||
+          allocation.interestMinor < 0n ||
+          (allocation.principalMinor === 0n &&
+            allocation.interestMinor === 0n) ||
+          allocation.principalBeforeMinor + allocation.principalMinor >
+            fromSqliteInteger(currentInstallment.principalDueMinor) ||
+          allocation.interestBeforeMinor + allocation.interestMinor >
+            fromSqliteInteger(currentInstallment.interestDueMinor)
+        ) {
+          throw new Error("Payment allocation exceeds the installment balance");
+        }
+      }
+
+      for (const change of input.scheduleChanges) {
+        if (change.action !== "CANCELLED") continue;
+        const currentInstallment = tx
+          .select()
+          .from(liabilityInstallments)
+          .where(
+            and(
+              eq(liabilityInstallments.id, change.installmentId),
+              eq(liabilityInstallments.liabilityId, input.payment.liabilityId),
+            ),
+          )
+          .get();
+        if (
+          !currentInstallment ||
+          currentInstallment.status !== change.previousStatus
+        ) {
+          throw new Error(
+            "Repayment schedule changed while payment was being prepared; retry payment",
+          );
+        }
+      }
       if (
         input.journalEntry.id !== input.payment.journalEntryId ||
         input.journalEntry.idempotencyKey !== input.payment.idempotencyKey ||
@@ -666,40 +748,34 @@ export class SqliteLiabilityRepository implements LiabilityRepository {
   }
 
   async syncStatuses(liabilityId: string, localDate: string): Promise<void> {
-    const rows = await this.db
-      .select()
-      .from(liabilityInstallments)
-      .where(eq(liabilityInstallments.liabilityId, liabilityId))
-      .all();
-    for (const row of rows) {
-      if (row.status === "PAID" || row.status === "CANCELLED") continue;
-      const principalLeft =
-        fromSqliteInteger(row.principalDueMinor) -
-        fromSqliteInteger(row.principalPaidMinor);
-      const interestLeft =
-        fromSqliteInteger(row.interestDueMinor) -
-        fromSqliteInteger(row.interestPaidMinor);
-      const paid = principalLeft === 0n && interestLeft === 0n;
-      const partial =
-        fromSqliteInteger(row.principalPaidMinor) > 0n ||
-        fromSqliteInteger(row.interestPaidMinor) > 0n;
-      const status = paid
-        ? "PAID"
-        : row.dueDate < localDate
-          ? "OVERDUE"
-          : partial
-            ? "PARTIALLY_PAID"
-            : row.dueDate === localDate
-              ? "DUE"
-              : "UPCOMING";
-      if (status !== row.status) {
-        await this.db
-          .update(liabilityInstallments)
-          .set({ status, updatedAt: new Date().toISOString() })
-          .where(eq(liabilityInstallments.id, row.id))
-          .run();
-      }
-    }
+    // Compute each status from the row's current persisted payment values in one
+    // statement. A read-then-write loop can overwrite PAID with a stale OVERDUE
+    // snapshot when a payment commits between the SELECT and UPDATE.
+    await this.db
+      .update(liabilityInstallments)
+      .set({
+        status: sql<RepaymentStatus>`CASE
+          WHEN ${liabilityInstallments.principalPaidMinor} = ${liabilityInstallments.principalDueMinor}
+            AND ${liabilityInstallments.interestPaidMinor} = ${liabilityInstallments.interestDueMinor}
+            THEN 'PAID'
+          WHEN ${liabilityInstallments.dueDate} < ${localDate}
+            THEN 'OVERDUE'
+          WHEN ${liabilityInstallments.principalPaidMinor} > 0
+            OR ${liabilityInstallments.interestPaidMinor} > 0
+            THEN 'PARTIALLY_PAID'
+          WHEN ${liabilityInstallments.dueDate} = ${localDate}
+            THEN 'DUE'
+          ELSE 'UPCOMING'
+        END`,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(
+        and(
+          eq(liabilityInstallments.liabilityId, liabilityId),
+          notInArray(liabilityInstallments.status, ["PAID", "CANCELLED"]),
+        ),
+      )
+      .run();
   }
 
   async archive(id: string, archivedAt: string): Promise<void> {
@@ -783,15 +859,29 @@ export class SqliteLiabilityRepository implements LiabilityRepository {
       );
     const paymentDerivedPrincipalMinor =
       fromSqliteInteger(row.originalPrincipalMinor) - netPrincipalPaidMinor;
+    const scheduleInterestPaidMinor = installments.reduce(
+      (total, item) => total + fromSqliteInteger(item.interestPaidMinor),
+      0n,
+    );
+    const paymentDerivedInterestPaidMinor = payments
+      .filter((item) => !reversedPaymentIds.has(item.id))
+      .reduce(
+        (total, item) => total + fromSqliteInteger(item.interestPaidMinor),
+        0n,
+      );
     return {
       ledgerPrincipalMinor,
       recordedPrincipalMinor,
       schedulePrincipalMinor,
       paymentDerivedPrincipalMinor,
+      scheduleInterestPaidMinor,
+      paymentDerivedInterestPaidMinor,
       differenceMinor: ledgerPrincipalMinor - recordedPrincipalMinor,
       scheduleDifferenceMinor: schedulePrincipalMinor - recordedPrincipalMinor,
       paymentDifferenceMinor:
         paymentDerivedPrincipalMinor - recordedPrincipalMinor,
+      interestDifferenceMinor:
+        paymentDerivedInterestPaidMinor - scheduleInterestPaidMinor,
     };
   }
 

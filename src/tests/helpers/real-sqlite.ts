@@ -1,3 +1,4 @@
+import { rmSync } from "node:fs";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 import type { SQLiteDatabase } from "expo-sqlite";
 import { drizzle } from "drizzle-orm/expo-sqlite";
@@ -87,9 +88,12 @@ export async function createRealSqliteTestDatabase(
   migrationIndices: number[] = ledgerMigrations.journal.entries.map(
     (entry) => entry.idx,
   ),
+  databasePath = ":memory:",
 ): Promise<RealSqliteTestDatabase> {
-  const raw = new DatabaseSync(":memory:");
+  const raw = new DatabaseSync(databasePath);
   raw.exec("PRAGMA foreign_keys = ON");
+  raw.exec("PRAGMA busy_timeout = 5000");
+  if (databasePath !== ":memory:") raw.exec("PRAGMA journal_mode = WAL");
   const client = expoSqliteClient(raw);
   const db = drizzle(client as unknown as SQLiteDatabase, {
     schema: ledgerSchema,
@@ -119,5 +123,39 @@ export async function createRealSqliteTestDatabase(
     throw error;
   }
 
-  return { raw, db, migrateEntries, close: () => raw.close() };
+  return {
+    raw,
+    db,
+    migrateEntries,
+    close: () => {
+      raw.close();
+      if (databasePath !== ":memory:") {
+        rmSync(databasePath, { force: true });
+        rmSync(`${databasePath}-wal`, { force: true });
+        rmSync(`${databasePath}-shm`, { force: true });
+      }
+    },
+  };
+}
+
+/** Opens a second independent connection to an already-migrated file database. */
+export function openRealSqliteTestDatabase(
+  databasePath: string,
+): RealSqliteTestDatabase {
+  const raw = new DatabaseSync(databasePath);
+  raw.exec("PRAGMA foreign_keys = ON");
+  raw.exec("PRAGMA busy_timeout = 5000");
+  raw.exec("PRAGMA journal_mode = WAL");
+  const client = expoSqliteClient(raw);
+  const db = drizzle(client as unknown as SQLiteDatabase, {
+    schema: ledgerSchema,
+  }) as unknown as LedgerDatabase;
+  return {
+    raw,
+    db,
+    migrateEntries: async () => {
+      throw new Error("The second SQLite connection must not rerun migrations");
+    },
+    close: () => raw.close(),
+  };
 }

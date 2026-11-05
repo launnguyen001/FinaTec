@@ -97,6 +97,9 @@ function createHarness(
       differenceMinor: 0n,
       scheduleDifferenceMinor: 0n,
       paymentDifferenceMinor: 0n,
+      scheduleInterestPaidMinor: 0n,
+      paymentDerivedInterestPaidMinor: 0n,
+      interestDifferenceMinor: 0n,
     }),
   } as unknown as jest.Mocked<LiabilityRepository>;
   const ledger = {
@@ -608,6 +611,9 @@ describe("LiabilityService", () => {
       differenceMinor: 0n,
       scheduleDifferenceMinor: 1n,
       paymentDifferenceMinor: 0n,
+      scheduleInterestPaidMinor: 0n,
+      paymentDerivedInterestPaidMinor: 0n,
+      interestDifferenceMinor: 0n,
     });
 
     await expect(service.archive(current.id)).rejects.toThrow(
