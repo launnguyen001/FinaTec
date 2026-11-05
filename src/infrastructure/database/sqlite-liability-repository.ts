@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, notInArray, sql } from "drizzle-orm";
 
 import {
   fromSqliteInteger,
@@ -16,6 +16,7 @@ import type {
   LiabilityJournalCommit,
   LiabilityRateChange,
   LiabilityPaymentReversal,
+  RepaymentStatus,
 } from "../../domain/liability/liability";
 import type {
   CreateLiabilityRecord,
@@ -747,40 +748,34 @@ export class SqliteLiabilityRepository implements LiabilityRepository {
   }
 
   async syncStatuses(liabilityId: string, localDate: string): Promise<void> {
-    const rows = await this.db
-      .select()
-      .from(liabilityInstallments)
-      .where(eq(liabilityInstallments.liabilityId, liabilityId))
-      .all();
-    for (const row of rows) {
-      if (row.status === "PAID" || row.status === "CANCELLED") continue;
-      const principalLeft =
-        fromSqliteInteger(row.principalDueMinor) -
-        fromSqliteInteger(row.principalPaidMinor);
-      const interestLeft =
-        fromSqliteInteger(row.interestDueMinor) -
-        fromSqliteInteger(row.interestPaidMinor);
-      const paid = principalLeft === 0n && interestLeft === 0n;
-      const partial =
-        fromSqliteInteger(row.principalPaidMinor) > 0n ||
-        fromSqliteInteger(row.interestPaidMinor) > 0n;
-      const status = paid
-        ? "PAID"
-        : row.dueDate < localDate
-          ? "OVERDUE"
-          : partial
-            ? "PARTIALLY_PAID"
-            : row.dueDate === localDate
-              ? "DUE"
-              : "UPCOMING";
-      if (status !== row.status) {
-        await this.db
-          .update(liabilityInstallments)
-          .set({ status, updatedAt: new Date().toISOString() })
-          .where(eq(liabilityInstallments.id, row.id))
-          .run();
-      }
-    }
+    // Compute each status from the row's current persisted payment values in one
+    // statement. A read-then-write loop can overwrite PAID with a stale OVERDUE
+    // snapshot when a payment commits between the SELECT and UPDATE.
+    await this.db
+      .update(liabilityInstallments)
+      .set({
+        status: sql<RepaymentStatus>`CASE
+          WHEN ${liabilityInstallments.principalPaidMinor} = ${liabilityInstallments.principalDueMinor}
+            AND ${liabilityInstallments.interestPaidMinor} = ${liabilityInstallments.interestDueMinor}
+            THEN 'PAID'
+          WHEN ${liabilityInstallments.dueDate} < ${localDate}
+            THEN 'OVERDUE'
+          WHEN ${liabilityInstallments.principalPaidMinor} > 0
+            OR ${liabilityInstallments.interestPaidMinor} > 0
+            THEN 'PARTIALLY_PAID'
+          WHEN ${liabilityInstallments.dueDate} = ${localDate}
+            THEN 'DUE'
+          ELSE 'UPCOMING'
+        END`,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(
+        and(
+          eq(liabilityInstallments.liabilityId, liabilityId),
+          notInArray(liabilityInstallments.status, ["PAID", "CANCELLED"]),
+        ),
+      )
+      .run();
   }
 
   async archive(id: string, archivedAt: string): Promise<void> {

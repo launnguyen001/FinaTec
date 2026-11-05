@@ -384,3 +384,11 @@ Không có phát hiện critical/high trong phạm vi sửa over-allocation.
 - Không sửa source, test, schema, migration hay business logic; không commit, không push, không merge.
 - Chỉ tài liệu này được sửa (append section 16). Các script probe nằm ngoài repo tại `/tmp/opencode`; database dùng cho kiểm tra là file tạm/in-memory và đã đóng, không đụng production.
 - Lệnh `git status --porcelain=v1` sau khi ghi báo đúng một tệp: `M AgentDocs/roadmap/task/task-06-liability-management.md`.
+
+
+### 16.9. Remediation R1/R2 implementation checkpoint
+
+- Implementation branch: `remediation/task-06-concurrency`; based on the accepted F-07 implementation and the independent acceptance report at `9ed9c76714e9bb5afa59a3490edf076e4a57f15c`.
+- **R1 implementation:** `syncStatuses` no longer SELECTs installment snapshots and then updates rows individually. It computes status from the current persisted principal/interest due and paid columns in one atomic SQL `UPDATE ... CASE` statement, excluding terminal `PAID` and `CANCELLED` rows. This removes the stale read-modify-write window that could overwrite `PAID` with `OVERDUE`.
+- **R2 implementation:** the real-SQLite test harness supports a file-backed database and a second independent connection, with WAL and a busy timeout. A regression test starts overdue status synchronization and payment concurrently through separate connections, then asserts the installment remains `PAID`, interest reconciliation is zero, and both connections report no foreign-key violations.
+- **Verification status:** implementation is committed separately from the original F-07 acceptance checkpoint. Typecheck, lint, Prettier, Jest, CI, and independent re-acceptance must still pass before this remediation can be marked accepted or merged. No device acceptance is claimed by this Node-side concurrency change.

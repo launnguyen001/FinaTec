@@ -1,8 +1,14 @@
+import { randomUUID } from "node:crypto";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { LiabilityService } from "../application/liability/liability-service";
 import type { Account, AccountType } from "../domain/ledger/repository";
 import { SqliteLedgerRepository } from "../infrastructure/database/sqlite-ledger-repository";
 import { SqliteLiabilityRepository } from "../infrastructure/database/sqlite-liability-repository";
-import { createRealSqliteTestDatabase } from "./helpers/real-sqlite";
+import {
+  createRealSqliteTestDatabase,
+  openRealSqliteTestDatabase,
+} from "./helpers/real-sqlite";
 
 const timestamp = "2026-01-15T12:00:00.000Z";
 
@@ -190,6 +196,73 @@ describe("SQLite liability payment repository", () => {
         [],
       );
     } finally {
+      database.close();
+    }
+  });
+
+  it("preserves PAID status when status sync races payment across two SQLite connections", async () => {
+    const databasePath = join(tmpdir(), `finatec-liability-${randomUUID()}.sqlite`);
+    const database = await createRealSqliteTestDatabase(
+      undefined,
+      databasePath,
+    );
+    const secondConnection = openRealSqliteTestDatabase(databasePath);
+    try {
+      const { service, liability } = await createLiabilityFixture(
+        database,
+        "INTEREST_ONLY",
+      );
+      const secondLedger = new SqliteLedgerRepository(secondConnection.db);
+      const secondRepository = new SqliteLiabilityRepository(
+        secondConnection.db,
+      );
+      const syncService = new LiabilityService(
+        secondRepository,
+        secondLedger,
+        {
+          now: () => "2026-02-02T12:00:00.000Z",
+          createId: (() => {
+            let nextId = 0;
+            return () => `liability-sync-test-${++nextId}`;
+          })(),
+        },
+      );
+
+      // Start the overdue catch-up and the payment from separate SQLite
+      // connections at the same time. Whichever writer commits first, status
+      // sync must derive its result from current paid values, never a stale row.
+      const results = await Promise.allSettled([
+        syncService.syncStatuses(),
+        service.recordPayment({
+          liabilityId: liability.id,
+          sourceAccountId: "liability-test-cash",
+          amountMinor: 1_000n,
+          paidAt: "2026-02-02T12:00:00.000Z",
+          idempotencyKey: "two-connection-status-race",
+        }),
+      ]);
+
+      expect(results[0]?.status).toBe("fulfilled");
+      expect(results[1]?.status).toBe("fulfilled");
+
+      const detail = await service.getDetail(liability.id);
+      const firstInstallment = detail.installments.find(
+        (item) => item.sequence === 1,
+      );
+      expect(firstInstallment).toMatchObject({
+        status: "PAID",
+        interestDueMinor: 1_000n,
+        interestPaidMinor: 1_000n,
+      });
+      expect(detail.reconciliation.interestDifferenceMinor).toBe(0n);
+      expect(database.raw.prepare("PRAGMA foreign_key_check").all()).toEqual(
+        [],
+      );
+      expect(
+        secondConnection.raw.prepare("PRAGMA foreign_key_check").all(),
+      ).toEqual([]);
+    } finally {
+      secondConnection.close();
       database.close();
     }
   });
