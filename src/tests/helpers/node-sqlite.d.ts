@@ -18,3 +18,11 @@ declare module "node:sqlite" {
     close(): void;
   }
 }
+
+
+declare module "node:fs" {
+  export function rmSync(
+    path: string,
+    options?: { force?: boolean },
+  ): void;
+}

@@ -1,6 +1,3 @@
-import { randomUUID } from "node:crypto";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { LiabilityService } from "../application/liability/liability-service";
 import type { Account, AccountType } from "../domain/ledger/repository";
 import { SqliteLedgerRepository } from "../infrastructure/database/sqlite-ledger-repository";
@@ -201,7 +198,8 @@ describe("SQLite liability payment repository", () => {
   });
 
   it("preserves PAID status when status sync races payment across two SQLite connections", async () => {
-    const databasePath = join(tmpdir(), `finatec-liability-${randomUUID()}.sqlite`);
+    const databasePath =
+      `/tmp/finatec-liability-${Date.now()}-${Math.random()}.sqlite`;
     const database = await createRealSqliteTestDatabase(
       undefined,
       databasePath,
