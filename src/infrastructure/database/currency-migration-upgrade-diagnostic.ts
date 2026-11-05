@@ -89,7 +89,9 @@ export async function runCurrencyMigrationUpgradeDiagnostic(): Promise<
         .map((row) => row.name)
         .join(", ");
       throw new Error(
-        `Legacy 0004-0010 fixture unexpectedly contains currency triggers: ${unexpectedTriggerNames}`,
+        "Legacy 0004-0010 fixture unexpectedly contains " +
+          "currency triggers: " +
+          unexpectedTriggerNames,
       );
     }
 
