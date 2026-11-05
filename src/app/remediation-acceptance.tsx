@@ -47,9 +47,10 @@ export default function RemediationAcceptanceRoute() {
         F-01 / F-02 Production acceptance
       </Text>
       <Text>
-        Exercises categorized transactions on the production runtime, then verifies
-        migration 0011 against an isolated SQLCipher database seeded with the
-        historical pre-0011 migration state. The existing development DB is not reset.
+        Exercises categorized transactions on the production runtime, then
+        verifies migration 0011 against an isolated SQLCipher database seeded
+        with the historical pre-0011 migration state. The existing development
+        DB is not reset.
       </Text>
       <Button
         title={running ? "Running…" : "Run remediation acceptance"}
