@@ -270,7 +270,9 @@ describe("SQLite liability payment repository", () => {
       expect(cancelledInstallment).toBeDefined();
 
       database.raw
-        .prepare("UPDATE liability_installments SET status = 'CANCELLED' WHERE id = ?")
+        .prepare(
+          "UPDATE liability_installments SET status = 'CANCELLED' WHERE id = ?",
+        )
         .run(cancelledInstallment!.id);
 
       await repository.syncStatuses(liability.id, "2026-12-31");
