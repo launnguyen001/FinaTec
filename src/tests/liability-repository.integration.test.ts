@@ -258,6 +258,33 @@ describe("SQLite liability payment repository", () => {
     }
   });
 
+  it("preserves CANCELLED installments during status synchronization", async () => {
+    const database = await createRealSqliteTestDatabase();
+    try {
+      const { repository, liability } = await createLiabilityFixture(database);
+      const cancelledInstallment = database.raw
+        .prepare(
+          "SELECT id FROM liability_installments WHERE liability_id = ? ORDER BY sequence LIMIT 1",
+        )
+        .get(liability.id) as { id: string } | undefined;
+      expect(cancelledInstallment).toBeDefined();
+
+      database.raw
+        .prepare("UPDATE liability_installments SET status = 'CANCELLED' WHERE id = ?")
+        .run(cancelledInstallment!.id);
+
+      await repository.syncStatuses(liability.id, "2026-12-31");
+
+      const persisted = database.raw
+        .prepare("SELECT status FROM liability_installments WHERE id = ?")
+        .get(cancelledInstallment!.id) as { status: string };
+
+      expect(persisted.status).toBe("CANCELLED");
+    } finally {
+      database.close();
+    }
+  });
+
   it("rolls back every payment write when a late transaction write fails", async () => {
     const database = await createRealSqliteTestDatabase();
     try {
