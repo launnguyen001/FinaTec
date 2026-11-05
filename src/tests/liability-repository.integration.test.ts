@@ -152,30 +152,28 @@ describe("SQLite liability payment repository", () => {
         idempotencyKey: "r3-ledger-interest-payment",
       });
       const afterPayment = await service.getDetail(liability.id);
-      expect(
-        afterPayment.reconciliation.paymentDerivedInterestPaidMinor,
-      ).toBe(1_000n);
-      expect(
-        afterPayment.reconciliation.ledgerInterestPaidMinor,
-      ).toBe(1_000n);
-      expect(
-        afterPayment.reconciliation.ledgerInterestDifferenceMinor,
-      ).toBe(0n);
+      expect(afterPayment.reconciliation.paymentDerivedInterestPaidMinor).toBe(
+        1_000n,
+      );
+      expect(afterPayment.reconciliation.ledgerInterestPaidMinor).toBe(1_000n);
+      expect(afterPayment.reconciliation.ledgerInterestDifferenceMinor).toBe(
+        0n,
+      );
 
       await service.reversePayment(payment.id, "R3 reversal coverage");
       const afterReversal = await service.getDetail(liability.id);
       expect(afterReversal.reconciliation.scheduleInterestPaidMinor).toBe(0n);
-      expect(
-        afterReversal.reconciliation.paymentDerivedInterestPaidMinor,
-      ).toBe(0n);
+      expect(afterReversal.reconciliation.paymentDerivedInterestPaidMinor).toBe(
+        0n,
+      );
       expect(afterReversal.reconciliation.ledgerInterestPaidMinor).toBe(0n);
       expect(afterReversal.reconciliation.interestDifferenceMinor).toBe(0n);
-      expect(
-        afterReversal.reconciliation.ledgerInterestDifferenceMinor,
-      ).toBe(0n);
-      expect(
-        database.raw.prepare("PRAGMA foreign_key_check").all(),
-      ).toEqual([]);
+      expect(afterReversal.reconciliation.ledgerInterestDifferenceMinor).toBe(
+        0n,
+      );
+      expect(database.raw.prepare("PRAGMA foreign_key_check").all()).toEqual(
+        [],
+      );
     } finally {
       database.close();
     }
@@ -218,9 +216,9 @@ describe("SQLite liability payment repository", () => {
       expect(reconciliation.interestDifferenceMinor).toBe(0n);
       expect(reconciliation.ledgerInterestPaidMinor).toBe(500n);
       expect(reconciliation.ledgerInterestDifferenceMinor).toBe(-500n);
-      expect(
-        database.raw.prepare("PRAGMA foreign_key_check").all(),
-      ).toEqual([]);
+      expect(database.raw.prepare("PRAGMA foreign_key_check").all()).toEqual(
+        [],
+      );
     } finally {
       database.close();
     }
