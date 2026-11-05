@@ -904,7 +904,8 @@ export class LiabilityService {
       detail.reconciliation.differenceMinor !== 0n ||
       detail.reconciliation.scheduleDifferenceMinor !== 0n ||
       detail.reconciliation.paymentDifferenceMinor !== 0n ||
-      detail.reconciliation.interestDifferenceMinor !== 0n
+      detail.reconciliation.interestDifferenceMinor !== 0n ||
+      detail.reconciliation.ledgerInterestDifferenceMinor !== 0n
     ) {
       throw new Error(
         "Ledger, schedule and payment history must reconcile before archiving",
