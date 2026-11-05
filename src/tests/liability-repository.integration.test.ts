@@ -197,8 +197,8 @@ describe("SQLite liability payment repository", () => {
     }
   });
 
-  it("preserves PAID status when status sync races payment across two SQLite connections", async () => {
-    const databasePath = `/tmp/finatec-liability-${Date.now()}-${Math.random()}.sqlite`;
+  it("does not overwrite PAID during concurrent status sync", async () => {
+    const databasePath = `/tmp/ft-${Date.now()}-${Math.random()}.sqlite`;
     const database = await createRealSqliteTestDatabase(
       undefined,
       databasePath,
@@ -225,7 +225,7 @@ describe("SQLite liability payment repository", () => {
 
       // Start the overdue catch-up and the payment from separate SQLite
       // connections at the same time. Whichever writer commits first, status
-      // sync must derive its result from current paid values, never a stale row.
+      // sync must derive its result from current paid values, not a stale row.
       const results = await Promise.allSettled([
         syncService.syncStatuses(),
         service.recordPayment({
