@@ -250,7 +250,15 @@ Bổ sung/chi tiết hóa các hạng mục sau vào task này:
 - F-06 chỉ đóng vấn đề duplicate resolver và test coverage cho production key lifecycle.
 - Báo cáo audit vẫn ghi nhận **old-key recovery / khôi phục database cũ khi key không còn khả dụng là NOT VERIFIED**.
 - F-06 không triển khai Recovery Key, key envelope, on-device recovery hoặc cross-device backup restore. Các phần này vẫn thuộc phạm vi thiết kế/triển khai TASK-09 trong tài liệu này.
-- Không có bằng chứng trong báo cáo audit đã kiểm tra về một finding độc lập mang mã **F-08**. Do đó trạng thái F-08 ở thời điểm ghi note là: **NOT ESTABLISHED / chưa có căn cứ để tạo remediation riêng**. Nếu F-08 được dùng để chỉ một yêu cầu bảo vệ vòng đời khóa khác ngoài phạm vi F-06, owner cần xác định lại yêu cầu cụ thể trước khi mở finding; không suy diễn rằng F-06 đã giải quyết mọi vấn đề recovery.
+- **Không được dùng riêng `AgentDocs/report.md` làm kết luận cuối về F-08.** Theo owner, đây là báo cáo ở checkpoint cũ khi audit chưa hoàn tất; sau đó audit tiếp tục nhận các remediation PR riêng. Vì vậy, việc report.md không liệt kê F-08 không đủ để kết luận finding này không tồn tại.
+- Bốn remediation PR được tích hợp vào audit branch trước khi audit được đưa về `main`:
+  - PR #10 — `remediation/task-06-concurrency` → `remediation/audit-00-06`; merge commit `d47595fbe086e8b87083702213509ba585b5ee86`.
+  - PR #11 — `remediation/f-02-forward-migration` → `remediation/audit-00-06`; merge commit `d297cadf60072a848f01b1ef9e5eae5827b5232d`.
+  - PR #12 — `remediation/task-06-interest-reconciliation` → `remediation/audit-00-06`; merge commit `7a6035db07c60ec840a99ef09d514371289b224a`.
+  - PR #13 — `remediation/f-02-upgrade-verification` → `remediation/audit-00-06`; merge commit `227878eda3a4844e0ff1b66a2fcb5a824d8cc35b`.
+- PR #9 sau đó tích hợp `remediation/audit-00-06` vào `main`, merged ngày 2026-11-05 với merge commit `7f36fa5bc104d57ae53dae308560e93faf82a1f7`. PR #9 mô tả F-01 đến F-06 và TASK-06 R1/R2/R3; không liệt kê một finding F-08 riêng.
+- Trong các artifact đã đối chiếu ở lượt này (report.md checkpoint cũ, mô tả PR #9 và remediation PR #10–#13), em chưa tìm thấy định nghĩa/phạm vi độc lập cho F-08. Tuy nhiên, vì chưa có final audit finding register hoặc báo cáo closeout cuối cùng chứng minh danh sách finding đầy đủ, trạng thái chính xác phải ghi là **NOT DETERMINED / CHƯA XÁC ĐỊNH**, không phải NOT ESTABLISHED và cũng không được tự tạo remediation.
+- Nếu F-08 được dùng để chỉ yêu cầu bảo vệ vòng đời khóa khác ngoài F-06, cần đối chiếu final audit record hoặc acceptance evidence tương ứng trước khi kết luận. Không suy diễn rằng F-06 đã giải quyết mọi vấn đề recovery.
 
 ### 10.3 Việc cần owner rà soát sau
 
