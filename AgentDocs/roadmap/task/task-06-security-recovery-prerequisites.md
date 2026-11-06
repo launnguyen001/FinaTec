@@ -187,3 +187,78 @@ Bổ sung/chi tiết hóa các hạng mục sau vào task này:
 5. Trước release: chạy acceptance trên thiết bị thật, bao gồm mất SecureStore key, restore cùng thiết bị, restore từ thiết bị A sang B và các ca backup hỏng/khôi phục bị gián đoạn.
 
 **Kết luận:** chốt kiến trúc và đóng các tiền đề key lifecycle trước TASK-07; triển khai đầy đủ Recovery Key và backup/restore trong TASK-09. Không trì hoãn quyết định kiến trúc, nhưng cũng không kéo toàn bộ phạm vi bảo mật vào TASK-07.
+
+
+---
+
+## 10. Addendum rà soát ngày 2026-11-06 — các điểm cần hoàn thiện
+
+> **Mục đích:** Ghi lại các thiếu sót/điểm chưa chốt được phát hiện trong buổi rà soát hôm nay để owner xem xét trước khi phê duyệt architecture baseline. Đây là ghi chú bổ sung, không tự biến các đề xuất dưới đây thành quyết định kiến trúc đã được chấp thuận. Không sửa nội dung hoặc trạng thái của TASK-00–09.
+
+### 10.1 Các điểm thiết kế còn thiếu hoặc cần chốt
+
+1. **Vị trí lưu key envelope cho on-device recovery**
+   - Chưa quy định envelope được lưu ở đâu để vẫn đọc được khi SecureStore không còn cung cấp DEK.
+   - Cần xem xét lưu một bản envelope trong app-private storage độc lập với SecureStore; encrypted backup cũng phải chứa envelope.
+   - Không được lưu Recovery Key/KEK dạng rõ. Nếu envelope local bị mất/hỏng thì phải xử lý như một failure state riêng; không giả định có thể khôi phục chỉ từ database.
+   - Owner cần chốt retention, atomic write và cách version hóa envelope.
+
+2. **Xác thực manifest và metadata của backup**
+   - Cần xác định chính xác metadata nào được xác thực, không chỉ kiểm tra format bằng logic thông thường.
+   - Các trường cần được ràng buộc với cơ chế xác thực mật mã gồm package format/version, cipher/KDF/AEAD identifiers, KDF parameters, salt, nonce, schema/migration version và database ciphertext.
+   - Khi dùng AEAD, cần đánh giá đưa metadata phù hợp vào Associated Authenticated Data (AAD), hoặc dùng cơ chế xác thực tương đương đã được security review.
+   - Thay đổi metadata quan trọng phải bị phát hiện trước khi restore/promote database.
+
+3. **KDF phải phù hợp với loại Recovery Key**
+   - Tài liệu hiện xác định Recovery Key là bí mật ngẫu nhiên entropy cao, nhưng ví dụ KDF đang đặt Argon2id cạnh các lựa chọn tương thích mà chưa phân biệt rõ loại đầu vào.
+   - Nếu Recovery Key là random secret có entropy cao, cần đánh giá KDF/key-derivation phù hợp như HKDF; nếu cho phép passphrase do người dùng tự đặt thì cần password-hardening KDF như Argon2id hoặc lựa chọn đã được security review.
+   - Không dùng cùng một cấu hình theo mặc định cho random Recovery Key và human-memorable passphrase. Không tự triển khai primitive mật mã; phải kiểm tra native compatibility và tham số trên Expo/React Native.
+
+4. **Làm rõ DEK sau cross-device restore**
+   - Cần chốt MVP/V1 có giữ nguyên DEK được mở từ envelope hay re-encrypt database bằng DEK mới trên thiết bị đích.
+   - Đề xuất đơn giản cho MVP: giữ nguyên DEK của backup, xác minh database thành công rồi lưu DEK đó vào SecureStore riêng của thiết bị đích. Như vậy “SecureStore key riêng” nghĩa là bản lưu trữ theo thiết bị, không phải một DEK khác.
+   - Nếu muốn sinh DEK mới, phải có quy trình re-encrypt toàn bộ database, tạo envelope mới và acceptance riêng; không để implementation tự suy diễn.
+
+5. **Atomic restore, WAL và rollback**
+   - Cần mô tả rõ staging database, xử lý WAL/SHM và đóng mọi connection trước khi promote.
+   - Restore phải xác minh package, SQLCipher open, integrity, foreign keys và schema compatibility trên vùng tạm.
+   - Chỉ promote sau khi toàn bộ kiểm tra thành công; cần có recovery/rollback strategy nếu app bị kill, hết dung lượng hoặc lỗi trong giai đoạn promote.
+   - Database đang hoạt động và backup nguồn phải được giữ nguyên khi restore thất bại. Không copy riêng database file khi WAL có thể còn dữ liệu chưa checkpoint.
+
+6. **Bổ sung các acceptance case chuyên biệt**
+   - SecureStore key mất nhưng local envelope còn.
+   - SecureStore key và local envelope đều mất.
+   - Envelope/manifest bị sửa hoặc sai version.
+   - Database ciphertext bị sửa/hỏng.
+   - Sai Recovery Key hoặc KDF parameters không hỗ trợ.
+   - App bị kill/hết dung lượng trong lúc restore và trong lúc promote.
+   - Restore từ thiết bị A sang B, sau đó mở lại app và xác minh database vẫn dùng được.
+   - Kiểm tra không rò rỉ Recovery Key/DEK/KEK qua log, crash report, clipboard hoặc dữ liệu chẩn đoán.
+
+### 10.2 Đối chiếu F-08 với audit/remediation F-06
+
+**Kết quả kiểm tra báo cáo audit:**
+
+- Báo cáo audit ban đầu xác định **F-06 — Shipped key lifecycle bị duplicate và chỉ spike helper được test**. Đây là verification gap của TASK-00, không phải finding mang mã F-08.
+- Remediation closeout trên nhánh `remediation/audit-00-06` ghi F-06 **FIXED**: production database và spike diagnostics dùng chung `src/infrastructure/database/key-lifecycle.ts`; test import module production và cover valid stored key, missing key với database hiện hữu, invalid stored key, valid generated key và invalid generated key.
+- PR #9 đã được merge vào `main` với merge commit `7f36fa5bc104d57ae53dae308560e93faf82a1f7`. Đối chiếu source hiện tại trên `main` xác nhận `database.ts` import shared resolver và `key-lifecycle.test.ts` import đúng module production.
+- Vì vậy, **không mở F-08 riêng để lặp lại phần shared resolver / generated-key validation / fail-closed hardening đã được F-06 xử lý**.
+
+**Giới hạn cần giữ rõ:**
+
+- F-06 chỉ đóng vấn đề duplicate resolver và test coverage cho production key lifecycle.
+- Báo cáo audit vẫn ghi nhận **old-key recovery / khôi phục database cũ khi key không còn khả dụng là NOT VERIFIED**.
+- F-06 không triển khai Recovery Key, key envelope, on-device recovery hoặc cross-device backup restore. Các phần này vẫn thuộc phạm vi thiết kế/triển khai TASK-09 trong tài liệu này.
+- Không có bằng chứng trong báo cáo audit đã kiểm tra về một finding độc lập mang mã **F-08**. Do đó trạng thái F-08 ở thời điểm ghi note là: **NOT ESTABLISHED / chưa có căn cứ để tạo remediation riêng**. Nếu F-08 được dùng để chỉ một yêu cầu bảo vệ vòng đời khóa khác ngoài phạm vi F-06, owner cần xác định lại yêu cầu cụ thể trước khi mở finding; không suy diễn rằng F-06 đã giải quyết mọi vấn đề recovery.
+
+### 10.3 Việc cần owner rà soát sau
+
+- [ ] Chốt nơi lưu local key envelope và cách xử lý khi envelope mất/hỏng.
+- [ ] Chốt metadata được xác thực và cơ chế AAD/integrity cho backup package.
+- [ ] Chốt KDF theo loại Recovery Key (random secret hay passphrase).
+- [ ] Chốt MVP/V1 giữ nguyên DEK khi restore hay re-encrypt bằng DEK mới.
+- [ ] Chốt staging/promote/rollback và WAL handling.
+- [ ] Xác nhận không mở F-08 trùng F-06; nếu có yêu cầu khác, mô tả rõ gap và bằng chứng audit trước khi tạo finding.
+- [ ] Giữ old-key recovery ở trạng thái **NOT VERIFIED** cho tới khi có implementation và acceptance evidence riêng trong TASK-09.
+
+**Ranh giới thay đổi:** Addendum này chỉ bổ sung vào architecture note hiện tại. Không tạo file mới, không sửa task documents cũ, không thay đổi source code, migration, task status hoặc acceptance status.
