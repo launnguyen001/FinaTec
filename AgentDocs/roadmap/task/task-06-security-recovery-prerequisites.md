@@ -243,6 +243,7 @@ Bổ sung/chi tiết hóa các hạng mục sau vào task này:
 - Remediation closeout trên nhánh `remediation/audit-00-06` ghi F-06 **FIXED**: production database và spike diagnostics dùng chung `src/infrastructure/database/key-lifecycle.ts`; test import module production và cover valid stored key, missing key với database hiện hữu, invalid stored key, valid generated key và invalid generated key.
 - PR #9 đã được merge vào `main` với merge commit `7f36fa5bc104d57ae53dae308560e93faf82a1f7`. Đối chiếu source hiện tại trên `main` xác nhận `database.ts` import shared resolver và `key-lifecycle.test.ts` import đúng module production.
 - Vì vậy, **không mở F-08 riêng để lặp lại phần shared resolver / generated-key validation / fail-closed hardening đã được F-06 xử lý**.
+- Kết quả này cũng **thay thế các checkbox F-06 còn để trống ở §5 và bước F-06 tại §9**: đó là trạng thái ghi nhận trước khi đối chiếu remediation; không còn là việc cần làm lại trên `main`. Các mục interface/failure-state khác chỉ được xem là đã hoàn tất nếu có bằng chứng riêng, không tự động được đóng theo F-06.
 
 **Giới hạn cần giữ rõ:**
 
