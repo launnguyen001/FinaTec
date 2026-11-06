@@ -235,39 +235,82 @@ Bổ sung/chi tiết hóa các hạng mục sau vào task này:
    - Restore từ thiết bị A sang B, sau đó mở lại app và xác minh database vẫn dùng được.
    - Kiểm tra không rò rỉ Recovery Key/DEK/KEK qua log, crash report, clipboard hoặc dữ liệu chẩn đoán.
 
-### 10.2 Đối chiếu F-08 với audit/remediation F-06
+### 10.2 Nội dung rà soát F-08 — yêu cầu nghiệp vụ phát sinh ngày 2026-11-06
 
-**Kết quả kiểm tra báo cáo audit:**
+**Cách hiểu đúng:** F-08 ở đây là nhóm yêu cầu/hành vi cần rà soát được phát hiện trong buổi làm việc hôm nay. Việc audit cũ có hoặc không có chuỗi ký hiệu “F-08” không quyết định yêu cầu này đã được đáp ứng hay chưa. Mục tiêu là ghi lại đầy đủ yêu cầu, sau đó đối chiếu với source code, test, acceptance evidence và kết luận audit cuối cùng. Tại thời điểm ghi chú, trạng thái đáp ứng của toàn bộ yêu cầu dưới đây **chưa được kết luận**.
 
-- Báo cáo audit ban đầu xác định **F-06 — Shipped key lifecycle bị duplicate và chỉ spike helper được test**. Đây là verification gap của TASK-00, không phải finding mang mã F-08.
-- Remediation closeout trên nhánh `remediation/audit-00-06` ghi F-06 **FIXED**: production database và spike diagnostics dùng chung `src/infrastructure/database/key-lifecycle.ts`; test import module production và cover valid stored key, missing key với database hiện hữu, invalid stored key, valid generated key và invalid generated key.
-- PR #9 đã được merge vào `main` với merge commit `7f36fa5bc104d57ae53dae308560e93faf82a1f7`. Đối chiếu source hiện tại trên `main` xác nhận `database.ts` import shared resolver và `key-lifecycle.test.ts` import đúng module production.
-- Vì vậy, **không mở F-08 riêng để lặp lại phần shared resolver / generated-key validation / fail-closed hardening đã được F-06 xử lý**.
-- Kết quả này cũng **thay thế các checkbox F-06 còn để trống ở §5 và bước F-06 tại §9**: đó là trạng thái ghi nhận trước khi đối chiếu remediation; không còn là việc cần làm lại trên `main`. Các mục interface/failure-state khác chỉ được xem là đã hoàn tất nếu có bằng chứng riêng, không tự động được đóng theo F-06.
+#### A. Hành vi hệ thống bắt buộc
 
-**Giới hạn cần giữ rõ:**
+1. **Phân biệt database mới và database hiện hữu**
+   - Khi khởi động, hệ thống phải xác định trạng thái database thực tế, metadata/schema cần thiết và trạng thái key storage.
+   - Không được coi việc SecureStore trả về missing item là bằng chứng đủ để kết luận đây là lần cài đặt mới.
+   - Chỉ được tạo DEK và database mới khi xác định chắc chắn database chưa tồn tại và đây thực sự là luồng khởi tạo mới.
+   - Nếu database đã tồn tại nhưng key không lấy được, phải giữ database và chuyển sang xử lý lỗi/recovery; không được rẽ sang fresh initialization.
 
-- F-06 chỉ đóng vấn đề duplicate resolver và test coverage cho production key lifecycle.
-- Báo cáo audit vẫn ghi nhận **old-key recovery / khôi phục database cũ khi key không còn khả dụng là NOT VERIFIED**.
-- F-06 không triển khai Recovery Key, key envelope, on-device recovery hoặc cross-device backup restore. Các phần này vẫn thuộc phạm vi thiết kế/triển khai TASK-09 trong tài liệu này.
-- **Không được dùng riêng `AgentDocs/report.md` làm kết luận cuối về F-08.** Theo owner, đây là báo cáo ở checkpoint cũ khi audit chưa hoàn tất; sau đó audit tiếp tục nhận các remediation PR riêng. Vì vậy, việc report.md không liệt kê F-08 không đủ để kết luận finding này không tồn tại.
-- Bốn remediation PR được tích hợp vào audit branch trước khi audit được đưa về `main`:
-  - PR #10 — `remediation/task-06-concurrency` → `remediation/audit-00-06`; merge commit `d47595fbe086e8b87083702213509ba585b5ee86`.
-  - PR #11 — `remediation/f-02-forward-migration` → `remediation/audit-00-06`; merge commit `d297cadf60072a848f01b1ef9e5eae5827b5232d`.
-  - PR #12 — `remediation/task-06-interest-reconciliation` → `remediation/audit-00-06`; merge commit `7a6035db07c60ec840a99ef09d514371289b224a`.
-  - PR #13 — `remediation/f-02-upgrade-verification` → `remediation/audit-00-06`; merge commit `227878eda3a4844e0ff1b66a2fcb5a824d8cc35b`.
-- PR #9 sau đó tích hợp `remediation/audit-00-06` vào `main`, merged ngày 2026-11-05 với merge commit `7f36fa5bc104d57ae53dae308560e93faf82a1f7`. PR #9 mô tả F-01 đến F-06 và TASK-06 R1/R2/R3; không liệt kê một finding F-08 riêng.
-- Trong các artifact đã đối chiếu ở lượt này (report.md checkpoint cũ, mô tả PR #9 và remediation PR #10–#13), em chưa tìm thấy định nghĩa/phạm vi độc lập cho F-08. Tuy nhiên, vì chưa có final audit finding register hoặc báo cáo closeout cuối cùng chứng minh danh sách finding đầy đủ, trạng thái chính xác phải ghi là **NOT DETERMINED / CHƯA XÁC ĐỊNH**, không phải NOT ESTABLISHED và cũng không được tự tạo remediation.
-- Nếu F-08 được dùng để chỉ yêu cầu bảo vệ vòng đời khóa khác ngoài F-06, cần đối chiếu final audit record hoặc acceptance evidence tương ứng trước khi kết luận. Không suy diễn rằng F-06 đã giải quyết mọi vấn đề recovery.
+2. **Fail-closed khi khóa không còn khả dụng**
+   - Database hiện hữu + SecureStore key bị thiếu, không hợp lệ hoặc không thể sử dụng: không tự sinh DEK thay thế.
+   - Không xóa, truncate, overwrite, reset hoặc tạo database rỗng tại đường dẫn database hiện tại.
+   - Không chạy migration/seed/initialization theo cách có thể làm thay đổi database khi chưa mở được bằng khóa hợp lệ.
+   - Giữ nguyên database và các dữ liệu liên quan để người dùng còn cơ hội recovery.
 
-### 10.3 Việc cần owner rà soát sau
+3. **Chuyển sang Recovery State và bảo toàn dữ liệu**
+   - Khi không thể mở database do key không khả dụng, ứng dụng phải khóa các chức năng cần truy cập dữ liệu và đưa người dùng vào trạng thái xử lý rõ ràng, thay vì tiếp tục như một tài khoản/cơ sở dữ liệu mới.
+   - Thông báo cho người dùng bằng ngôn ngữ dễ hiểu: dữ liệu hiện có chưa bị xóa, nhưng ứng dụng hiện không thể giải mã/truy cập dữ liệu.
+   - Không hiển thị dữ liệu giả, số dư mặc định hoặc màn hình onboarding như thể database trống.
+   - Recovery/reset phải là hành động tách biệt; reset chỉ được thực hiện sau khi người dùng được cảnh báo hậu quả và xác nhận rõ ràng. Không tự reset như một cách khắc phục lỗi khởi động.
 
-- [ ] Chốt nơi lưu local key envelope và cách xử lý khi envelope mất/hỏng.
-- [ ] Chốt metadata được xác thực và cơ chế AAD/integrity cho backup package.
-- [ ] Chốt KDF theo loại Recovery Key (random secret hay passphrase).
-- [ ] Chốt MVP/V1 giữ nguyên DEK khi restore hay re-encrypt bằng DEK mới.
-- [ ] Chốt staging/promote/rollback và WAL handling.
-- [ ] Xác nhận không mở F-08 trùng F-06; nếu có yêu cầu khác, mô tả rõ gap và bằng chứng audit trước khi tạo finding.
-- [ ] Giữ old-key recovery ở trạng thái **NOT VERIFIED** cho tới khi có implementation và acceptance evidence riêng trong TASK-09.
+4. **Phân loại lỗi, không gom mọi lỗi thành “mất khóa”**
+   - Missing SecureStore item: không tìm thấy key entry.
+   - SecureStore/Keystore access error: nền tảng không cho phép đọc key hoặc phát sinh lỗi truy cập.
+   - Invalid key format: có item nhưng sai định dạng/độ dài/encoding.
+   - SQLCipher key rejection: key có định dạng hợp lệ nhưng không mở được database.
+   - Database corruption/integrity failure: database hỏng hoặc kiểm tra integrity thất bại.
+   - Migration/schema incompatibility: database mở được nhưng schema/version không tương thích.
+   - Chỉ kết luận key bị mất khi có bằng chứng tương ứng; không suy luận từ mọi lỗi open database.
+   - Mỗi nhóm lỗi cần có cách xử lý và thông điệp phù hợp; lỗi nền tảng tạm thời không được tự động kích hoạt reset/re-initialization.
+
+5. **Khởi tạo và xử lý lỗi theo cách an toàn**
+   - Kiểm tra database existence, metadata và key state phải được phối hợp trong một luồng khởi tạo nhất quán, tránh race condition giữa nhiều lần startup.
+   - Việc lưu key và tạo database mới phải có thứ tự an toàn; nếu một bước thất bại hoặc app bị kill giữa chừng, lần khởi động sau phải nhận diện được trạng thái dở dang và không tạo database/key mới một cách mù quáng.
+   - Khởi tạo lặp phải idempotent; không ghi đè key hợp lệ hoặc database hiện hữu.
+   - Không để UI/presentation tự quyết định tạo, thay thế hoặc xóa DEK; quyết định phải thuộc database/key-lifecycle layer.
+
+6. **Ranh giới với recovery thực sự**
+   - F-08 yêu cầu ứng dụng phát hiện đúng trạng thái, bảo toàn database, fail-closed và hướng người dùng vào recovery state.
+   - F-08 không tự đồng nghĩa với việc đã có khả năng tái tạo khóa cũ.
+   - Khôi phục DEK bằng Recovery Key/key envelope, export encrypted backup và cross-device restore là các năng lực riêng; nếu chưa triển khai thì phải thể hiện rõ giới hạn, không giả vờ recovery thành công.
+   - Khi không có recovery material đã thiết lập từ trước, ứng dụng phải nói rõ giới hạn khôi phục; không được tạo key mới rồi báo dữ liệu đã được phục hồi.
+
+#### B. Đối chiếu sơ bộ với F-06 và audit
+
+F-06 và F-08 có phần giao nhau nhưng không được đồng nhất:
+
+- **F-06 — phần đã có bằng chứng remediation:** production database và spike diagnostics dùng chung module src/infrastructure/database/key-lifecycle.ts; test import module production và cover valid stored key, missing key với database hiện hữu, invalid stored key, valid generated key và invalid generated key. Đây là bằng chứng cho shared resolver và một phần key validation/fail-closed ở tầng key lifecycle.
+- **F-08 — phạm vi rà soát rộng hơn:** cần xác minh thêm luồng startup có phối hợp database existence/metadata/key state hay không; missing key có bị nhầm thành fresh install hay không; ứng dụng có bảo toàn database và chuyển sang Recovery State hay không; các lỗi SecureStore/Keystore, malformed key, SQLCipher rejection, corruption và migration incompatibility có được phân loại riêng hay không; reset có bị chặn cho tới khi người dùng xác nhận hay không; và các trường hợp khởi tạo dở dang/retry có an toàn hay không.
+- Vì vậy, F-06 được merge không tự động chứng minh toàn bộ F-08 đã hoàn thành. Ngược lại, cũng không được kết luận F-08 còn thiếu chỉ vì audit report cũ không có mã F-08: từng yêu cầu phải được kiểm tra bằng code/test/acceptance evidence thực tế.
+
+**Lịch sử audit cần dùng đúng ngữ cảnh:**
+
+- AgentDocs/report.md là báo cáo ở checkpoint cũ khi audit chưa hoàn tất; không dùng riêng file này làm kết luận cuối.
+- Bốn remediation PR được tích hợp vào audit branch trước khi audit được đưa về main:
+  - PR #10 — remediation/task-06-concurrency → remediation/audit-00-06; merge commit d47595fbe086e8b87083702213509ba585b5ee86.
+  - PR #11 — remediation/f-02-forward-migration → remediation/audit-00-06; merge commit d297cadf60072a848f01b1ef9e5eae5827b5232d.
+  - PR #12 — remediation/task-06-interest-reconciliation → remediation/audit-00-06; merge commit 7a6035db07c60ec840a99ef09d514371289b224a.
+  - PR #13 — remediation/f-02-upgrade-verification → remediation/audit-00-06; merge commit 227878eda3a4844e0ff1b66a2fcb5a824d8cc35b.
+- PR #9 sau đó tích hợp remediation/audit-00-06 vào main, merged ngày 2026-11-05 với merge commit 7f36fa5bc104d57ae53dae308560e93faf82a1f7.
+- PR #9 mô tả các finding F-01 đến F-06 và TASK-06 R1/R2/R3. Điều này chỉ cho biết nội dung được nêu trong PR description; không thay thế việc kiểm tra các yêu cầu F-08 vừa phát sinh.
+- **Trạng thái F-08 hiện tại: PENDING AUDIT COMPARISON / CHỜ ĐỐI CHIẾU.** Chưa đủ căn cứ để kết luận toàn bộ đã đáp ứng, chưa đáp ứng, hoặc audit đã bỏ sót. Cần đối chiếu từng mục A.1–A.6 với code trên main, test tương ứng và acceptance evidence cuối cùng của audit. Chỉ mở remediation nếu phát hiện gap có thể chứng minh.
+
+### 10.3 Checklist đối chiếu F-08 với source và acceptance evidence
+
+- [ ] A.1 — Startup phân biệt được fresh install với database hiện hữu; missing SecureStore item không tự bị coi là fresh install.
+- [ ] A.2 — Database hiện hữu + key missing/invalid/unavailable luôn fail-closed; không sinh key thay thế, reset, xóa hoặc overwrite database.
+- [ ] A.3 — Ứng dụng giữ nguyên dữ liệu, khóa các chức năng cần DB và hiển thị Recovery State phù hợp; không trình bày database như rỗng.
+- [ ] A.4 — Missing item, platform access error, invalid format, SQLCipher key rejection, corruption và migration/schema incompatibility được phân loại riêng.
+- [ ] A.5 — Startup/initialization có thứ tự an toàn, idempotent và xử lý được lỗi/kill giữa chừng; không race hoặc ghi đè key/database hợp lệ.
+- [ ] A.6 — Recovery/reset không bị tự động kích hoạt; recovery material không tồn tại thì ứng dụng thông báo đúng giới hạn, không giả lập thành công.
+- [ ] Với mỗi mục, lưu bằng chứng cụ thể: file/module và symbol liên quan, test name/kết quả, thiết bị/build nếu cần, cùng acceptance report/commit tương ứng.
+- [ ] Đánh dấu riêng mục nào đã được F-06 bao phủ để không làm lại remediation shared resolver; không dùng F-06 làm bằng chứng thay thế cho các mục UI/startup/error-state chưa được kiểm tra.
+- [ ] Sau khi đối chiếu, phân loại từng mục: **PASS / FAIL / NOT VERIFIED / NOT APPLICABLE**; chỉ tổng kết F-08 khi tất cả mục đã có trạng thái và bằng chứng.
 
 **Ranh giới thay đổi:** Addendum này chỉ bổ sung vào architecture note hiện tại. Không tạo file mới, không sửa task documents cũ, không thay đổi source code, migration, task status hoặc acceptance status.
