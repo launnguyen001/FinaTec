@@ -111,7 +111,7 @@ This audit is not a legal opinion, does not determine title, and does not guaran
 
 ## 10. Legal references
 
-- Vietnam Law on Intellectual Property (consolidated framework): https://thuvienphapluat.vn/van-ban/So-huu-tri-tue/Van-ban-hop-nhat-155-VBHN-VPQH-2025-Luat-So-huu-tri-tue-672556.aspx
+- Vietnam Law on Intellectual Property (latest consolidated text located during this audit, 160/2026/VBHN-LQ-VPQH, dated 2026-09-29): https://thuvienphapluat.vn/van-ban/So-huu-tri-tue/Van-ban-hop-nhat-160-2026-VBHN-LQ-VPQH-Luat-So-huu-tri-tue-728317.aspx
 - Law No. 131/2025/QH15 (effective 2026-04-01): https://vanban.chinhphu.vn/?docid=216511&pageid=27160
 - Law No. 07/2022/QH15: https://chinhphu.vn/?classid=1&docid=206240&orggroupid=1&pageid=27160
 - WIPO Lex — Vietnam IP Law: https://www.wipo.int/wipolex/
