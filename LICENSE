@@ -1,21 +1,35 @@
-The MIT License (MIT)
+FINATEC PROPRIETARY SOFTWARE NOTICE
 
-Copyright (c) 2015-present 650 Industries, Inc. (aka Expo)
+Copyright (c) 2026 NGUYEN NGOC LAU. All rights reserved.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+SPDX-License-Identifier: LicenseRef-FinaTec-Proprietary
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+1. OWNERSHIP AND SCOPE
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+This notice applies only to original FinaTec materials, including source code, documentation, product-specific designs, schemas, scripts, and other materials, to the extent those materials are owned by NGUYEN NGOC LAU (the “Owner”) or are otherwise lawfully controlled by the Owner (the “FinaTec Materials”). It does not claim ownership of third-party software, third-party content, or materials whose rights belong to another person or entity.
+
+2. NO PUBLIC LICENSE GRANT
+
+Except for rights that cannot lawfully be excluded, no permission or license is granted under this notice to copy, reproduce, modify, adapt, publish, distribute, sublicense, make available, create derivative works from, commercially exploit, or otherwise use the FinaTec Materials. Any such permission must be granted separately in a written agreement signed by or on behalf of the Owner.
+
+3. REPOSITORY ACCESS
+
+Access to this private repository, including access granted through Git hosting, collaboration tools, or development services, is not by itself a public copyright license or permission to exploit the FinaTec Materials. Any limited access or development permission must be interpreted according to the applicable written agreement or express authorization and is limited to its stated purpose.
+
+4. THIRD-PARTY MATERIALS
+
+Third-party libraries, frameworks, SDKs, generated platform components, fonts, assets, and other external materials are not relicensed by this notice. They remain subject to their respective copyright notices and license terms. See THIRD_PARTY_NOTICES.md for the dependency inventory currently identified in the repository. Where a third-party license grants rights that cannot be restricted by this notice, those rights remain unaffected.
+
+5. TRADEMARKS AND BRAND
+
+No trademark, service mark, trade name, logo, or endorsement right is granted by this notice. Third-party names and marks remain the property of their respective owners.
+
+6. NO WARRANTY
+
+To the maximum extent permitted by applicable law, the FinaTec Materials are provided without warranties or conditions of any kind. Nothing in this section excludes liability or rights that cannot lawfully be excluded under applicable law.
+
+7. RESERVATION OF RIGHTS
+
+All rights in the FinaTec Materials not expressly granted in a separate written instrument are reserved by the Owner.
+
+IMPORTANT: This notice records the intended proprietary licensing position. It does not, by itself, prove chain of title, transfer rights from contributors, or override third-party licenses. Ownership must be supported by authorship records and written assignments or contributor agreements where required.
